@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import division
 
 import logging
+import os
 import signal
 import sys
 import time
@@ -20,14 +21,16 @@ from twisted.python.log import msg
 from zope.interface import implementer
 
 from config import get_anydex_configuration
-from pyipv8.ipv8.REST.rest_manager import RESTManager
+from core.community import MarketTestnetCommunity
+from restapi.rest_manager import RESTManager
+from wallet.dummy_wallet import DummyWallet1, DummyWallet2
 
 if hasattr(sys.modules['__main__'], "IPv8"):
     sys.modules[__name__] = sys.modules['__main__']
 else:
     if __name__ == '__main__' or __name__ == 'ipv8_service':
         from pyipv8.ipv8.messaging.interfaces.statistics_endpoint import StatisticsEndpoint
-        from pyipv8.ipv8.attestation.trustchain.community import TrustChainCommunity, TrustChainTestnetCommunity
+        from pyipv8.ipv8.attestation.trustchain.community import TrustChainTestnetCommunity
         from pyipv8.ipv8.keyvault.crypto import default_eccrypto
         from pyipv8.ipv8.keyvault.private.m2crypto import M2CryptoSK
         from pyipv8.ipv8.messaging.interfaces.udp.endpoint import UDPEndpoint
@@ -38,7 +41,7 @@ else:
         from pyipv8.ipv8.dht.discovery import DHTDiscoveryCommunity
     else:
         from .pyipv8.ipv8.messaging.interfaces.statistics_endpoint import StatisticsEndpoint
-        from .pyipv8.ipv8.attestation.trustchain.community import TrustChainCommunity, TrustChainTestnetCommunity
+        from .pyipv8.ipv8.attestation.trustchain.community import TrustChainTestnetCommunity
         from .pyipv8.ipv8.keyvault.crypto import default_eccrypto
         from .pyipv8.ipv8.keyvault.private.m2crypto import M2CryptoSK
         from .pyipv8.ipv8.messaging.interfaces.udp.endpoint import UDPEndpoint
@@ -50,7 +53,6 @@ else:
 
     _COMMUNITIES = {
         'DiscoveryCommunity': DiscoveryCommunity,
-        'TrustChainCommunity': TrustChainCommunity,
         'DHTDiscoveryCommunity': DHTDiscoveryCommunity,
         'TrustChainTestnetCommunity': TrustChainTestnetCommunity,
     }
@@ -162,10 +164,14 @@ else:
 
 
 class Options(usage.Options):
-    optParameters = []
+    optParameters = [
+        ["statedir", "s", ".", "Use an alternate statedir", str],
+        ["apiport", "p", 8085, "Use an alternative port for the REST api", int],
+    ]
     optFlags = [
         ["no-rest-api", "a", "Autonomous: disable the REST api"],
         ["statistics", "s", "Enable IPv8 overlay statistics"],
+        ["testnet", "t", "Join the testnet"],
     ]
 
 
@@ -181,13 +187,33 @@ class AnyDexServiceMaker(object):
         """
         self.ipv8 = None
         self.restapi = None
+        self.trustchain = None
+        self.dht = None
+        self.market = None
+        self.wallets = {}
         self._stopping = False
 
     def start_anydex(self, options):
         """
         Main method to startup AnyDex.
         """
-        self.ipv8 = IPv8(get_anydex_configuration(), enable_statistics=options['statistics'])
+        config = get_anydex_configuration()
+
+        if options["statedir"]:
+            # If we use a custom state directory, update various variables
+            for key in config["keys"]:
+                key["file"] = os.path.join(options["statedir"], key["file"])
+
+            for community in config["overlays"]:
+                if community["class"] == "TrustChainCommunity":
+                    community["initialize"]["working_directory"] = options["statedir"]
+
+        if 'testnet' in options and options['testnet']:
+            for community in config["overlays"]:
+                if community["class"] == "TrustChainCommunity":
+                    community["class"] = "TrustChainTestnetCommunity"
+
+        self.ipv8 = IPv8(config, enable_statistics=options['statistics'])
 
         def signal_handler(sig, _):
             msg("Received shut down signal %s" % sig)
@@ -205,6 +231,31 @@ class AnyDexServiceMaker(object):
         if not options['no-rest-api']:
             self.restapi = RESTManager(self.ipv8)
             reactor.callLater(0.0, self.restapi.start)
+
+            # Get Trustchain + DHT overlays
+            for overlay in self.ipv8.overlays:
+                if isinstance(overlay, TrustChainTestnetCommunity):
+                    self.trustchain = overlay
+                elif isinstance(overlay, DHTDiscoveryCommunity):
+                    self.dht = overlay
+
+            # Initialize wallets
+            dummy_wallet1 = DummyWallet1()
+            self.wallets[dummy_wallet1.get_identifier()] = dummy_wallet1
+
+            dummy_wallet2 = DummyWallet2()
+            self.wallets[dummy_wallet2.get_identifier()] = dummy_wallet2
+
+            # Load market community
+            self.market = MarketTestnetCommunity(self.trustchain.my_peer, self.ipv8.endpoint, self.ipv8.network,
+                                                 trustchain=self.trustchain,
+                                                 dht=self.dht,
+                                                 wallets=self.wallets,
+                                                 working_directory=options["statedir"],
+                                                 record_transactions=False)
+
+            self.ipv8.overlays.append(self.market)
+            self.ipv8.strategies.append((RandomWalk(self.market), 20))
 
     def makeService(self, options):
         """
