@@ -2,3 +2,5 @@
 **.DS_Store
 .idea/**
 _trial_temp/**
+sqlite/**
+ec.pem
