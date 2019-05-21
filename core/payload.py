@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 from core.assetamount import AssetAmount
 from core.assetpair import AssetPair
+from core.bloomfilter import BloomFilter
 from core.message import TraderId
 from core.order import OrderId, OrderNumber
 from core.payment_id import PaymentId
@@ -9,7 +10,7 @@ from core.timeout import Timeout
 from core.timestamp import Timestamp
 from core.transaction import TransactionId, TransactionNumber
 from core.wallet_address import WalletAddress
-from pyipv8.ipv8.messaging.bloomfilter import BloomFilter
+
 from pyipv8.ipv8.messaging.payload import Payload
 
 

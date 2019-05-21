@@ -22,14 +22,14 @@ class BaseAsksBidsEndpoint(BaseMarketEndpoint):
         quantity and timeout of the ask/bid.
         """
         timeout = 3600
-        if has_param(parameters, 'timeout'):
-            timeout = int(get_param(parameters, 'timeout'))
+        if has_param(parameters, b'timeout'):
+            timeout = int(get_param(parameters, b'timeout'))
 
-        first_asset_amount = int(get_param(parameters, 'first_asset_amount'))
-        second_asset_amount = int(get_param(parameters, 'second_asset_amount'))
+        first_asset_amount = int(get_param(parameters, b'first_asset_amount'))
+        second_asset_amount = int(get_param(parameters, b'second_asset_amount'))
 
-        first_asset_type = get_param(parameters, 'first_asset_type')
-        second_asset_type = get_param(parameters, 'second_asset_type')
+        first_asset_type = get_param(parameters, b'first_asset_type').decode('utf-8')
+        second_asset_type = get_param(parameters, b'second_asset_type').decode('utf-8')
 
         return AssetPair(AssetAmount(first_asset_amount, first_asset_type),
                          AssetAmount(second_asset_amount, second_asset_type)), timeout
@@ -117,11 +117,11 @@ class AsksEndpoint(BaseAsksBidsEndpoint):
         """
         parameters = http.parse_qs(request.content.read(), 1)
 
-        if not has_param(parameters, 'first_asset_amount') or not has_param(parameters, 'second_asset_amount'):
+        if not has_param(parameters, b'first_asset_amount') or not has_param(parameters, b'second_asset_amount'):
             request.setResponseCode(http.BAD_REQUEST)
             return json.twisted_dumps({"error": "asset amount parameter missing"})
 
-        if not has_param(parameters, 'first_asset_type') or not has_param(parameters, 'second_asset_type'):
+        if not has_param(parameters, b'first_asset_type') or not has_param(parameters, b'second_asset_type'):
             request.setResponseCode(http.BAD_REQUEST)
             return json.twisted_dumps({"error": "asset type parameter missing"})
 

@@ -10,6 +10,7 @@ from twisted.internet.defer import Deferred, inlineCallbacks, succeed
 from wallet.tc_wallet import TrustchainWallet
 from core import MAX_ORDER_TIMEOUT
 from core.block import MarketBlock
+from core.bloomfilter import BloomFilter
 from core import DeclineMatchReason, DeclinedTradeReason
 from core.matching_engine import MatchingEngine, PriceTimeStrategy
 from core.message import TraderId
@@ -35,7 +36,6 @@ from core.payload import AcceptMatchPayload, DeclineMatchPayload, DeclineTradePa
 from pyipv8.ipv8.attestation.trustchain.listener import BlockListener
 from pyipv8.ipv8.attestation.trustchain.payload import HalfBlockPairPayload
 from pyipv8.ipv8.community import Community, lazy_wrapper
-from pyipv8.ipv8.messaging.bloomfilter import BloomFilter
 from pyipv8.ipv8.messaging.payload_headers import BinMemberAuthenticationPayload
 from pyipv8.ipv8.messaging.payload_headers import GlobalTimeDistributionPayload
 from pyipv8.ipv8.peer import Peer
