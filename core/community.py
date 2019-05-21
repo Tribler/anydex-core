@@ -17,7 +17,7 @@ from core.message import TraderId
 from core.order import OrderId, OrderNumber
 from core.order_manager import OrderManager
 from core.order_repository import DatabaseOrderRepository, MemoryOrderRepository
-from core.orderbook import DatabaseOrderBook
+from core.orderbook import DatabaseOrderBook, OrderBook
 from core.payment import Payment
 from core.payment_id import PaymentId
 from core.tick import Ask, Bid, Tick
@@ -144,8 +144,8 @@ class MarketCommunity(Community, BlockListener):
         self.trustchain.settings.broadcast_blocks = False
         self.trustchain.add_listener(self, [b'ask', b'bid', b'cancel_order', b'tx_init', b'tx_payment', b'tx_done'])
         self.dht = kwargs.pop('dht', None)
+        self.use_database = kwargs.pop('use_database', True)
 
-        use_database = kwargs.pop('use_database', True)
         db_working_dir = kwargs.pop('working_directory', '')
 
         Community.__init__(self, *args, **kwargs)
@@ -167,7 +167,7 @@ class MarketCommunity(Community, BlockListener):
         self.request_cache = RequestCache()
         self.cancelled_orders = set()  # Keep track of cancelled orders so we don't add them again to the orderbook.
 
-        if use_database:
+        if self.use_database:
             order_repository = DatabaseOrderRepository(self.mid, self.market_database)
             transaction_repository = DatabaseTransactionRepository(self.mid, self.market_database)
         else:
@@ -255,8 +255,11 @@ class MarketCommunity(Community, BlockListener):
         """
         Enable this node to be a matchmaker
         """
-        self.order_book = DatabaseOrderBook(self.market_database)
-        self.order_book.restore_from_database()
+        if self.use_database:
+            self.order_book = DatabaseOrderBook(self.market_database)
+            self.order_book.restore_from_database()
+        else:
+            self.order_book = OrderBook()
         self.matching_engine = MatchingEngine(PriceTimeStrategy(self.order_book))
         self.is_matchmaker = True
 
@@ -324,7 +327,8 @@ class MarketCommunity(Community, BlockListener):
 
         # Save the ticks to the database
         if self.is_matchmaker:
-            self.order_book.save_to_database()
+            if self.use_database:
+                self.order_book.save_to_database()
             self.order_book.shutdown_task_manager()
         self.market_database.close()
         yield super(MarketCommunity, self).unload()
