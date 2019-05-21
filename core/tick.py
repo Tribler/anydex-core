@@ -60,7 +60,7 @@ class Tick(object):
         order_id = OrderId(TraderId(trader_id), OrderNumber(order_number))
         return tick_cls(order_id, AssetPair(AssetAmount(asset1_amount, str(asset1_type)),
                                             AssetAmount(asset2_amount, str(asset2_type))),
-                        Timeout(timeout), Timestamp(timestamp), traded=traded, block_hash=str(block_hash))
+                        Timeout(timeout), Timestamp(timestamp), traded=traded, block_hash=bytes(block_hash))
 
     def to_database(self):
         return (database_blob(bytes(self.order_id.trader_id)), int(self.order_id.order_number),
@@ -204,7 +204,7 @@ class Tick(object):
             "timeout": int(self.timeout),
             "timestamp": int(self.timestamp),
             "traded": self.traded,
-            "block_hash": hexlify(self.block_hash),
+            "block_hash": hexlify(self.block_hash).decode('utf-8'),
         }
 
     def __str__(self):

@@ -171,5 +171,4 @@ class Side(object):
         for asset1, asset2 in self._price_level_list_map.keys():
             rlist.append({'asset1': asset2, 'asset2': asset1,
                           'ticks': self._price_level_list_map[(asset1, asset2)].get_ticks_list()})
-
         return rlist
