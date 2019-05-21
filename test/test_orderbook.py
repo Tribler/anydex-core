@@ -123,7 +123,7 @@ class TestOrderBook(AbstractTestOrderBook):
         # Test for properties
         self.order_book.insert_ask(self.ask2)
         self.order_book.insert_bid(self.bid2)
-        self.assertEquals(Price(-0.025, 'MB', 'BTC'), self.order_book.get_bid_ask_spread('MB', 'BTC'))
+        self.assertEquals(Price(-25, 1000, 'MB', 'BTC'), self.order_book.get_bid_ask_spread('MB', 'BTC'))
 
     def test_ask_price_level(self):
         self.order_book.insert_ask(self.ask)
@@ -140,16 +140,16 @@ class TestOrderBook(AbstractTestOrderBook):
         # Test for ask side depth
         self.order_book.insert_ask(self.ask)
         self.order_book.insert_ask(self.ask2)
-        self.assertEquals(100, self.order_book.ask_side_depth(Price(0.3, 'MB', 'BTC')))
-        self.assertEquals([(Price(0.075, 'MB', 'BTC'), 400), (Price(0.3, 'MB', 'BTC'), 100)],
+        self.assertEquals(100, self.order_book.ask_side_depth(Price(3, 10, 'MB', 'BTC')))
+        self.assertEquals([(Price(75, 1000, 'MB', 'BTC'), 400), (Price(3, 10, 'MB', 'BTC'), 100)],
                           self.order_book.get_ask_side_depth_profile('MB', 'BTC'))
 
     def test_bid_side_depth(self):
         # Test for bid side depth
         self.order_book.insert_bid(self.bid)
         self.order_book.insert_bid(self.bid2)
-        self.assertEquals(300, self.order_book.bid_side_depth(Price(0.1, 'MB', 'BTC')))
-        self.assertEquals([(Price(0.1, 'MB', 'BTC'), 300), (Price(0.15, 'MB', 'BTC'), 200)],
+        self.assertEquals(300, self.order_book.bid_side_depth(Price(1, 10, 'MB', 'BTC')))
+        self.assertEquals([(Price(1, 10, 'MB', 'BTC'), 300), (Price(15, 100, 'MB', 'BTC'), 200)],
                           self.order_book.get_bid_side_depth_profile('MB', 'BTC'))
 
     def test_remove_tick(self):
@@ -194,14 +194,6 @@ class TestOrderBook(AbstractTestOrderBook):
             "timestamp": int(Timestamp.now())
         }
 
-        self.order_book.get_tick(self.ask.order_id).reserve_for_matching(100)
-        self.order_book.get_tick(self.bid.order_id).reserve_for_matching(100)
-        self.order_book.update_ticks(ask_dict, bid_dict, 100, unreserve=True)
-
-        self.assertEqual(len(self.order_book.asks), 0)
-        self.assertEqual(len(self.order_book.bids), 1)
-        self.order_book.remove_bid(self.bid.order_id)
-
         ask_dict["traded"] = 50
         bid_dict["traded"] = 50
         self.order_book.completed_orders = []
@@ -215,6 +207,6 @@ class TestOrderBook(AbstractTestOrderBook):
         self.order_book.insert_bid(self.bid)
 
         self.assertEquals('------ Bids -------\n'
-                          '200 BTC\t@\t0.15 MB (R: 0)\n\n'
+                          '200 BTC\t@\t0.15 MB\n\n'
                           '------ Asks -------\n'
-                          '100 BTC\t@\t0.3 MB (R: 0)\n\n', str(self.order_book))
+                          '100 BTC\t@\t0.3 MB\n\n', str(self.order_book))

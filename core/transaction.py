@@ -136,7 +136,6 @@ class Transaction(object):
         self.outgoing_address = None
         self.partner_incoming_address = None
         self.partner_outgoing_address = None
-        self.match_id = ''
 
         self._payments = []
         self._current_payment = 0
@@ -149,7 +148,7 @@ class Transaction(object):
         (trader_id, transaction_number, order_trader_id, order_number, partner_trader_id, partner_order_number,
          asset1_amount, asset1_type, asset1_transferred, asset2_amount, asset2_type, asset2_transferred,
          transaction_timestamp, sent_wallet_info, received_wallet_info, incoming_address, outgoing_address,
-         partner_incoming_address, partner_outgoing_address, match_id) = data
+         partner_incoming_address, partner_outgoing_address) = data
 
         transaction_id = TransactionId(TraderId(bytes(trader_id)), TransactionNumber(transaction_number))
         transaction = cls(transaction_id,
@@ -167,7 +166,6 @@ class Transaction(object):
         transaction.outgoing_address = WalletAddress(str(outgoing_address))
         transaction.partner_incoming_address = WalletAddress(str(partner_incoming_address))
         transaction.partner_outgoing_address = WalletAddress(str(partner_outgoing_address))
-        transaction.match_id = str(match_id)
         transaction._payments = payments
 
         return transaction
@@ -196,7 +194,6 @@ class Transaction(object):
         outgoing_address = None
         partner_incoming_address = None
         partner_outgoing_address = None
-        match_id = ''
 
         transaction_id = TransactionId(TraderId(trader_id), TransactionNumber(transaction_number))
         transaction = cls(transaction_id,
@@ -214,7 +211,6 @@ class Transaction(object):
         transaction.outgoing_address = WalletAddress(str(outgoing_address))
         transaction.partner_incoming_address = WalletAddress(str(partner_incoming_address))
         transaction.partner_outgoing_address = WalletAddress(str(partner_outgoing_address))
-        transaction.match_id = str(match_id)
 
         return transaction
 
@@ -230,8 +226,7 @@ class Transaction(object):
                 self.assets.second.amount, text_type(self.assets.second.asset_id),
                 self.transferred_assets.second.amount, int(self.timestamp), self.sent_wallet_info,
                 self.received_wallet_info, text_type(self.incoming_address), text_type(self.outgoing_address),
-                text_type(self.partner_incoming_address), text_type(self.partner_outgoing_address),
-                text_type(self.match_id))
+                text_type(self.partner_incoming_address), text_type(self.partner_outgoing_address))
 
     @classmethod
     def from_proposed_trade(cls, proposed_trade, transaction_id):

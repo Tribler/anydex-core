@@ -123,6 +123,49 @@ class TestMarketCommunity(TestMarketCommunityBase):
         # The ask should be removed since this node thinks the order is already completed
         self.assertEqual(len(self.nodes[2].overlay.order_book.asks), 0)
 
+    @trial_timeout(3)
+    @inlineCallbacks
+    def test_decline_trade_cancel(self):
+        """
+        Test whether a cancelled order is correctly declined when negotiating
+        """
+        yield self.introduce_nodes()
+
+        order = yield self.nodes[0].overlay.create_ask(AssetPair(AssetAmount(2, 'DUM1'), AssetAmount(2, 'DUM2')), 3600)
+        yield self.nodes[0].overlay.cancel_order(order.order_id, broadcast=False)
+
+        self.assertEqual(order.status, "cancelled")
+
+        yield self.nodes[1].overlay.create_bid(AssetPair(AssetAmount(2, 'DUM1'), AssetAmount(2, 'DUM2')), 3600)
+
+        yield self.sleep(1)
+
+        # No trade should have been made
+        self.assertFalse(list(self.nodes[0].overlay.transaction_manager.find_all()))
+        self.assertFalse(list(self.nodes[0].overlay.transaction_manager.find_all()))
+        self.assertEqual(len(self.nodes[2].overlay.order_book.asks), 0)
+
+    @trial_timeout(2)
+    @inlineCallbacks
+    def test_decline_match_cancel(self):
+        """
+        Test whether an order is removed when the matched order is cancelled
+        """
+        yield self.introduce_nodes()
+
+        yield self.nodes[0].overlay.create_ask(AssetPair(AssetAmount(2, 'DUM1'), AssetAmount(2, 'DUM2')), 3600)
+        yield self.sleep(0.5)
+
+        order = yield self.nodes[1].overlay.create_bid(AssetPair(AssetAmount(2, 'DUM1'), AssetAmount(2, 'DUM2')), 3600)
+        self.nodes[1].overlay.cancel_order(order.order_id, broadcast=False)  # Immediately cancel it
+
+        yield self.sleep(0.5)
+
+        # No trade should have been made
+        self.assertFalse(list(self.nodes[0].overlay.transaction_manager.find_all()))
+        self.assertFalse(list(self.nodes[0].overlay.transaction_manager.find_all()))
+        self.assertEqual(len(self.nodes[2].overlay.order_book.bids), 0)
+
     @trial_timeout(2)
     @inlineCallbacks
     def test_counter_trade(self):
@@ -144,7 +187,49 @@ class TestMarketCommunity(TestMarketCommunityBase):
         self.assertTrue(list(self.nodes[0].overlay.transaction_manager.find_all()))
         self.assertTrue(list(self.nodes[1].overlay.transaction_manager.find_all()))
 
-    @trial_timeout(2)
+    @trial_timeout(3)
+    @inlineCallbacks
+    def test_completed_trade(self):
+        """
+        Test whether a completed trade is removed from the orderbook of a matchmaker
+        """
+        yield self.introduce_nodes()
+
+        yield self.nodes[0].overlay.create_ask(AssetPair(AssetAmount(2, 'DUM1'), AssetAmount(2, 'DUM2')), 3600)
+
+        yield self.sleep(0.5)  # Give it some time to disseminate
+
+        self.assertEqual(len(self.nodes[2].overlay.order_book.asks), 1)
+        order = yield self.nodes[1].overlay.create_bid(AssetPair(AssetAmount(2, 'DUM1'), AssetAmount(2, 'DUM2')), 3600)
+        order._traded_quantity = 2  # Fulfill this order
+
+        yield self.sleep(0.5)
+
+        # The matchmaker should have removed this order from the orderbook
+        self.assertFalse(self.nodes[2].overlay.order_book.tick_exists(order.order_id))
+
+    @trial_timeout(3)
+    @inlineCallbacks
+    def test_other_completed_trade(self):
+        """
+        Test whether a completed trade of a counterparty is removed from the orderbook of a matchmaker
+        """
+        yield self.introduce_nodes()
+
+        order = yield self.nodes[0].overlay.create_ask(AssetPair(AssetAmount(2, 'DUM1'), AssetAmount(2, 'DUM2')), 3600)
+
+        yield self.sleep(0.5)  # Give it some time to disseminate
+
+        order._traded_quantity = 2  # Fulfill this order
+        self.assertEqual(len(self.nodes[2].overlay.order_book.asks), 1)
+        self.nodes[1].overlay.create_bid(AssetPair(AssetAmount(2, 'DUM1'), AssetAmount(2, 'DUM2')), 3600)
+
+        yield self.sleep(1)
+
+        # Matchmaker should have removed this order from the orderbook
+        self.assertFalse(self.nodes[2].overlay.order_book.tick_exists(order.order_id))
+
+    @trial_timeout(3)
     @inlineCallbacks
     def test_e2e_trade(self):
         """
@@ -261,10 +346,8 @@ class TestMarketCommunity(TestMarketCommunityBase):
 
         yield self.sleep(0.5)
 
-        ask_tick_entry = self.nodes[2].overlay.order_book.get_tick(ask_order.order_id)
-        bid_tick_entry = self.nodes[2].overlay.order_book.get_tick(bid_order.order_id)
-        self.assertEqual(bid_tick_entry.reserved_for_matching, 0)
-        self.assertEqual(ask_tick_entry.reserved_for_matching, 0)
+        self.assertEqual(ask_order.reserved_quantity, 0)
+        self.assertEqual(bid_order.reserved_quantity, 0)
 
     @trial_timeout(3)
     @inlineCallbacks
@@ -286,10 +369,8 @@ class TestMarketCommunity(TestMarketCommunityBase):
 
         yield self.sleep(0.5)
 
-        ask_tick_entry = self.nodes[2].overlay.order_book.get_tick(ask_order.order_id)
-        bid_tick_entry = self.nodes[2].overlay.order_book.get_tick(bid_order.order_id)
-        self.assertEqual(bid_tick_entry.reserved_for_matching, 0)
-        self.assertEqual(ask_tick_entry.reserved_for_matching, 0)
+        self.assertEqual(ask_order.reserved_quantity, 0)
+        self.assertEqual(bid_order.reserved_quantity, 0)
 
     @trial_timeout(4)
     @inlineCallbacks
@@ -403,13 +484,6 @@ class TestMarketCommunityTwoNodes(TestMarketCommunityBase):
         self.assertEqual(len(transactions2), 1)
         self.assertEqual(len(transactions2[0].payments), 2)
 
-        # There should be no reserved quantity in the orderbook
-        ask_order_id = list(self.nodes[0].overlay.order_manager.order_repository.find_all())[0].order_id
-        for node_nr in [0, 1]:
-            ask_tick_entry = self.nodes[node_nr].overlay.order_book.get_tick(ask_order_id)
-            if ask_tick_entry:
-                self.assertEqual(ask_tick_entry.reserved_for_matching, 0)
-
         yield self.nodes[1].overlay.create_bid(AssetPair(AssetAmount(8, 'DUM1'), AssetAmount(8, 'DUM2')), 3600)
 
         yield self.sleep(1)
@@ -428,6 +502,124 @@ class TestMarketCommunityTwoNodes(TestMarketCommunityBase):
         Test the ping/pong mechanism of the market
         """
         yield self.nodes[0].overlay.ping_peer(self.nodes[1].overlay.my_peer)
+
+
+class TestMarketCommunityFourNodes(TestMarketCommunityBase):
+    __testing__ = True
+    NUM_NODES = 5
+
+    def setUp(self):
+        super(TestMarketCommunityFourNodes, self).setUp()
+
+        self.nodes[0].overlay.disable_matchmaker()
+        self.nodes[1].overlay.disable_matchmaker()
+        self.nodes[2].overlay.disable_matchmaker()
+
+    @trial_timeout(2)
+    @inlineCallbacks
+    def test_partial_match(self):
+        """
+        Test matchmaking with partial orders
+        """
+        yield self.introduce_nodes()
+
+        self.nodes[0].overlay.create_ask(AssetPair(AssetAmount(5, 'DUM1'), AssetAmount(5, 'DUM2')), 3600)
+        self.nodes[1].overlay.create_ask(AssetPair(AssetAmount(5, 'DUM1'), AssetAmount(5, 'DUM2')), 3600)
+
+        yield self.sleep(0.5)
+
+        self.nodes[2].overlay.create_bid(AssetPair(AssetAmount(10, 'DUM1'), AssetAmount(10, 'DUM2')), 3600)
+
+        yield self.sleep(0.5)
+
+        # Verify that the trade has been made
+        self.assertEqual(len(list(self.nodes[0].overlay.transaction_manager.find_all())), 1)
+        self.assertEqual(len(list(self.nodes[1].overlay.transaction_manager.find_all())), 1)
+        self.assertEqual(len(list(self.nodes[2].overlay.transaction_manager.find_all())), 2)
+
+    @inlineCallbacks
+    def match_window_impl(self, test_ask):
+        yield self.introduce_nodes()
+
+        self.nodes[2].overlay.settings.match_window = 0.5  # Wait 1 sec before accepting (the best) match
+
+        if test_ask:
+            order1 = yield self.nodes[1].overlay.create_bid(
+                AssetPair(AssetAmount(10, 'DUM1'), AssetAmount(10, 'DUM2')), 3600)
+            order2 = yield self.nodes[0].overlay.create_bid(
+                AssetPair(AssetAmount(10, 'DUM1'), AssetAmount(20, 'DUM2')), 3600)
+        else:
+            order1 = yield self.nodes[0].overlay.create_ask(
+                AssetPair(AssetAmount(10, 'DUM1'), AssetAmount(10, 'DUM2')), 3600)
+            order2 = yield self.nodes[1].overlay.create_ask(
+                AssetPair(AssetAmount(10, 'DUM1'), AssetAmount(20, 'DUM2')), 3600)
+
+        yield self.sleep(0.2)
+
+        # Make sure that the two matchmaker match different orders
+        order1_tick = self.nodes[3].overlay.order_book.get_tick(order1.order_id)
+        order2_tick = self.nodes[4].overlay.order_book.get_tick(order2.order_id)
+        order1_tick.available_for_matching = 0
+        order2_tick.available_for_matching = 0
+
+        if test_ask:
+            yield self.nodes[2].overlay.create_ask(AssetPair(AssetAmount(10, 'DUM1'), AssetAmount(20, 'DUM2')), 3600)
+        else:
+            yield self.nodes[2].overlay.create_bid(AssetPair(AssetAmount(10, 'DUM1'), AssetAmount(20, 'DUM2')), 3600)
+
+        yield self.sleep(1)
+
+        # Verify that the trade has been made
+        self.assertTrue(list(self.nodes[0].overlay.transaction_manager.find_all()))
+        self.assertTrue(list(self.nodes[2].overlay.transaction_manager.find_all()))
+
+    @trial_timeout(4)
+    @inlineCallbacks
+    def test_match_window_bid(self):
+        """
+        Test the match window when one is matching a new bid
+        """
+        yield self.match_window_impl(False)
+
+    @trial_timeout(4)
+    @inlineCallbacks
+    def test_match_window_ask(self):
+        """
+        Test the match window when one is matching a new ask
+        """
+        yield self.match_window_impl(True)
+
+    @trial_timeout(4)
+    @inlineCallbacks
+    def test_match_window_multiple(self):
+        """
+        Test whether multiple ask orders in the matching window will get matched
+        """
+        yield self.introduce_nodes()
+
+        self.nodes[2].overlay.settings.match_window = 0.5  # Wait 1 sec before accepting (the best) match
+
+        order1 = yield self.nodes[0].overlay.create_bid(
+            AssetPair(AssetAmount(10, 'DUM1'), AssetAmount(10, 'DUM2')), 3600)
+        order2 = yield self.nodes[1].overlay.create_bid(
+            AssetPair(AssetAmount(10, 'DUM1'), AssetAmount(10, 'DUM2')), 3600)
+
+        yield self.sleep(0.3)
+
+        # Make sure that the two matchmaker match different orders
+        order1_tick = self.nodes[3].overlay.order_book.get_tick(order1.order_id)
+        order2_tick = self.nodes[4].overlay.order_book.get_tick(order2.order_id)
+        order1_tick.available_for_matching = 0
+        order2_tick.available_for_matching = 0
+
+        yield self.nodes[2].overlay.create_ask(AssetPair(AssetAmount(20, 'DUM1'), AssetAmount(20, 'DUM2')), 3600)
+
+        yield self.sleep(1.5)
+
+        # Verify that the trade has been made
+        self.assertEqual(len(list(self.nodes[0].overlay.transaction_manager.find_all())), 1)
+        self.assertEqual(len(list(self.nodes[1].overlay.transaction_manager.find_all())), 1)
+        self.assertEqual(len(list(self.nodes[2].overlay.transaction_manager.find_all())), 2)
 
 
 class TestMarketCommunitySingle(TestMarketCommunityBase):

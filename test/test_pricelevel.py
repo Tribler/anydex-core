@@ -24,7 +24,7 @@ class PriceLevelTestSuite(unittest.TestCase):
                                                                              AssetAmount(30, 'MC')),
                      Timeout(100), Timestamp.now(), True)
 
-        self.price_level = PriceLevel(Price(10, 'MC', 'BTC'))
+        self.price_level = PriceLevel(Price(50, 5, 'MC', 'BTC'))
         self.tick_entry1 = TickEntry(tick, self.price_level)
         self.tick_entry2 = TickEntry(tick, self.price_level)
         self.tick_entry3 = TickEntry(tick, self.price_level)
@@ -61,5 +61,5 @@ class PriceLevelTestSuite(unittest.TestCase):
         # Test for price level string representation
         self.price_level.append_tick(self.tick_entry1)
         self.price_level.append_tick(self.tick_entry2)
-        self.assertEquals('60 BTC\t@\t0.5 MC (R: 0)\n'
-                          '60 BTC\t@\t0.5 MC (R: 0)\n', str(self.price_level))
+        self.assertEquals('60 BTC\t@\t0.5 MC\n'
+                          '60 BTC\t@\t0.5 MC\n', str(self.price_level))

@@ -61,7 +61,6 @@ CREATE TABLE IF NOT EXISTS orders(
   outgoing_address         TEXT NOT NULL,
   partner_incoming_address TEXT NOT NULL,
   partner_outgoing_address TEXT NOT NULL,
-  match_id                 TEXT NOT NULL,
 
   PRIMARY KEY (trader_id, transaction_number)
  );
@@ -233,8 +232,8 @@ class MarketDB(TrustChainDB):
             u"INSERT INTO transactions (trader_id, transaction_number, order_trader_id, order_number,"
             u"partner_trader_id, partner_order_number, asset1_amount, asset1_type, asset1_transferred, asset2_amount,"
             u"asset2_type, asset2_transferred, transaction_timestamp, sent_wallet_info, received_wallet_info,"
-            u"incoming_address, outgoing_address, partner_incoming_address, partner_outgoing_address, match_id) "
-            u"VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", transaction.to_database())
+            u"incoming_address, outgoing_address, partner_incoming_address, partner_outgoing_address) "
+            u"VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", transaction.to_database())
         self.commit()
 
         self.delete_payments(transaction.transaction_id)
@@ -250,8 +249,8 @@ class MarketDB(TrustChainDB):
             u"INSERT OR IGNORE INTO transactions (trader_id, transaction_number, order_trader_id, order_number,"
             u"partner_trader_id, partner_order_number, asset1_amount, asset1_type, asset1_transferred, asset2_amount,"
             u"asset2_type, asset2_transferred, transaction_timestamp, sent_wallet_info, received_wallet_info,"
-            u"incoming_address, outgoing_address, partner_incoming_address, partner_outgoing_address, match_id) "
-            u"VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", transaction.to_database())
+            u"incoming_address, outgoing_address, partner_incoming_address, partner_outgoing_address) "
+            u"VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", transaction.to_database())
 
         self.execute(
             u"UPDATE transactions SET asset1_amount = ?, asset1_transferred = ?, asset2_amount = ?, "

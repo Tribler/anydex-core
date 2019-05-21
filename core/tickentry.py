@@ -24,8 +24,9 @@ class TickEntry(TaskManager):
         self._price_level = price_level
         self._prev_tick = None
         self._next_tick = None
-        self._reserved_for_matching = 0
-        self._blocked_for_matching = []
+        self.available_for_matching = 0
+        self.update_available_for_matching()
+        self._blocked_for_matching = set()
 
     @property
     def tick(self):
@@ -58,6 +59,7 @@ class TickEntry(TaskManager):
     @traded.setter
     def traded(self, new_traded):
         self._tick.traded = new_traded
+        self.update_available_for_matching()
 
     @property
     def price(self):
@@ -79,7 +81,7 @@ class TickEntry(TaskManager):
             self._blocked_for_matching.remove(unblock_id)
 
         self._logger.debug("Blocking %s for tick %s", order_id, self.order_id)
-        self._blocked_for_matching.append(order_id)
+        self._blocked_for_matching.add(order_id)
         self.register_task("unblock_%s" % order_id, reactor.callLater(10, unblock_order_id, order_id))
 
     def is_blocked_for_matching(self, order_id):
@@ -87,26 +89,6 @@ class TickEntry(TaskManager):
         Return whether the order_id is blocked for matching
         """
         return order_id in self._blocked_for_matching
-
-    def reserve_for_matching(self, reserve_quantity):
-        """
-        Reserve some quantity of this tick entry for matching.
-        :param reserve_quantity: The quantity to reserve
-        """
-        self._logger.debug("Reserved %s quantity for matching (in tick %s)", reserve_quantity, self.tick)
-
-        self._reserved_for_matching += reserve_quantity
-        self._price_level.reserved += reserve_quantity
-
-    def release_for_matching(self, release_quantity):
-        """
-        Release some quantity of this tick entry for matching.
-        :param release_quantity: The quantity to release
-        """
-        self._logger.debug("Released %s quantity for matching (in tick %s)", release_quantity, self.tick)
-
-        self._reserved_for_matching -= release_quantity
-        self._price_level.reserved -= release_quantity
 
     def is_valid(self):
         """
@@ -146,21 +128,6 @@ class TickEntry(TaskManager):
         """
         return self._next_tick
 
-    @property
-    def reserved_for_matching(self):
-        """
-        :rtype: long
-        """
-        return self._reserved_for_matching
-
-    @property
-    def available_for_matching(self):
-        """
-        Return the amount that we can match in this TickEntry object.
-        :rtype: long
-        """
-        return self.assets.first.amount - self.reserved_for_matching - self.tick.traded
-
     @next_tick.setter
     def next_tick(self, new_next_tick):
         """
@@ -169,10 +136,13 @@ class TickEntry(TaskManager):
         """
         self._next_tick = new_next_tick
 
+    def update_available_for_matching(self):
+        self.available_for_matching = self._tick._assets.first._amount - self._tick._traded
+
     def __str__(self):
         """
         format: <quantity>\t@\t<price>
         :rtype: str
         """
-        return "%s\t@\t%g %s (R: %s)" % (self._tick.assets.first, self._tick.price.amount,
-                                         self._tick.assets.second.asset_id, self.reserved_for_matching)
+        return "%s\t@\t%g %s" % (self._tick.assets.first, self._tick.price.amount,
+                                         self._tick.assets.second.asset_id)
