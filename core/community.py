@@ -214,7 +214,7 @@ class MarketCommunity(Community, BlockListener):
         if address:
             return succeed(address)
 
-        self.logger.info("Address for trader %s not found locally, doing DHT request", trader_id)
+        self.logger.info("Address for trader %s not found locally, doing DHT request", trader_id.as_hex())
         deferred = Deferred()
 
         def on_peers(peers):
@@ -223,7 +223,7 @@ class MarketCommunity(Community, BlockListener):
                 deferred.callback(peers[0].address)
 
         def on_dht_error(failure):
-            self._logger.warning("Unable to get address for trader %s", trader_id)
+            self._logger.warning("Unable to get address for trader %s", trader_id.as_hex())
             deferred.errback(failure)
 
         if not self.dht:
