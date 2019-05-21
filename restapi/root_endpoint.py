@@ -6,6 +6,7 @@ from pyipv8.ipv8.REST.root_endpoint import RootEndpoint as IPv8RootEndpoint
 from restapi.asks_bids_endpoint import AsksEndpoint, BidsEndpoint
 from restapi.matchmakers_endpoint import MatchmakersEndpoint
 from restapi.orders_endpoint import OrdersEndpoint
+from restapi.state_endpoint import StateEndpoint
 from restapi.transactions_endpoint import TransactionsEndpoint
 
 
@@ -29,7 +30,8 @@ class RootEndpoint(BaseEndpoint):
             b"transactions": TransactionsEndpoint,
             b"orders": OrdersEndpoint,
             b"matchmakers": MatchmakersEndpoint,
-            b"ipv8": IPv8RootEndpoint
+            b"state": StateEndpoint,
+            b"ipv8": IPv8RootEndpoint,
         }
         for path, child_cls in child_handler_dict.items():
             self.putChild(path, child_cls(self.session))

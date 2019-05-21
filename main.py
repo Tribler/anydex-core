@@ -11,6 +11,7 @@ from os.path import isfile
 from threading import RLock
 from traceback import format_exception
 
+from autobahn.twisted import WebSocketServerFactory
 from twisted.application.service import IServiceMaker, MultiService
 from twisted.internet import reactor
 from twisted.internet.defer import DeferredList, inlineCallbacks, maybeDeferred
@@ -23,6 +24,7 @@ from zope.interface import implementer
 from config import get_anydex_configuration
 from core.community import MarketTestnetCommunity
 from restapi.rest_manager import RESTManager
+from restapi.websocket import AnyDexWebsocketProtocol
 from wallet.dummy_wallet import DummyWallet1, DummyWallet2
 
 if hasattr(sys.modules['__main__'], "IPv8"):
@@ -232,30 +234,34 @@ class AnyDexServiceMaker(object):
             self.restapi = RESTManager(self.ipv8)
             reactor.callLater(0.0, self.restapi.start)
 
-            # Get Trustchain + DHT overlays
-            for overlay in self.ipv8.overlays:
-                if isinstance(overlay, TrustChainTestnetCommunity):
-                    self.trustchain = overlay
-                elif isinstance(overlay, DHTDiscoveryCommunity):
-                    self.dht = overlay
+            factory = WebSocketServerFactory(u"ws://127.0.0.1:9000")
+            factory.protocol = AnyDexWebsocketProtocol
+            reactor.listenTCP(9000, factory)
 
-            # Initialize wallets
-            dummy_wallet1 = DummyWallet1()
-            self.wallets[dummy_wallet1.get_identifier()] = dummy_wallet1
+        # Get Trustchain + DHT overlays
+        for overlay in self.ipv8.overlays:
+            if isinstance(overlay, TrustChainTestnetCommunity):
+                self.trustchain = overlay
+            elif isinstance(overlay, DHTDiscoveryCommunity):
+                self.dht = overlay
 
-            dummy_wallet2 = DummyWallet2()
-            self.wallets[dummy_wallet2.get_identifier()] = dummy_wallet2
+        # Initialize wallets
+        dummy_wallet1 = DummyWallet1()
+        self.wallets[dummy_wallet1.get_identifier()] = dummy_wallet1
 
-            # Load market community
-            self.market = MarketTestnetCommunity(self.trustchain.my_peer, self.ipv8.endpoint, self.ipv8.network,
-                                                 trustchain=self.trustchain,
-                                                 dht=self.dht,
-                                                 wallets=self.wallets,
-                                                 working_directory=options["statedir"],
-                                                 record_transactions=False)
+        dummy_wallet2 = DummyWallet2()
+        self.wallets[dummy_wallet2.get_identifier()] = dummy_wallet2
 
-            self.ipv8.overlays.append(self.market)
-            self.ipv8.strategies.append((RandomWalk(self.market), 20))
+        # Load market community
+        self.market = MarketTestnetCommunity(self.trustchain.my_peer, self.ipv8.endpoint, self.ipv8.network,
+                                             trustchain=self.trustchain,
+                                             dht=self.dht,
+                                             wallets=self.wallets,
+                                             working_directory=options["statedir"],
+                                             record_transactions=False)
+
+        self.ipv8.overlays.append(self.market)
+        self.ipv8.strategies.append((RandomWalk(self.market), 20))
 
     def makeService(self, options):
         """
