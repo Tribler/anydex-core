@@ -69,6 +69,7 @@ class OrderId(object):
 
         self._trader_id = trader_id
         self._order_number = order_number
+        self._hash = hash((self._trader_id, self._order_number))
 
     @property
     def trader_id(self):
@@ -106,7 +107,7 @@ class OrderId(object):
         return not self.__eq__(other)
 
     def __hash__(self):
-        return hash((self._trader_id, self._order_number))
+        return self._hash
 
 
 class Order(object):
