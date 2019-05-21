@@ -90,7 +90,7 @@ class Trade(Message):
         :param timestamp: A timestamp when the trade was countered
         :param proposed_trade: A proposed trade that needs to be countered
         :type trader_id: TraderId
-        :type quantity: Quantity
+        :type assets: AssetPair
         :type timestamp: Timestamp
         :type proposed_trade: ProposedTrade
         :return: A counter trade

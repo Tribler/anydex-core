@@ -45,9 +45,9 @@ class Side(object):
         :param price: The price to create the level for
         :type price: Price
         """
-        self._depth[(price.numerator, price.denominator)] += 1
+        self._depth[(price.num_type, price.denom_type)] += 1
         price_level = PriceLevel(price)
-        self._price_level_list_map[(price.numerator, price.denominator)].insert(price_level)
+        self._price_level_list_map[(price.num_type, price.denom_type)].insert(price_level)
         self._price_map[price] = price_level
 
     def _remove_price_level(self, price):
@@ -55,9 +55,9 @@ class Side(object):
         :param price: The price to remove the level for
         :type price: Price
         """
-        self._depth[(price.numerator, price.denominator)] -= 1
+        self._depth[(price.num_type, price.denom_type)] -= 1
 
-        self._price_level_list_map[(price.numerator, price.denominator)].remove(price)
+        self._price_level_list_map[(price.num_type, price.denom_type)].remove(price)
         del self._price_map[price]
 
     def _price_level_exists(self, price):

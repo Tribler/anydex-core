@@ -91,14 +91,13 @@ class OrderBook(TaskManager):
             self.cancel_pending_task("bid_%s_timeout" % order_id)
             self._bids.remove_tick(order_id)
 
-    def update_ticks(self, ask_order_dict, bid_order_dict, traded_quantity, unreserve=True):
+    def update_ticks(self, ask_order_dict, bid_order_dict, traded_quantity):
         """
         Update ticks according to a TrustChain block containing the status of the ask/bid orders.
 
         :type ask_order_dict: dict
         :type bid_order_dict: dict
         :type traded_quantity: int
-        :type unreserve: bool
         """
         ask_order_id = OrderId(TraderId(unhexlify(ask_order_dict["trader_id"])),
                                OrderNumber(ask_order_dict["order_number"]))
@@ -113,8 +112,6 @@ class OrderBook(TaskManager):
         if ask_exists and ask_order_dict["traded"] >= self.get_tick(ask_order_id).traded:
             tick = self.get_tick(ask_order_id)
             tick.traded = ask_order_dict["traded"]
-            if unreserve:
-                tick.release_for_matching(traded_quantity)
             if tick.traded >= tick.assets.first.amount:
                 self.remove_tick(tick.order_id)
                 self.completed_orders.add(tick.order_id)
@@ -132,8 +129,6 @@ class OrderBook(TaskManager):
         if bid_exists and bid_order_dict["traded"] >= self.get_tick(bid_order_id).traded:
             tick = self.get_tick(bid_order_id)
             tick.traded = bid_order_dict["traded"]
-            if unreserve:
-                tick.release_for_matching(traded_quantity)
             if tick.traded >= tick.assets.first.amount:
                 self.remove_tick(tick.order_id)
                 self.completed_orders.add(tick.order_id)
@@ -245,9 +240,9 @@ class OrderBook(TaskManager):
         Return the spread between the bid and the ask price
         :rtype: Price
         """
-        spread = self.get_ask_price(price_wallet_id, quantity_wallet_id).amount - \
-                 self.get_bid_price(price_wallet_id, quantity_wallet_id).amount
-        return Price(spread, price_wallet_id, quantity_wallet_id)
+        spread = self.get_ask_price(price_wallet_id, quantity_wallet_id).frac - \
+                 self.get_bid_price(price_wallet_id, quantity_wallet_id).frac
+        return Price(spread.numerator, spread.denominator, price_wallet_id, quantity_wallet_id)
 
     def bid_side_depth(self, price):
         """

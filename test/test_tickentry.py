@@ -29,7 +29,7 @@ class TickEntryTestSuite(AbstractServer):
         tick2 = Tick(OrderId(TraderId(b'0' * 20), OrderNumber(2)),
                      AssetPair(AssetAmount(63400, 'BTC'), AssetAmount(30, 'MB')), Timeout(100), Timestamp.now(), True)
 
-        self.price_level = PriceLevel(Price(100, 'MB', 'BTC'))
+        self.price_level = PriceLevel(Price(100, 1, 'MB', 'BTC'))
         self.tick_entry = TickEntry(tick, self.price_level)
         self.tick_entry2 = TickEntry(tick2, self.price_level)
 
@@ -58,7 +58,7 @@ class TickEntryTestSuite(AbstractServer):
 
     def test_str(self):
         # Test for tick string representation
-        self.assertEquals('60 BTC\t@\t0.5 MB (R: 0)', str(self.tick_entry))
+        self.assertEquals('60 BTC\t@\t0.5 MB', str(self.tick_entry))
 
     def test_is_valid(self):
         # Test for is valid

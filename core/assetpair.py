@@ -46,7 +46,7 @@ class AssetPair(object):
         """
         Return a Price object of this asset pair, which expresses the second asset into the first asset.
         """
-        return Price(float(self.second.amount) / float(self.first.amount), self.second.asset_id, self.first.asset_id)
+        return Price(self.second.amount, self.first.amount, self.second.asset_id, self.first.asset_id)
 
     def proportional_downscale(self, new_amount):
         """

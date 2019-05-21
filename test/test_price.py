@@ -9,9 +9,9 @@ class TestPrice(unittest.TestCase):
     """
 
     def setUp(self):
-        self.price1 = Price(2, 'MB', 'BTC')
-        self.price2 = Price(3, 'MB', 'BTC')
-        self.price3 = Price(2, 'MB', 'BTC')
+        self.price1 = Price(4, 2, 'MB', 'BTC')
+        self.price2 = Price(3, 1, 'MB', 'BTC')
+        self.price3 = Price(8, 4, 'MB', 'BTC')
 
     def test_str(self):
         """
@@ -27,3 +27,10 @@ class TestPrice(unittest.TestCase):
         self.assertNotEqual(self.price1, self.price2)
         self.assertNotEqual(self.price1, 2)
         self.assertFalse(self.price1 == 2)
+
+    def test_cmp(self):
+        """
+        Test comparison of a Price object
+        """
+        self.assertTrue(self.price1 < self.price2)
+        self.assertFalse(self.price1 > self.price2)

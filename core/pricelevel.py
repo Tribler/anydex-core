@@ -9,7 +9,6 @@ class PriceLevel(object):
         self._tail_tick = None  # Last tick of the double linked list
         self._length = 0  # The number of ticks in the price level
         self._depth = 0  # Total amount of quantity contained in this price level
-        self._reserved = 0  # Total amount of reserved quantity in this price level
         self._last = None  # The current tick of the iterator
         self._price = price  # The price of this price level
 
@@ -50,22 +49,6 @@ class PriceLevel(object):
         :type new_depth: int
         """
         self._depth = new_depth
-
-    @property
-    def reserved(self):
-        """
-        The amount of reserved quantity (for matching) in this price level
-        :rtype: int
-        """
-        return self._reserved
-
-    @reserved.setter
-    def reserved(self, new_reserved):
-        """
-        :param new_reserved: The new amount of quantity to reserve
-        :type new_reserved: Quantity
-        """
-        self._reserved = new_reserved
 
     def __len__(self):
         """
@@ -119,7 +102,6 @@ class PriceLevel(object):
         """
         # Update the counters
         self._depth -= tick.assets.first.amount
-        self._reserved -= tick.reserved_for_matching
         self._length -= 1
 
         if self._length == 0:  # Was the only tick in this price level

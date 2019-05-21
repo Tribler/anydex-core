@@ -3,13 +3,18 @@ class DeclinedTradeReason(object):
     ORDER_EXPIRED = 1
     ORDER_RESERVED = 2
     ORDER_INVALID = 3
-    UNACCEPTABLE_PRICE = 4
+    ORDER_CANCELLED = 4
+    UNACCEPTABLE_PRICE = 5
+    ADDRESS_LOOKUP_FAIL = 6
+    NO_AVAILABLE_QUANTITY = 7
+    OTHER = 8
 
 
 class DeclineMatchReason(object):
     ORDER_COMPLETED = 0
     OTHER_ORDER_COMPLETED = 1
-    OTHER = 2
+    OTHER_ORDER_CANCELLED = 2
+    OTHER = 3
 
 
 MAX_ORDER_TIMEOUT = 3600 * 24

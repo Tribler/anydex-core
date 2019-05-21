@@ -21,29 +21,25 @@ class TransactionManager(object):
 
         self.transaction_repository = transaction_repository
 
-    def create_from_proposed_trade(self, proposed_trade, match_id):
+    def create_from_proposed_trade(self, proposed_trade):
         """
         :type proposed_trade: ProposedTrade
-        :type match_id: str
         :rtype: Transaction
         """
         transaction = Transaction.from_proposed_trade(proposed_trade, self.transaction_repository.next_identity())
-        transaction.match_id = match_id
         self.transaction_repository.add(transaction)
 
         self._logger.info("Transaction created with id: %s, asset pair %s",
                           transaction.transaction_id, transaction.assets)
         return transaction
 
-    def create_from_start_transaction(self, start_transaction, match_id):
+    def create_from_start_transaction(self, start_transaction):
         """
         :type start_transaction: StartTransaction
-        :type match_id: str
         :rtype: Transaction
         """
         transaction = Transaction(start_transaction.transaction_id, start_transaction.assets,
                                   start_transaction.recipient_order_id, start_transaction.order_id, Timestamp.now())
-        transaction.match_id = match_id
         self.transaction_repository.add(transaction)
 
         self._logger.info("Transaction created with id: %s, asset pair %s",
