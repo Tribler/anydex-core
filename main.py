@@ -21,11 +21,11 @@ from twisted.python import usage
 from twisted.python.log import msg
 from zope.interface import implementer
 
-from config import get_anydex_configuration
-from core.community import MarketTestnetCommunity
-from restapi.rest_manager import RESTManager
-from restapi.websocket import AnyDexWebsocketProtocol
-from wallet.dummy_wallet import DummyWallet1, DummyWallet2
+from anydex.config import get_anydex_configuration
+from anydex.core.community import MarketTestnetCommunity
+from anydex.restapi.rest_manager import RESTManager
+from anydex.restapi.websocket import AnyDexWebsocketProtocol
+from anydex.wallet.dummy_wallet import DummyWallet1, DummyWallet2
 
 if hasattr(sys.modules['__main__'], "IPv8"):
     sys.modules[__name__] = sys.modules['__main__']
