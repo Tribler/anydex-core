@@ -36,14 +36,14 @@ from anydex.core.database import MarketDB
 from anydex.core.payload import DeclineMatchPayload, DeclineTradePayload, InfoPayload,\
     MatchPayload, OrderStatusRequestPayload, OrderStatusResponsePayload, OrderbookSyncPayload, PaymentPayload,\
     PingPongPayload, StartTransactionPayload, TradePayload, WalletInfoPayload
-from pyipv8.ipv8.attestation.trustchain.listener import BlockListener
-from pyipv8.ipv8.attestation.trustchain.payload import HalfBlockPairPayload
-from pyipv8.ipv8.community import Community, lazy_wrapper
-from pyipv8.ipv8.messaging.payload_headers import BinMemberAuthenticationPayload
-from pyipv8.ipv8.messaging.payload_headers import GlobalTimeDistributionPayload
-from pyipv8.ipv8.peer import Peer
-from pyipv8.ipv8.requestcache import NumberCache, RandomNumberCache, RequestCache
-from pyipv8.ipv8.util import addCallback
+from ipv8.attestation.trustchain.listener import BlockListener
+from ipv8.attestation.trustchain.payload import HalfBlockPairPayload
+from ipv8.community import Community, lazy_wrapper
+from ipv8.messaging.payload_headers import BinMemberAuthenticationPayload
+from ipv8.messaging.payload_headers import GlobalTimeDistributionPayload
+from ipv8.peer import Peer
+from ipv8.requestcache import NumberCache, RandomNumberCache, RequestCache
+from ipv8.util import addCallback
 
 
 # Message definitions

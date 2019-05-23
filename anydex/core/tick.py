@@ -12,9 +12,9 @@ from anydex.core.message import TraderId
 from anydex.core.order import OrderId, OrderNumber
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
-from pyipv8.ipv8.attestation.trustchain.block import GENESIS_HASH
-from pyipv8.ipv8.database import database_blob
-from pyipv8.ipv8.util import old_round
+from ipv8.attestation.trustchain.block import GENESIS_HASH
+from ipv8.database import database_blob
+from ipv8.util import old_round
 
 
 class Tick(object):

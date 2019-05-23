@@ -13,8 +13,8 @@ from anydex.core.payment import Payment
 from anydex.core.tick import Tick
 from anydex.core.transaction import Transaction, TransactionId, TransactionNumber
 
-from pyipv8.ipv8.attestation.trustchain.database import TrustChainDB
-from pyipv8.ipv8.database import database_blob
+from ipv8.attestation.trustchain.database import TrustChainDB
+from ipv8.database import database_blob
 
 DATABASE_DIRECTORY = path.join(u"sqlite")
 # Path to the database location + dispersy._workingdirectory

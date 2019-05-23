@@ -5,7 +5,7 @@ import time
 
 from six import integer_types
 
-from pyipv8.ipv8.util import old_round
+from ipv8.util import old_round
 
 
 class Timestamp(object):

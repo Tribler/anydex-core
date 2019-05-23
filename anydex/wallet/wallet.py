@@ -7,7 +7,7 @@ import string
 
 import six
 
-from pyipv8.ipv8.taskmanager import TaskManager
+from ipv8.taskmanager import TaskManager
 
 
 class InsufficientFunds(Exception):

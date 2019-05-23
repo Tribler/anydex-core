@@ -3,7 +3,7 @@ from __future__ import absolute_import
 from six import integer_types, string_types
 
 from anydex.core import MAX_ORDER_TIMEOUT
-from pyipv8.ipv8.attestation.trustchain.block import TrustChainBlock
+from ipv8.attestation.trustchain.block import TrustChainBlock
 
 
 class MarketBlock(TrustChainBlock):

@@ -3,7 +3,7 @@ import logging
 from twisted.internet import reactor
 
 from anydex.core.tick import Tick
-from pyipv8.ipv8.taskmanager import TaskManager
+from ipv8.taskmanager import TaskManager
 
 
 class TickEntry(TaskManager):

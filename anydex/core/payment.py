@@ -8,7 +8,7 @@ from anydex.core.payment_id import PaymentId
 from anydex.core.timestamp import Timestamp
 from anydex.core.transaction import TransactionId, TransactionNumber
 from anydex.core.wallet_address import WalletAddress
-from pyipv8.ipv8.database import database_blob
+from ipv8.database import database_blob
 
 
 class Payment(Message):

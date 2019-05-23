@@ -11,7 +11,7 @@ from anydex.core.message import Message, TraderId
 from anydex.core.order import OrderId, OrderNumber
 from anydex.core.timestamp import Timestamp
 from anydex.core.wallet_address import WalletAddress
-from pyipv8.ipv8.database import database_blob
+from ipv8.database import database_blob
 
 
 class TransactionNumber(object):

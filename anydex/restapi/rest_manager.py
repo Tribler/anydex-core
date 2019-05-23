@@ -6,8 +6,8 @@ from twisted.internet import reactor
 from twisted.internet.defer import maybeDeferred
 from twisted.web import server
 
-from pyipv8.ipv8.REST.rest_manager import RESTRequest
-from pyipv8.ipv8.taskmanager import TaskManager
+from ipv8.REST.rest_manager import RESTRequest
+from ipv8.taskmanager import TaskManager
 
 from anydex.restapi.root_endpoint import RootEndpoint
 
