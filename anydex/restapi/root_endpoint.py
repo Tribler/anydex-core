@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 
-from pyipv8.ipv8.REST.base_endpoint import BaseEndpoint
-from pyipv8.ipv8.REST.root_endpoint import RootEndpoint as IPv8RootEndpoint
+from ipv8.REST.base_endpoint import BaseEndpoint
+from ipv8.REST.root_endpoint import RootEndpoint as IPv8RootEndpoint
 
 from anydex.restapi.asks_bids_endpoint import AsksEndpoint, BidsEndpoint
 from anydex.restapi.matchmakers_endpoint import MatchmakersEndpoint

@@ -17,8 +17,8 @@ from anydex.core.side import Side
 from anydex.core.tick import Ask, Bid
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
-from pyipv8.ipv8.taskmanager import TaskManager
-from pyipv8.ipv8.util import old_round
+from ipv8.taskmanager import TaskManager
+from ipv8.util import old_round
 
 
 class OrderBook(TaskManager):

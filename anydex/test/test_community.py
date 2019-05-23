@@ -18,8 +18,8 @@ from anydex.core.tick import Ask, Bid
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
 from anydex.core.transaction import Transaction, TransactionId, TransactionNumber
-from pyipv8.ipv8.test.base import TestBase
-from pyipv8.ipv8.test.mocking.ipv8 import MockIPv8
+from ipv8.test.base import TestBase
+from ipv8.test.mocking.ipv8 import MockIPv8
 
 
 class TestMarketCommunityBase(TestBase):

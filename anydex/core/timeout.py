@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 import time
 
-from pyipv8.ipv8.util import old_round
+from ipv8.util import old_round
 
 
 class Timeout(object):

@@ -1,5 +1,5 @@
 from anydex.core.community import MarketCommunity
-from pyipv8.ipv8.REST.base_endpoint import BaseEndpoint
+from ipv8.REST.base_endpoint import BaseEndpoint
 
 
 class BaseMarketEndpoint(BaseEndpoint):

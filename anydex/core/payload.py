@@ -11,7 +11,7 @@ from anydex.core.timestamp import Timestamp
 from anydex.core.transaction import TransactionId, TransactionNumber
 from anydex.core.wallet_address import WalletAddress
 
-from pyipv8.ipv8.messaging.payload import Payload
+from ipv8.messaging.payload import Payload
 
 
 class MessagePayload(Payload):

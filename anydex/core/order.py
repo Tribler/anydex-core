@@ -9,7 +9,7 @@ from anydex.core.assetpair import AssetPair
 from anydex.core.message import TraderId
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
-from pyipv8.ipv8.database import database_blob
+from ipv8.database import database_blob
 
 
 class TickWasNotReserved(Exception):

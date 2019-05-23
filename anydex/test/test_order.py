@@ -12,7 +12,7 @@ from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
 from anydex.core.trade import Trade
 from anydex.core.transaction import Transaction, TransactionId, TransactionNumber
-from pyipv8.ipv8.util import old_round
+from ipv8.util import old_round
 
 
 class OrderTestSuite(unittest.TestCase):
