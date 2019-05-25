@@ -207,25 +207,6 @@ class CounterTrade(ProposedTrade):
     done to insure that trades were made quickly and efficiently.
     """
 
-    def __init__(self, trader_id, order_id, recipient_order_id, proposal_id, assets, timestamp):
-        """
-        Don't use this method directly, use one of the class methods of Trade or use from_network
-
-        :param trader_id: String representing the trader id
-        :param order_id: A order id to identify the order
-        :param recipient_order_id: A order id to identify the traded party
-        :param proposal_id: The ID of the trade proposal
-        :param assets: The assets to be traded in the proposal
-        :param timestamp: A timestamp wen this trade was created
-        :type trader_id: TraderId
-        :type order_id: OrderId
-        :type recipient_order_id: OrderId
-        :type proposal_id: int
-        :type assets: AssetPair
-        :type timestamp: Timestamp
-        """
-        super(CounterTrade, self).__init__(trader_id, order_id, recipient_order_id, proposal_id, assets, timestamp)
-
     @classmethod
     def from_network(cls, data):
         """

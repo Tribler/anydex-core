@@ -3,6 +3,8 @@ from __future__ import absolute_import
 import logging
 from binascii import unhexlify
 
+from ipv8.database import database_blob
+
 from six import text_type
 
 from anydex.core.assetamount import AssetAmount
@@ -11,7 +13,6 @@ from anydex.core.message import Message, TraderId
 from anydex.core.order import OrderId, OrderNumber
 from anydex.core.timestamp import Timestamp
 from anydex.core.wallet_address import WalletAddress
-from ipv8.database import database_blob
 
 
 class TransactionNumber(object):
@@ -296,7 +297,7 @@ class Transaction(object):
         Return the status of this transaction, can be one of these: "pending", "completed", "error".
         :rtype: str
         """
-        if len([payment for payment in self.payments if not payment.success]):
+        if [payment for payment in self.payments if not payment.success]:
             return "error"
         return "completed" if self.is_payment_complete() else "pending"
 

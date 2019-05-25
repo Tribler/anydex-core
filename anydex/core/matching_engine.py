@@ -2,8 +2,6 @@ import logging
 from abc import ABCMeta, abstractmethod
 from time import time
 
-from anydex.core.tickentry import TickEntry
-
 
 class MatchingStrategy(object):
     """Matching strategy base class"""
