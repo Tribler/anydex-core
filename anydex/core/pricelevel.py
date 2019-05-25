@@ -1,6 +1,3 @@
-from anydex.core.tickentry import TickEntry
-
-
 class PriceLevel(object):
     """Class to represents a list of ticks at a specific price level"""
 
