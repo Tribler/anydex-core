@@ -5,24 +5,35 @@ from base64 import b64decode
 from binascii import hexlify, unhexlify
 from functools import wraps
 
+from ipv8.attestation.trustchain.listener import BlockListener
+from ipv8.attestation.trustchain.payload import HalfBlockPairPayload
+from ipv8.community import Community, lazy_wrapper
+from ipv8.messaging.payload_headers import BinMemberAuthenticationPayload
+from ipv8.messaging.payload_headers import GlobalTimeDistributionPayload
+from ipv8.peer import Peer
+from ipv8.requestcache import NumberCache, RandomNumberCache, RequestCache
+from ipv8.util import addCallback
+
 from twisted.internet import reactor
 from twisted.internet.defer import Deferred, fail, inlineCallbacks, succeed
 
-from anydex.core.match_queue import MatchPriorityQueue
-from anydex.core.settings import MarketSettings
-from anydex.wallet.tc_wallet import TrustchainWallet
-from anydex.core import MAX_ORDER_TIMEOUT
+from anydex.core import DeclineMatchReason, DeclinedTradeReason, MAX_ORDER_TIMEOUT
 from anydex.core.block import MarketBlock
 from anydex.core.bloomfilter import BloomFilter
-from anydex.core import DeclineMatchReason, DeclinedTradeReason
+from anydex.core.database import MarketDB
+from anydex.core.match_queue import MatchPriorityQueue
 from anydex.core.matching_engine import MatchingEngine, PriceTimeStrategy
 from anydex.core.message import TraderId
 from anydex.core.order import OrderId, OrderNumber
 from anydex.core.order_manager import OrderManager
 from anydex.core.order_repository import DatabaseOrderRepository, MemoryOrderRepository
 from anydex.core.orderbook import DatabaseOrderBook, OrderBook
+from anydex.core.payload import DeclineMatchPayload, DeclineTradePayload, InfoPayload,\
+    MatchPayload, OrderStatusRequestPayload, OrderStatusResponsePayload, OrderbookSyncPayload, PaymentPayload,\
+    PingPongPayload, StartTransactionPayload, TradePayload, WalletInfoPayload
 from anydex.core.payment import Payment
 from anydex.core.payment_id import PaymentId
+from anydex.core.settings import MarketSettings
 from anydex.core.tick import Ask, Bid, Tick
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
@@ -32,18 +43,7 @@ from anydex.core.transaction_manager import TransactionManager
 from anydex.core.transaction_repository import DatabaseTransactionRepository,\
     MemoryTransactionRepository
 from anydex.core.wallet_address import WalletAddress
-from anydex.core.database import MarketDB
-from anydex.core.payload import DeclineMatchPayload, DeclineTradePayload, InfoPayload,\
-    MatchPayload, OrderStatusRequestPayload, OrderStatusResponsePayload, OrderbookSyncPayload, PaymentPayload,\
-    PingPongPayload, StartTransactionPayload, TradePayload, WalletInfoPayload
-from ipv8.attestation.trustchain.listener import BlockListener
-from ipv8.attestation.trustchain.payload import HalfBlockPairPayload
-from ipv8.community import Community, lazy_wrapper
-from ipv8.messaging.payload_headers import BinMemberAuthenticationPayload
-from ipv8.messaging.payload_headers import GlobalTimeDistributionPayload
-from ipv8.peer import Peer
-from ipv8.requestcache import NumberCache, RandomNumberCache, RequestCache
-from ipv8.util import addCallback
+from anydex.wallet.tc_wallet import TrustchainWallet
 
 
 # Message definitions
@@ -1038,7 +1038,6 @@ class MarketCommunity(Community, BlockListener):
         Process a match payload.
         """
         order_id = OrderId(TraderId(self.mid), payload.recipient_order_number)
-        other_order_id = OrderId(payload.trader_id, payload.order_number)
         order = self.order_manager.order_repository.find_by_id(order_id)
         if not order:
             self.logger.warning("Cannot find order %s in order repository!", order_id)
