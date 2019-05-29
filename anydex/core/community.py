@@ -1702,7 +1702,10 @@ class MarketCommunity(Community, BlockListener):
         :param block: The block created by this peer defining the transaction.
         """
         cache = self.request_cache.get(u"match", int(transaction.order_id.order_number))
-        if cache:
+        if cache and cache.order.status != "open":
+            # Remove the match request cache
+            self.request_cache.pop(u"match", int(transaction.order_id.order_number))
+        elif cache:
             cache.did_trade(transaction, block)
 
     def received_matched_tx_complete(self, _, data):
