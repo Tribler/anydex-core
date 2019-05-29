@@ -848,7 +848,7 @@ class MarketCommunity(Community, BlockListener):
         global_time = self.claim_global_time()
         dist = GlobalTimeDistributionPayload(global_time).to_pack_list()
         payload = HalfBlockPairBroadcastPayload.from_half_blocks(block1, block2, self.settings.ttl).to_pack_list()
-        packet = self._ez_pack(self._prefix, 6, [dist, payload], False)
+        packet = self._ez_pack(self.trustchain._prefix, 6, [dist, payload], False)
         if self.fixed_broadcast_set:
             broadcast_peers = self.fixed_broadcast_set
         else:
@@ -1702,7 +1702,10 @@ class MarketCommunity(Community, BlockListener):
         :param block: The block created by this peer defining the transaction.
         """
         cache = self.request_cache.get(u"match", int(transaction.order_id.order_number))
-        if cache:
+        if cache and cache.order.status != "open":
+            # Remove the match request cache
+            self.request_cache.pop(u"match", int(transaction.order_id.order_number))
+        elif cache:
             cache.did_trade(transaction, block)
 
     def received_matched_tx_complete(self, _, data):
