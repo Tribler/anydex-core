@@ -848,7 +848,7 @@ class MarketCommunity(Community, BlockListener):
         global_time = self.claim_global_time()
         dist = GlobalTimeDistributionPayload(global_time).to_pack_list()
         payload = HalfBlockPairBroadcastPayload.from_half_blocks(block1, block2, self.settings.ttl).to_pack_list()
-        packet = self._ez_pack(self._prefix, 6, [dist, payload], False)
+        packet = self._ez_pack(self.trustchain._prefix, 6, [dist, payload], False)
         if self.fixed_broadcast_set:
             broadcast_peers = self.fixed_broadcast_set
         else:
