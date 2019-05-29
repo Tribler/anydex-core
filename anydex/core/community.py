@@ -6,7 +6,8 @@ from binascii import hexlify, unhexlify
 from functools import wraps
 
 from ipv8.attestation.trustchain.listener import BlockListener
-from ipv8.attestation.trustchain.payload import HalfBlockPairPayload
+from ipv8.attestation.trustchain.payload import HalfBlockBroadcastPayload, HalfBlockPairBroadcastPayload,\
+    HalfBlockPairPayload
 from ipv8.community import Community, lazy_wrapper
 from ipv8.messaging.payload_headers import BinMemberAuthenticationPayload
 from ipv8.messaging.payload_headers import GlobalTimeDistributionPayload
@@ -86,7 +87,6 @@ class MatchCache(NumberCache):
         self.outstanding_request = None
         self.received_responses_ids = set()
         self.queue = MatchPriorityQueue(self.order)
-        self.tries = {}  # Keep track of the number of tries
 
     @property
     def timeout_delay(self):
@@ -318,6 +318,7 @@ class MarketCommunity(Community, BlockListener):
         self.dht = kwargs.pop('dht', None)
         self.use_database = kwargs.pop('use_database', True)
         self.settings = MarketSettings()
+        self.fixed_broadcast_set = []  # Optional list of fixed peers that will receive market messages
 
         db_working_dir = kwargs.pop('working_directory', '')
 
@@ -331,7 +332,6 @@ class MarketCommunity(Community, BlockListener):
         self.market_database = MarketDB(db_working_dir, self.DB_NAME)
         self.matching_engine = None
         self.transaction_manager = None
-        self.reputation_dict = {}
         self.use_local_address = False
         self.matching_enabled = True
         self.use_incremental_payments = False
@@ -770,7 +770,7 @@ class MarketCommunity(Community, BlockListener):
 
         def on_block_created(blocks):
             block, _ = blocks
-            self.trustchain.send_block(block, ttl=2)
+            order.broadcast_peers = self.broadcast_block(block)
             if self.is_matchmaker:
                 tick.block_hash = block.hash
                 # Search for matches
@@ -805,7 +805,7 @@ class MarketCommunity(Community, BlockListener):
 
         def on_block_created(blocks):
             block, _ = blocks
-            self.trustchain.send_block(block, ttl=2)
+            order.broadcast_peers = self.broadcast_block(block)
             if self.is_matchmaker:
                 tick.block_hash = block.hash
                 # Search for matches
@@ -816,6 +816,49 @@ class MarketCommunity(Community, BlockListener):
             return order
 
         return self.create_new_tick_block(tick).addCallback(on_block_created)
+
+    def broadcast_block(self, block):
+        """
+        Broadcast a block with market information to matchmakers.
+        :param block: The block to broadcast.
+        :return The peers this block was sent to.
+        """
+        global_time = self.claim_global_time()
+        dist = GlobalTimeDistributionPayload(global_time).to_pack_list()
+        payload = HalfBlockBroadcastPayload.from_half_block(block, self.settings.ttl).to_pack_list()
+        packet = self._ez_pack(self.trustchain._prefix, 5, [dist, payload], False)
+        if self.fixed_broadcast_set:
+            broadcast_peers = self.fixed_broadcast_set
+        else:
+            broadcast_peers = random.sample(self.matchmakers, min(len(self.matchmakers), self.settings.fanout))
+
+        for peer in broadcast_peers:
+            self.endpoint.send(peer.address, packet)
+        self.trustchain.relayed_broadcasts.append(block.block_id)
+
+        return broadcast_peers
+
+    def broadcast_block_pair(self, block1, block2):
+        """
+        Broadcast a block with market information to matchmakers.
+        :param block1: The first part of the block pair to broadcast.
+        :param block2: The second part of the block pair to broadcast.
+        :return The peers this block was sent to.
+        """
+        global_time = self.claim_global_time()
+        dist = GlobalTimeDistributionPayload(global_time).to_pack_list()
+        payload = HalfBlockPairBroadcastPayload.from_half_blocks(block1, block2, self.settings.ttl).to_pack_list()
+        packet = self._ez_pack(self._prefix, 6, [dist, payload], False)
+        if self.fixed_broadcast_set:
+            broadcast_peers = self.fixed_broadcast_set
+        else:
+            broadcast_peers = random.sample(self.matchmakers, min(len(self.matchmakers), self.settings.fanout))
+
+        for peer in broadcast_peers:
+            self.endpoint.send(peer.address, packet)
+        self.trustchain.relayed_broadcasts.append(block1.block_id)
+
+        return broadcast_peers
 
     def received_block(self, block):
         """
@@ -1159,7 +1202,7 @@ class MarketCommunity(Community, BlockListener):
             if order.verified:
                 deferred = self.create_new_cancel_order_block(order)
                 if broadcast:
-                    deferred.addCallback(lambda blocks: self.trustchain.send_block(blocks[0], ttl=2))
+                    deferred.addCallback(lambda blocks: self.broadcast_block(blocks[0]))
 
         return succeed(None)
 
@@ -1683,7 +1726,7 @@ class MarketCommunity(Community, BlockListener):
         self.match_order_ids([ask_order_id, bid_order_id])
 
         # Broadcast the pair of blocks
-        self.trustchain.send_block_pair(block1, block2)
+        self.broadcast_block_pair(block1, block2)
 
         order_id = OrderId(TraderId(unhexlify(tx_dict["tx"]["trader_id"])), OrderNumber(tx_dict["tx"]["order_number"]))
         tick_entry_sender = self.order_book.get_tick(order_id)
