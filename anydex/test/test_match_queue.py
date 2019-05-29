@@ -35,9 +35,9 @@ class TestMatchQueue(unittest.TestCase):
         item1 = self.queue.delete()
         item2 = self.queue.delete()
         item3 = self.queue.delete()
-        self.assertEqual(item1[0], 2)
+        self.assertEqual(item1[0], 0)
         self.assertEqual(item2[0], 1)
-        self.assertEqual(item3[0], 0)
+        self.assertEqual(item3[0], 2)
 
         # Same retries, different prices
         self.queue.insert(1, Price(1, 1, 'DUM1', 'DUM2'), order_id)
