@@ -26,9 +26,9 @@ class MatchPriorityQueue(object):
 
         def cmp_items(tup1, tup2):
             if tup1[0] < tup2[0]:
-                return 1
-            elif tup1[0] > tup2[0]:
                 return -1
+            elif tup1[0] > tup2[0]:
+                return 1
             else:
                 if self.order.is_ask():
                     if tup1[1] < tup2[1]:
