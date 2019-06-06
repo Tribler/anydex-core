@@ -25,7 +25,6 @@ class TraderIdTestSuite(unittest.TestCase):
         # Test for equality
         self.assertTrue(self.trader_id == self.trader_id2)
         self.assertTrue(self.trader_id != self.trader_id3)
-        self.assertFalse(self.trader_id == 6)
 
     def test_hash(self):
         # Test for hashes

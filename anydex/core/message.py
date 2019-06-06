@@ -21,30 +21,25 @@ class TraderId(object):
         if len(trader_id) != 20:
             raise ValueError("Trader ID must be 20 bytes")
 
-        self._trader_id = trader_id  # type: bytes
+        self.trader_id = trader_id  # type: bytes
 
     def __str__(self):
-        return "%s" % self._trader_id
+        return "%s" % self.trader_id
 
     def __bytes__(self):  # type: () -> bytes
-        return self._trader_id
+        return self.trader_id
 
     def as_hex(self):
         return hexlify(bytes(self)).decode('utf-8')
 
     def __eq__(self, other):
-        if not isinstance(other, TraderId):
-            return NotImplemented
-        elif self is other:
-            return True
-        else:
-            return self._trader_id == bytes(other)
+        return self.trader_id == other.trader_id
 
     def __ne__(self, other):
         return not self.__eq__(other)
 
     def __hash__(self):
-        return hash(self._trader_id)
+        return hash(self.trader_id)
 
 
 class Message(object):
