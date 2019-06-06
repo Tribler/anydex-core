@@ -67,32 +67,18 @@ class OrderId(object):
         """
         super(OrderId, self).__init__()
 
-        self._trader_id = trader_id
-        self._order_number = order_number
-        self._hash = hash((self._trader_id, self._order_number))
-
-    @property
-    def trader_id(self):
-        """
-        :rtype: TraderId
-        """
-        return self._trader_id
-
-    @property
-    def order_number(self):
-        """
-        :rtype: OrderNumber
-        """
-        return self._order_number
+        self.trader_id = trader_id
+        self.order_number = order_number
+        self._hash = hash((self.trader_id, self.order_number))
 
     def __str__(self):
         """
         format: <trader_id>.<order_number>
         """
-        return "%s.%d" % (self._trader_id.as_hex(), self._order_number)
+        return "%s.%d" % (self.trader_id.as_hex(), self.order_number)
 
     def __bytes__(self):
-        return b"%s.%d" % (self._trader_id.as_hex().encode('utf-8'), self._order_number)
+        return b"%s.%d" % (self.trader_id.as_hex().encode('utf-8'), self.order_number)
 
     def __eq__(self, other):
         if not isinstance(other, OrderId):
@@ -100,8 +86,7 @@ class OrderId(object):
         elif self is other:
             return True
         else:
-            return (self._trader_id, self._order_number) == \
-                   (other.trader_id, other.order_number)
+            return (self.trader_id, self.order_number) == (other.trader_id, other.order_number)
 
     def __ne__(self, other):
         return not self.__eq__(other)
