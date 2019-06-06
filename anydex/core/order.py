@@ -31,28 +31,22 @@ class OrderNumber(object):
         if not isinstance(order_number, integer_types):
             raise ValueError("Order number must be an integer")
 
-        self._order_number = order_number
+        self.order_number = order_number
 
     def __int__(self):
-        return self._order_number
+        return self.order_number
 
     def __str__(self):
-        return "%s" % self._order_number
+        return "%s" % self.order_number
 
     def __eq__(self, other):
-        if not isinstance(other, OrderNumber):
-            return NotImplemented
-        elif self is other:
-            return True
-        else:
-            return self._order_number == \
-                   other._order_number
+        return self.order_number == other.order_number
 
     def __ne__(self, other):
         return not self.__eq__(other)
 
     def __hash__(self):
-        return hash(self._order_number)
+        return hash(self.order_number)
 
 
 class OrderId(object):
