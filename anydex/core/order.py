@@ -2,6 +2,8 @@ from __future__ import absolute_import
 
 import logging
 
+from ipv8.database import database_blob
+
 from six import integer_types, text_type
 
 from anydex.core.assetamount import AssetAmount
@@ -9,7 +11,6 @@ from anydex.core.assetpair import AssetPair
 from anydex.core.message import TraderId
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
-from ipv8.database import database_blob
 
 
 class TickWasNotReserved(Exception):
@@ -31,28 +32,22 @@ class OrderNumber(object):
         if not isinstance(order_number, integer_types):
             raise ValueError("Order number must be an integer")
 
-        self._order_number = order_number
+        self.order_number = order_number
 
     def __int__(self):
-        return self._order_number
+        return self.order_number
 
     def __str__(self):
-        return "%s" % self._order_number
+        return "%s" % self.order_number
 
     def __eq__(self, other):
-        if not isinstance(other, OrderNumber):
-            return NotImplemented
-        elif self is other:
-            return True
-        else:
-            return self._order_number == \
-                   other._order_number
+        return self.order_number == other.order_number
 
     def __ne__(self, other):
         return not self.__eq__(other)
 
     def __hash__(self):
-        return hash(self._order_number)
+        return hash(self.order_number)
 
 
 class OrderId(object):
@@ -67,41 +62,21 @@ class OrderId(object):
         """
         super(OrderId, self).__init__()
 
-        self._trader_id = trader_id
-        self._order_number = order_number
-        self._hash = hash((self._trader_id, self._order_number))
-
-    @property
-    def trader_id(self):
-        """
-        :rtype: TraderId
-        """
-        return self._trader_id
-
-    @property
-    def order_number(self):
-        """
-        :rtype: OrderNumber
-        """
-        return self._order_number
+        self.trader_id = trader_id
+        self.order_number = order_number
+        self._hash = hash((self.trader_id, self.order_number))
 
     def __str__(self):
         """
         format: <trader_id>.<order_number>
         """
-        return "%s.%d" % (self._trader_id.as_hex(), self._order_number)
+        return "%s.%d" % (self.trader_id.as_hex(), self.order_number)
 
     def __bytes__(self):
-        return b"%s.%d" % (self._trader_id.as_hex().encode('utf-8'), self._order_number)
+        return b"%s.%d" % (self.trader_id.as_hex().encode('utf-8'), self.order_number)
 
     def __eq__(self, other):
-        if not isinstance(other, OrderId):
-            return NotImplemented
-        elif self is other:
-            return True
-        else:
-            return (self._trader_id, self._order_number) == \
-                   (other.trader_id, other.order_number)
+        return self.trader_id == other.trader_id and self.order_number == other.order_number
 
     def __ne__(self, other):
         return not self.__eq__(other)

@@ -3,6 +3,8 @@ from __future__ import absolute_import
 import time
 import unittest
 
+from ipv8.util import old_round
+
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
 from anydex.core.message import TraderId
@@ -12,7 +14,6 @@ from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
 from anydex.core.trade import Trade
 from anydex.core.transaction import Transaction, TransactionId, TransactionNumber
-from ipv8.util import old_round
 
 
 class OrderTestSuite(unittest.TestCase):
@@ -183,7 +184,6 @@ class OrderIDTestSuite(unittest.TestCase):
         self.assertEquals(self.order_id, self.order_id)
         self.assertEquals(self.order_id, self.order_id2)
         self.assertFalse(self.order_id == self.order_id3)
-        self.assertEquals(NotImplemented, self.order_id.__eq__(""))
 
     def test_non_equality(self):
         # Test for non equality
@@ -218,7 +218,6 @@ class OrderNumberTestSuite(unittest.TestCase):
         self.assertEquals(self.order_number, self.order_number)
         self.assertEquals(self.order_number, self.order_number2)
         self.assertFalse(self.order_number == self.order_number3)
-        self.assertEquals(NotImplemented, self.order_number.__eq__(""))
 
     def test_non_equality(self):
         # Test for non equality

@@ -1021,7 +1021,8 @@ class MarketCommunity(Community, BlockListener):
                     self.match(tick)
 
     def send_match_messages(self, matching_ticks, order_id):
-        return [self.send_match_message(tick_entry.tick, order_id) for tick_entry in matching_ticks]
+        for tick_entry in matching_ticks:
+            self.send_match_message(tick_entry.tick, order_id)
 
     def send_match_message(self, tick, recipient_order_id):
         """
