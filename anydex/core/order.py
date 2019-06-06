@@ -2,6 +2,8 @@ from __future__ import absolute_import
 
 import logging
 
+from ipv8.database import database_blob
+
 from six import integer_types, text_type
 
 from anydex.core.assetamount import AssetAmount
@@ -9,7 +11,6 @@ from anydex.core.assetpair import AssetPair
 from anydex.core.message import TraderId
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
-from ipv8.database import database_blob
 
 
 class TickWasNotReserved(Exception):
@@ -75,12 +76,7 @@ class OrderId(object):
         return b"%s.%d" % (self.trader_id.as_hex().encode('utf-8'), self.order_number)
 
     def __eq__(self, other):
-        if not isinstance(other, OrderId):
-            return NotImplemented
-        elif self is other:
-            return True
-        else:
-            return (self.trader_id, self.order_number) == (other.trader_id, other.order_number)
+        return self.trader_id == other.trader_id and self.order_number == other.order_number
 
     def __ne__(self, other):
         return not self.__eq__(other)
