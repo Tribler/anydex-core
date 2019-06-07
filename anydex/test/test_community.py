@@ -1,25 +1,27 @@
 from __future__ import absolute_import
 
+from ipv8.test.base import TestBase
+from ipv8.test.mocking.ipv8 import MockIPv8
+
 from nose.tools import raises
 
-from twisted.internet.defer import fail, inlineCallbacks
+from twisted.internet.defer import Deferred, fail, inlineCallbacks
 from twisted.python.failure import Failure
 
-from anydex.test.util import MockObject, trial_timeout
-from anydex.wallet.dummy_wallet import DummyWallet1, DummyWallet2
-from anydex.wallet.tc_wallet import TrustchainWallet
-from anydex.core.block import MarketBlock
-from anydex.core.community import MarketCommunity
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
+from anydex.core.block import MarketBlock
+from anydex.core.clearing_policy import SingleTradeClearingPolicy
+from anydex.core.community import MarketCommunity
 from anydex.core.message import TraderId
 from anydex.core.order import Order, OrderId, OrderNumber
 from anydex.core.tick import Ask, Bid
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
-from anydex.core.transaction import Transaction, TransactionId, TransactionNumber
-from ipv8.test.base import TestBase
-from ipv8.test.mocking.ipv8 import MockIPv8
+from anydex.core.transaction import Transaction, TransactionId
+from anydex.test.util import MockObject, trial_timeout
+from anydex.wallet.dummy_wallet import DummyWallet1, DummyWallet2
+from anydex.wallet.tc_wallet import TrustchainWallet
 
 
 class TestMarketCommunityBase(TestBase):
@@ -44,6 +46,9 @@ class TestMarketCommunityBase(TestBase):
                              is_matchmaker=True, wallets=wallets, use_database=False, working_directory=u":memory:")
         tc_wallet = TrustchainWallet(mock_ipv8.trustchain)
         mock_ipv8.overlay.wallets['MB'] = tc_wallet
+
+        mock_ipv8.overlay.settings.single_trade = False
+        mock_ipv8.overlay.clearing_policies = []
 
         return mock_ipv8
 
@@ -112,6 +117,7 @@ class TestMarketCommunity(TestMarketCommunityBase):
 
         order = yield self.nodes[0].overlay.create_ask(AssetPair(AssetAmount(1, 'DUM1'), AssetAmount(1, 'DUM2')), 3600)
         order._traded_quantity = 1  # So it looks like this order has already been fulfilled
+        order._received_quantity = 1
 
         yield self.sleep(0.5)
 
@@ -202,6 +208,7 @@ class TestMarketCommunity(TestMarketCommunityBase):
         self.assertEqual(len(self.nodes[2].overlay.order_book.asks), 1)
         order = yield self.nodes[1].overlay.create_bid(AssetPair(AssetAmount(2, 'DUM1'), AssetAmount(2, 'DUM2')), 3600)
         order._traded_quantity = 2  # Fulfill this order
+        order._received_quantity = 2
 
         yield self.sleep(0.5)
 
@@ -221,6 +228,7 @@ class TestMarketCommunity(TestMarketCommunityBase):
         yield self.sleep(0.5)  # Give it some time to disseminate
 
         order._traded_quantity = 2  # Fulfill this order
+        order._received_quantity = 2
         self.assertEqual(len(self.nodes[2].overlay.order_book.asks), 1)
         self.nodes[1].overlay.create_bid(AssetPair(AssetAmount(2, 'DUM1'), AssetAmount(2, 'DUM2')), 3600)
 
@@ -302,26 +310,6 @@ class TestMarketCommunity(TestMarketCommunityBase):
         yield self.sleep(0.5)
 
         self.assertTrue(self.nodes[0].overlay.order_manager.order_repository.find_by_id(ask_order.order_id).cancelled)
-
-    @trial_timeout(2)
-    @inlineCallbacks
-    def test_failing_payment(self):
-        """
-        Test trading between two persons when a payment fails
-        """
-        yield self.introduce_nodes()
-
-        for node_nr in [0, 1]:
-            self.nodes[node_nr].overlay.wallets['DUM1'].transfer = lambda *_: fail(RuntimeError("oops"))
-            self.nodes[node_nr].overlay.wallets['DUM2'].transfer = lambda *_: fail(RuntimeError("oops"))
-
-        yield self.nodes[0].overlay.create_ask(AssetPair(AssetAmount(1, 'DUM1'), AssetAmount(1, 'DUM2')), 3600)
-        yield self.nodes[1].overlay.create_bid(AssetPair(AssetAmount(1, 'DUM1'), AssetAmount(1, 'DUM2')), 3600)
-
-        yield self.sleep(0.5)
-
-        self.assertEqual(list(self.nodes[0].overlay.transaction_manager.find_all())[0].status, "error")
-        self.assertEqual(list(self.nodes[1].overlay.transaction_manager.find_all())[0].status, "error")
 
     @trial_timeout(3)
     @inlineCallbacks
@@ -444,12 +432,17 @@ class TestMarketCommunityTwoNodes(TestMarketCommunityBase):
         """
         yield self.introduce_nodes()
 
-        self.nodes[0].overlay.create_ask(AssetPair(AssetAmount(10, 'DUM1'), AssetAmount(13, 'DUM2')), 3600)
-        self.nodes[1].overlay.create_bid(AssetPair(AssetAmount(10, 'DUM1'), AssetAmount(13, 'DUM2')), 3600)
+        order1 = yield self.nodes[0].overlay.create_ask(
+            AssetPair(AssetAmount(10, 'DUM1'), AssetAmount(13, 'DUM2')), 3600)
+        order2 = yield self.nodes[1].overlay.create_bid(
+            AssetPair(AssetAmount(10, 'DUM1'), AssetAmount(13, 'DUM2')), 3600)
 
         yield self.sleep(0.5)
 
         # Verify that the trade has been made
+        self.assertEqual(order1.status, "completed")
+        self.assertEqual(order2.status, "completed")
+
         self.assertTrue(list(self.nodes[0].overlay.transaction_manager.find_all()))
         self.assertTrue(list(self.nodes[1].overlay.transaction_manager.find_all()))
 
@@ -504,12 +497,12 @@ class TestMarketCommunityTwoNodes(TestMarketCommunityBase):
         yield self.nodes[0].overlay.ping_peer(self.nodes[1].overlay.my_peer)
 
 
-class TestMarketCommunityFourNodes(TestMarketCommunityBase):
+class TestMarketCommunityFiveNodes(TestMarketCommunityBase):
     __testing__ = True
     NUM_NODES = 5
 
     def setUp(self):
-        super(TestMarketCommunityFourNodes, self).setUp()
+        super(TestMarketCommunityFiveNodes, self).setUp()
 
         self.nodes[0].overlay.disable_matchmaker()
         self.nodes[1].overlay.disable_matchmaker()
@@ -621,6 +614,68 @@ class TestMarketCommunityFourNodes(TestMarketCommunityBase):
         self.assertEqual(len(list(self.nodes[1].overlay.transaction_manager.find_all())), 1)
         self.assertEqual(len(list(self.nodes[2].overlay.transaction_manager.find_all())), 2)
 
+    @trial_timeout(4)
+    @inlineCallbacks
+    def test_clearing_policy_pending_trade_decline(self):
+        """
+        Test whether we are refusing to trade with a counterparty who is currently involved in another trade
+        We make node 0 malicious, in other words, it does not send a payment back.
+        """
+        clearing_policy = SingleTradeClearingPolicy(self.nodes[2].overlay)
+        self.nodes[2].overlay.clearing_policies.append(clearing_policy)
+
+        yield self.introduce_nodes()
+
+        self.nodes[0].overlay.wallets['DUM1'].transfer = lambda *_: Deferred()
+        self.nodes[0].overlay.wallets['DUM2'].transfer = lambda *_: Deferred()
+
+        order1 = yield self.nodes[0].overlay.create_bid(
+            AssetPair(AssetAmount(10, 'DUM1'), AssetAmount(10, 'DUM2')), 3600)
+        order2 = yield self.nodes[1].overlay.create_ask(
+            AssetPair(AssetAmount(5, 'DUM1'), AssetAmount(5, 'DUM2')), 3600)
+
+        yield self.sleep(0.5)
+
+        # The trade should not be finished
+        self.assertEqual(order1.status, "open")
+        self.assertEqual(order2.status, "open")
+
+        # Another node now tries to transact with node 0, which should not be accepted
+        yield self.nodes[2].overlay.create_ask(AssetPair(AssetAmount(5, 'DUM1'), AssetAmount(5, 'DUM2')), 3600)
+        yield self.sleep(0.5)
+        self.assertFalse(list(self.nodes[2].overlay.transaction_manager.find_all()))
+
+    @trial_timeout(4)
+    @inlineCallbacks
+    def test_clearing_policy_pending_trade_accept(self):
+        """
+        Test whether we accept trade with a counterparty who is currently involved in another trade
+        We make node 0 malicious, in other words, it does not send a payment back.
+        """
+        clearing_policy = SingleTradeClearingPolicy(self.nodes[2].overlay)
+        self.nodes[2].overlay.clearing_policies.append(clearing_policy)
+
+        yield self.introduce_nodes()
+
+        self.nodes[0].overlay.wallets['DUM1'].transfer = lambda *_: Deferred()
+        self.nodes[0].overlay.wallets['DUM2'].transfer = lambda *_: Deferred()
+
+        order1 = yield self.nodes[0].overlay.create_bid(
+            AssetPair(AssetAmount(10, 'DUM1'), AssetAmount(10, 'DUM2')), 3600)
+        order2 = yield self.nodes[1].overlay.create_ask(
+            AssetPair(AssetAmount(15, 'DUM1'), AssetAmount(15, 'DUM2')), 3600)
+
+        yield self.sleep(0.5)
+
+        # The trade should not be finished
+        self.assertEqual(order1.status, "open")
+        self.assertEqual(order2.status, "open")
+
+        # Check that we can trade with the other party
+        yield self.nodes[2].overlay.create_bid(AssetPair(AssetAmount(5, 'DUM1'), AssetAmount(5, 'DUM2')), 3600)
+        yield self.sleep(0.5)
+        self.assertTrue(list(self.nodes[2].overlay.transaction_manager.find_all()))
+
 
 class TestMarketCommunitySingle(TestMarketCommunityBase):
     __testing__ = True
@@ -645,7 +700,7 @@ class TestMarketCommunitySingle(TestMarketCommunityBase):
         ask._traded_quantity = ask_total_traded
         bid = Order(OrderId(TraderId(b'1' * 20), OrderNumber(1)), bid_pair, Timeout(3600), Timestamp.now(), False)
         bid._traded_quantity = bid_total_traded
-        tx = Transaction(TransactionId(TraderId(b'0' * 20), TransactionNumber(1)),
+        tx = Transaction(TransactionId(b'a' * 32),
                          AssetPair(AssetAmount(traded_amount, 'BTC'), AssetAmount(traded_amount, 'MB')),
                          OrderId(TraderId(b'0' * 20), OrderNumber(1)),
                          OrderId(TraderId(b'1' * 20), OrderNumber(1)), Timestamp(0))
@@ -656,7 +711,7 @@ class TestMarketCommunitySingle(TestMarketCommunityBase):
         tx_done_block.transaction = {
             'ask': ask.to_status_dictionary(),
             'bid': bid.to_status_dictionary(),
-            'tx': tx.to_dictionary(),
+            'tx': tx.to_block_dictionary(),
             'version': MarketCommunity.PROTOCOL_VERSION
         }
         tx_done_block.transaction['ask']['address'], tx_done_block.transaction['ask']['port'] = "1.1.1.1", 1234

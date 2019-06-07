@@ -5,3 +5,4 @@
 sqlite/**
 ec.pem
 _trial_temp.lock
+anydex/test/temp/**

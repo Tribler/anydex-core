@@ -5,22 +5,23 @@ from __future__ import absolute_import
 
 from os import path
 
+from ipv8.attestation.trustchain.database import TrustChainDB
+from ipv8.database import database_blob
+
 from six import text_type
 
 from anydex.core.message import TraderId
 from anydex.core.order import Order, OrderId, OrderNumber
 from anydex.core.payment import Payment
 from anydex.core.tick import Tick
-from anydex.core.transaction import Transaction, TransactionId, TransactionNumber
+from anydex.core.transaction import Transaction, TransactionId
 
-from ipv8.attestation.trustchain.database import TrustChainDB
-from ipv8.database import database_blob
 
 DATABASE_DIRECTORY = path.join(u"sqlite")
 # Path to the database location + dispersy._workingdirectory
 DATABASE_PATH = path.join(DATABASE_DIRECTORY, u"market.db")
 # Version to keep track if the db schema needs to be updated.
-LATEST_DB_VERSION = 4
+LATEST_DB_VERSION = 5
 # Schema for the Market DB.
 schema = u"""
 CREATE TABLE IF NOT EXISTS orders(
@@ -31,6 +32,7 @@ CREATE TABLE IF NOT EXISTS orders(
  asset2_amount        BIGINT NOT NULL,
  asset2_type          TEXT NOT NULL,
  traded_quantity      BIGINT NOT NULL,
+ received_quantity    BIGINT NOT NULL,
  timeout              INTEGER NOT NULL,
  order_timestamp      BIGINT NOT NULL,
  completed_timestamp  BIGINT,
@@ -43,8 +45,7 @@ CREATE TABLE IF NOT EXISTS orders(
 
  CREATE TABLE IF NOT EXISTS transactions(
   trader_id                TEXT NOT NULL,
-  transaction_number       INTEGER NOT NULL,
-  order_trader_id          TEXT NOT NULL,
+  transaction_id           TEXT NOT NULL,
   order_number             INTEGER NOT NULL,
   partner_trader_id        TEXT NOT NULL,
   partner_order_number     INTEGER NOT NULL,
@@ -62,22 +63,20 @@ CREATE TABLE IF NOT EXISTS orders(
   partner_incoming_address TEXT NOT NULL,
   partner_outgoing_address TEXT NOT NULL,
 
-  PRIMARY KEY (trader_id, transaction_number)
+  PRIMARY KEY (transaction_id)
  );
 
  CREATE TABLE IF NOT EXISTS payments(
   trader_id                TEXT NOT NULL,
-  transaction_trader_id    TEXT NOT NULL,
-  transaction_number       INTEGER NOT NULL,
+  transaction_id           TEXT NOT NULL,
   payment_id               TEXT NOT NULL,
   transferred_amount       BIGINT NOT NULL,
   transferred_type         TEXT NOT NULL,
   address_from             TEXT NOT NULL,
   address_to               TEXT NOT NULL,
   timestamp                BIGINT NOT NULL,
-  success                  INTEGER NOT NULL,
 
-  PRIMARY KEY (trader_id, payment_id, transaction_trader_id, transaction_number)
+  PRIMARY KEY (trader_id, payment_id, transaction_id)
  );
 
  CREATE TABLE IF NOT EXISTS ticks(
@@ -150,8 +149,8 @@ class MarketDB(TrustChainDB):
         """
         self.execute(
             u"INSERT INTO orders (trader_id, order_number, asset1_amount, asset1_type, asset2_amount, asset2_type,"
-            u"traded_quantity, timeout, order_timestamp, completed_timestamp, is_ask, cancelled, verified) "
-            u"VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            u"traded_quantity, received_quantity, timeout, order_timestamp, completed_timestamp, is_ask, cancelled,"
+            u"verified) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             order.to_database())
         self.commit()
 
@@ -208,8 +207,7 @@ class MarketDB(TrustChainDB):
         """
         db_result = self.execute(u"SELECT * FROM transactions")
         return [Transaction.from_database(db_item,
-                                          self.get_payments(TransactionId(TraderId(bytes(db_item[0])),
-                                                                          TransactionNumber(db_item[1]))))
+                                          self.get_payments(TransactionId(db_item[1])))
                 for db_item in db_result]
 
     def get_transaction(self, transaction_id):
@@ -217,9 +215,8 @@ class MarketDB(TrustChainDB):
         Return a transaction with a specific id.
         """
         try:
-            db_result = next(self.execute(u"SELECT * FROM transactions WHERE trader_id = ? AND transaction_number = ?",
-                                          (database_blob(bytes(transaction_id.trader_id)),
-                                           text_type(transaction_id.transaction_number))))
+            db_result = next(self.execute(u"SELECT * FROM transactions WHERE transaction_id = ?",
+                                          (database_blob(bytes(transaction_id)),)))
         except StopIteration:
             return None
         return Transaction.from_database(db_result, self.get_payments(transaction_id))
@@ -229,11 +226,11 @@ class MarketDB(TrustChainDB):
         Add a specific transaction to the database
         """
         self.execute(
-            u"INSERT INTO transactions (trader_id, transaction_number, order_trader_id, order_number,"
+            u"INSERT INTO transactions (trader_id, transaction_id, order_number,"
             u"partner_trader_id, partner_order_number, asset1_amount, asset1_type, asset1_transferred, asset2_amount,"
             u"asset2_type, asset2_transferred, transaction_timestamp, sent_wallet_info, received_wallet_info,"
             u"incoming_address, outgoing_address, partner_incoming_address, partner_outgoing_address) "
-            u"VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", transaction.to_database())
+            u"VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", transaction.to_database())
         self.commit()
 
         self.delete_payments(transaction.transaction_id)
@@ -246,22 +243,21 @@ class MarketDB(TrustChainDB):
         Updates only if the timestamp is more recent than the one in the database.
         """
         self.execute(
-            u"INSERT OR IGNORE INTO transactions (trader_id, transaction_number, order_trader_id, order_number,"
+            u"INSERT OR IGNORE INTO transactions (trader_id, transaction_id, order_number,"
             u"partner_trader_id, partner_order_number, asset1_amount, asset1_type, asset1_transferred, asset2_amount,"
             u"asset2_type, asset2_transferred, transaction_timestamp, sent_wallet_info, received_wallet_info,"
             u"incoming_address, outgoing_address, partner_incoming_address, partner_outgoing_address) "
-            u"VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", transaction.to_database())
+            u"VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", transaction.to_database())
 
         self.execute(
             u"UPDATE transactions SET asset1_amount = ?, asset1_transferred = ?, asset2_amount = ?, "
-            u"asset2_transferred = ?, transaction_timestamp = ? WHERE trader_id = ? AND transaction_number = ?"
+            u"asset2_transferred = ?, transaction_timestamp = ? WHERE transaction_id = ?"
             u"AND transaction_timestamp < ?", (transaction.assets.first.amount,
                                                transaction.transferred_assets.first.amount,
                                                transaction.assets.second.amount,
                                                transaction.transferred_assets.second.amount,
                                                int(transaction.timestamp),
-                                               database_blob(bytes(transaction.transaction_id.trader_id)),
-                                               int(transaction.transaction_id.transaction_number),
+                                               database_blob(bytes(transaction.transaction_id)),
                                                int(transaction.timestamp))
         )
 
@@ -271,47 +267,32 @@ class MarketDB(TrustChainDB):
         """
         Delete a specific transaction from the database
         """
-        self.execute(u"DELETE FROM transactions WHERE trader_id = ? AND transaction_number = ?",
-                     (database_blob(bytes(transaction_id.trader_id)),
-                      text_type(transaction_id.transaction_number)))
+        self.execute(u"DELETE FROM transactions WHERE transaction_id = ?", (database_blob(bytes(transaction_id)),))
         self.delete_payments(transaction_id)
-
-    def get_next_transaction_number(self):
-        """
-        Return the next transaction number from the database
-        """
-        highest_transaction_number = next(self.execute(u"SELECT MAX(transaction_number) FROM transactions"))
-        if not highest_transaction_number[0]:
-            return 1
-        return highest_transaction_number[0] + 1
 
     def add_payment(self, payment):
         """
         Add a specific transaction to the database
         """
         self.execute(
-            u"INSERT INTO payments (trader_id, transaction_trader_id, transaction_number, payment_id,"
-            u"transferred_amount, transferred_type, address_from, address_to, timestamp,"
-            u"success) VALUES(?,?,?,?,?,?,?,?,?,?)", payment.to_database())
+            u"INSERT INTO payments (trader_id, transaction_id, payment_id,"
+            u"transferred_amount, transferred_type, address_from, address_to, timestamp) VALUES(?,?,?,?,?,?,?,?)",
+            payment.to_database())
         self.commit()
 
     def get_payments(self, transaction_id):
         """
         Return all payment tied to a specific transaction.
         """
-        db_result = self.execute(u"SELECT * FROM payments WHERE transaction_trader_id = ? AND transaction_number = ?"
-                                 u"ORDER BY timestamp ASC",
-                                 (database_blob(bytes(transaction_id.trader_id)),
-                                  text_type(transaction_id.transaction_number)))
+        db_result = self.execute(u"SELECT * FROM payments WHERE transaction_id = ? ORDER BY timestamp ASC",
+                                 (database_blob(bytes(transaction_id)),))
         return [Payment.from_database(db_item) for db_item in db_result]
 
     def delete_payments(self, transaction_id):
         """
         Delete all payments that are associated with a specific transaction
         """
-        self.execute(u"DELETE FROM payments WHERE transaction_trader_id = ? AND transaction_number = ?",
-                     (database_blob(bytes(transaction_id.trader_id)),
-                      text_type(transaction_id.transaction_number)))
+        self.execute(u"DELETE FROM payments WHERE transaction_id = ?", (database_blob(bytes(transaction_id)), ))
 
     def add_tick(self, tick):
         """
@@ -339,7 +320,7 @@ class MarketDB(TrustChainDB):
         return super(MarketDB, self).open(initial_statements, prepare_visioning)
 
     def get_upgrade_script(self, current_version):
-        if current_version == 1 or current_version == 2 or current_version == 3:
+        if current_version == 1 or current_version == 2 or current_version == 3 or current_version == 4:
             return u"DROP TABLE IF EXISTS orders;" \
                    u"DROP TABLE IF EXISTS transactions;" \
                    u"DROP TABLE IF EXISTS payments;" \

@@ -1,15 +1,16 @@
 from __future__ import absolute_import
 
-from anydex.test.base import BaseTestCase
-from anydex.core.block import MarketBlock
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
+from anydex.core.block import MarketBlock
 from anydex.core.message import TraderId
 from anydex.core.order import OrderId, OrderNumber
 from anydex.core.tick import Ask
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
-from anydex.core.transaction import Transaction, TransactionId, TransactionNumber
+from anydex.core.trade import AcceptedTrade
+from anydex.core.transaction import Transaction, TransactionId
+from anydex.test.base import BaseTestCase
 
 
 class TestMarketBlock(BaseTestCase):
@@ -24,10 +25,10 @@ class TestMarketBlock(BaseTestCase):
                        AssetPair(AssetAmount(30, 'BTC'), AssetAmount(30, 'MB')), Timeout(30), Timestamp(0), True)
         self.bid = Ask(OrderId(TraderId(b'1' * 20), OrderNumber(1)),
                        AssetPair(AssetAmount(30, 'BTC'), AssetAmount(30, 'MB')), Timeout(30), Timestamp(0), False)
-        self.transaction = Transaction(TransactionId(TraderId(b'0' * 20), TransactionNumber(1)),
-                                       AssetPair(AssetAmount(30, 'BTC'), AssetAmount(30, 'MB')),
-                                       OrderId(TraderId(b'0' * 20), OrderNumber(1)),
-                                       OrderId(TraderId(b'1' * 20), OrderNumber(1)), Timestamp(0))
+        self.accepted_trade = AcceptedTrade(TraderId(b'0' * 20), OrderId(TraderId(b'0' * 20), OrderNumber(1)),
+                                            OrderId(TraderId(b'1' * 20), OrderNumber(1)), 1234,
+                                            AssetPair(AssetAmount(30, 'BTC'), AssetAmount(30, 'MB')), Timestamp(0))
+        self.transaction = Transaction.from_accepted_trade(self.accepted_trade, TransactionId(b'a' * 32))
 
         ask_tx = self.ask.to_block_dict()
         bid_tx = self.bid.to_block_dict()
@@ -40,17 +41,23 @@ class TestMarketBlock(BaseTestCase):
         self.cancel_block.type = b'cancel_order'
         self.cancel_block.transaction = {'trader_id': 'a' * 20, 'order_number': 1}
 
-        self.tx_block = MarketBlock()
-        self.tx_block.type = b'tx_init'
-        self.tx_block.transaction = {
+        self.tx_init_block = MarketBlock()
+        self.tx_init_block.type = b'tx_init'
+        self.tx_init_block.transaction = {
+            'tx': self.accepted_trade.to_block_dictionary()
+        }
+
+        self.tx_done_block = MarketBlock()
+        self.tx_done_block.type = b'tx_done'
+        self.tx_done_block.transaction = {
             'ask': ask_tx,
             'bid': bid_tx,
-            'tx': self.transaction.to_dictionary()
+            'tx': self.transaction.to_block_dictionary()
         }
 
         payment = {
             'trader_id': 'a' * 40,
-            'transaction_number': 3,
+            'transaction_id': 'a' * 64,
             'transferred': {
                 'amount': 3,
                 'type': 'BTC'
@@ -59,7 +66,6 @@ class TestMarketBlock(BaseTestCase):
             'address_from': 'a',
             'address_to': 'b',
             'timestamp': 1234,
-            'success': True
         }
         self.payment_block = MarketBlock()
         self.payment_block.type = b'tx_payment'
@@ -134,50 +140,30 @@ class TestMarketBlock(BaseTestCase):
         self.cancel_block.transaction['trader_id'] = 3
         self.assertFalse(self.cancel_block.is_valid_cancel_block())
 
-    def test_tx_init_done_block(self):
+    def test_tx_init_block(self):
         """
         Test whether a tx_init/tx_done block can be correctly verified
         """
-        self.assertTrue(self.tx_block.is_valid_tx_init_done_block())
+        self.assertTrue(self.tx_init_block.is_valid_tx_init_done_block())
 
-        self.tx_block.type = b'test'
-        self.assertFalse(self.tx_block.is_valid_tx_init_done_block())
+        self.tx_init_block.type = b'test'
+        self.assertFalse(self.tx_init_block.is_valid_tx_init_done_block())
 
-        self.tx_block.type = b'tx_init'
-        self.tx_block.transaction['test'] = self.tx_block.transaction.pop('ask')
-        self.assertFalse(self.tx_block.is_valid_tx_init_done_block())
+        self.tx_init_block.type = b'tx_init'
+        self.tx_init_block.transaction['tx'].pop('trader_id')
+        self.assertFalse(self.tx_init_block.is_valid_tx_init_done_block())
 
-        self.tx_block.transaction['ask'] = self.tx_block.transaction.pop('test')
-        self.tx_block.transaction['ask']['timeout'] = 3.44
-        self.assertFalse(self.tx_block.is_valid_tx_init_done_block())
+        self.tx_init_block.transaction['tx']['trader_id'] = 'a' * 40
+        self.tx_init_block.transaction['tx']['test'] = 3
+        self.assertFalse(self.tx_init_block.is_valid_tx_init_done_block())
 
-        self.tx_block.transaction['ask']['timeout'] = 3
-        self.tx_block.transaction['bid']['timeout'] = 3.44
-        self.assertFalse(self.tx_block.is_valid_tx_init_done_block())
+        self.tx_init_block.transaction['tx'].pop('test')
+        self.tx_init_block.transaction['tx']['trader_id'] = 'a'
+        self.assertFalse(self.tx_init_block.is_valid_tx_init_done_block())
 
-        self.tx_block.transaction['bid']['timeout'] = 3
-        self.tx_block.transaction['tx'].pop('trader_id')
-        self.assertFalse(self.tx_block.is_valid_tx_init_done_block())
-
-        self.tx_block.transaction['tx']['trader_id'] = 'a' * 40
-        self.tx_block.transaction['tx']['test'] = 3
-        self.assertFalse(self.tx_block.is_valid_tx_init_done_block())
-
-        self.tx_block.transaction['tx'].pop('test')
-        self.tx_block.transaction['tx']['trader_id'] = 'a'
-        self.assertFalse(self.tx_block.is_valid_tx_init_done_block())
-
-        self.tx_block.transaction['tx']['trader_id'] = 'a' * 40
-        self.tx_block.transaction['tx']['assets']['first']['amount'] = 3.4
-        self.assertFalse(self.tx_block.is_valid_tx_init_done_block())
-
-        self.tx_block.transaction['tx']['assets']['first']['amount'] = 3
-        self.tx_block.transaction['tx']['transferred']['first']['amount'] = 3.4
-        self.assertFalse(self.tx_block.is_valid_tx_init_done_block())
-
-        self.tx_block.transaction['tx']['transferred']['first']['amount'] = 3
-        self.tx_block.transaction['tx']['transaction_number'] = 3.4
-        self.assertFalse(self.tx_block.is_valid_tx_init_done_block())
+        self.tx_init_block.transaction['tx']['trader_id'] = 'a' * 40
+        self.tx_init_block.transaction['tx']['assets']['first']['amount'] = 3.4
+        self.assertFalse(self.tx_init_block.is_valid_tx_init_done_block())
 
     def test_tx_payment_block(self):
         """

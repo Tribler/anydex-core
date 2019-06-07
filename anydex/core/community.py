@@ -15,12 +15,13 @@ from ipv8.peer import Peer
 from ipv8.requestcache import NumberCache, RandomNumberCache, RequestCache
 from ipv8.util import addCallback
 
-from twisted.internet import reactor
-from twisted.internet.defer import Deferred, fail, inlineCallbacks, succeed
+from twisted.internet import reactor, task
+from twisted.internet.defer import Deferred, DeferredList, fail, inlineCallbacks, succeed
 
 from anydex.core import DeclineMatchReason, DeclinedTradeReason, MAX_ORDER_TIMEOUT
 from anydex.core.block import MarketBlock
 from anydex.core.bloomfilter import BloomFilter
+from anydex.core.clearing_policy import SingleTradeClearingPolicy
 from anydex.core.database import MarketDB
 from anydex.core.match_queue import MatchPriorityQueue
 from anydex.core.matching_engine import MatchingEngine, PriceTimeStrategy
@@ -29,17 +30,17 @@ from anydex.core.order import OrderId, OrderNumber
 from anydex.core.order_manager import OrderManager
 from anydex.core.order_repository import DatabaseOrderRepository, MemoryOrderRepository
 from anydex.core.orderbook import DatabaseOrderBook, OrderBook
-from anydex.core.payload import DeclineMatchPayload, DeclineTradePayload, InfoPayload,\
-    MatchPayload, OrderStatusRequestPayload, OrderStatusResponsePayload, OrderbookSyncPayload, PaymentPayload,\
-    PingPongPayload, StartTransactionPayload, TradePayload, WalletInfoPayload
+from anydex.core.payload import DeclineMatchPayload, DeclineTradePayload, InfoPayload, MatchPayload,\
+    OrderStatusRequestPayload, OrderStatusResponsePayload, OrderbookSyncPayload, PingPongPayload, PublicKeyPayload,\
+    TradePayload, WalletInfoPayload
 from anydex.core.payment import Payment
 from anydex.core.payment_id import PaymentId
 from anydex.core.settings import MarketSettings
 from anydex.core.tick import Ask, Bid, Tick
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
-from anydex.core.trade import CounterTrade, DeclinedTrade, ProposedTrade, Trade
-from anydex.core.transaction import StartTransaction, Transaction, TransactionId, TransactionNumber
+from anydex.core.trade import AcceptedTrade, CounterTrade, DeclinedTrade, ProposedTrade, Trade
+from anydex.core.transaction import Transaction, TransactionId
 from anydex.core.transaction_manager import TransactionManager
 from anydex.core.transaction_repository import DatabaseTransactionRepository,\
     MemoryTransactionRepository
@@ -53,15 +54,16 @@ MSG_MATCH_DECLINE = 9
 MSG_PROPOSED_TRADE = 10
 MSG_DECLINED_TRADE = 11
 MSG_COUNTER_TRADE = 12
-MSG_START_TX = 13
+MSG_ACCEPT_TRADE = 13
 MSG_WALLET_INFO = 14
-MSG_PAYMENT = 15
 MSG_ORDER_QUERY = 16
 MSG_ORDER_RESPONSE = 17
 MSG_BOOK_SYNC = 19
 MSG_PING = 20
 MSG_PONG = 21
 MSG_MATCH_DONE = 22
+MSG_PK_QUERY = 23
+MSG_PK_RESPONSE = 24
 
 
 def synchronized(f):
@@ -82,6 +84,7 @@ class MatchCache(NumberCache):
         self.community = community
         self.order = order
         self.matches = {}
+        self.schedule_propose = None
         self.schedule_task = None
         self.schedule_task_done = False
         self.outstanding_request = None
@@ -123,7 +126,8 @@ class MatchCache(NumberCache):
         if not self.schedule_task:
             # Schedule a timer
             self._logger.info("Scheduling batch match of order %s" % str(self.order.order_id))
-            self.schedule_task = reactor.callLater(self.community.settings.match_window, self.start_process_matches)
+            self.schedule_task = task.deferLater(reactor, self.community.settings.match_window,
+                                                 self.start_process_matches).addErrback(lambda _: None)
         elif self.schedule_task_done and not self.outstanding_request:
             # If we are currently not processing anything and the schedule task is done, process the matches
             self.process_match()
@@ -154,6 +158,10 @@ class MatchCache(NumberCache):
         """
         Process the first eligible match. First, we sort the list based on price.
         """
+        if self.order.available_quantity == 0:
+            self._logger.debug("No available quantity for order when processing!")
+            return
+
         item = self.queue.delete()
         if not item:
             self._logger.info("Done with processsing match queue for order %s!", self.order.order_id)
@@ -165,7 +173,9 @@ class MatchCache(NumberCache):
                 delay = random.uniform(0, 0)
             else:
                 delay = random.uniform(1, 2)
-            reactor.callLater(delay, self.community.accept_match_and_propose, self.order, other_order_id)
+            self.schedule_propose = task.deferLater(reactor, delay,
+                                                    self.community.accept_match_and_propose,
+                                                    self.order, other_order_id).addErrback(lambda _: None)
 
     def received_decline_trade(self, other_order_id, decline_reason):
         """
@@ -193,7 +203,8 @@ class MatchCache(NumberCache):
                                                           other_order_id,
                                                           match_payload.matchmaker_trader_id,
                                                           DeclineMatchReason.OTHER)
-        elif decline_reason == DeclinedTradeReason.ORDER_RESERVED and self.outstanding_request:
+        elif decline_reason in [DeclinedTradeReason.ORDER_RESERVED, DeclinedTradeReason.ALREADY_TRADING] and \
+                self.outstanding_request:
             # Add it to the queue again
             self._logger.debug("Adding entry (%d, %s, %s) to matching queue again", *self.outstanding_request)
             self.queue.insert(self.outstanding_request[0] + 1, self.outstanding_request[1], self.outstanding_request[2])
@@ -257,7 +268,9 @@ class ProposedTradeRequestCache(NumberCache):
     def on_timeout(self):
         # Just remove the reserved quantity from the order
         order = self.community.order_manager.order_repository.find_by_id(self.proposed_trade.order_id)
-        order.release_quantity_for_tick(self.proposed_trade.recipient_order_id, self.proposed_trade.assets.first.amount)
+        proposed_assets = self.proposed_trade.assets
+        owned_assets = proposed_assets.first.amount if order.is_ask() else proposed_assets.first.amount
+        order.release_quantity_for_tick(self.proposed_trade.recipient_order_id, owned_assets)
         self.community.order_manager.order_repository.update(order)
 
         # Let the match cache know about the timeout
@@ -278,6 +291,21 @@ class OrderStatusRequestCache(RandomNumberCache):
 
     def on_timeout(self):
         self._logger.warning("No response in time from remote peer when requesting order status")
+
+
+class PublicKeyRequestCache(RandomNumberCache):
+
+    def __init__(self, community, trader_id, request_deferred):
+        super(PublicKeyRequestCache, self).__init__(community.request_cache, u"pk-request")
+        self.trader_id = trader_id
+        self.request_deferred = request_deferred
+
+    @property
+    def timeout_delay(self):
+        return 20.0
+
+    def on_timeout(self):
+        self._logger.warning("No response in time from remote peer when requesting public key")
 
 
 class PingRequestCache(RandomNumberCache):
@@ -304,7 +332,7 @@ class MarketCommunity(Community, BlockListener):
     """
     master_peer = Peer(unhexlify("4c69624e61434c504b3ab5bb7dc5a3a61de442585122b24c9f752469a212dc6d8ffa3d42bbf9c2f8d10"
                                  "ba569b270f615ef78aeff0547f38745d22af268037ad64935ee7c054b7921b23b"))
-    PROTOCOL_VERSION = 3
+    PROTOCOL_VERSION = 4
     BLOCK_CLASS = MarketBlock
     DB_NAME = 'market'
 
@@ -328,6 +356,7 @@ class MarketCommunity(Community, BlockListener):
         self._use_main_thread = True  # Market community is unable to deal with thread pool message processing yet
         self.mid = self.my_peer.mid
         self.mid_register = {}
+        self.pk_register = {}
         self.order_book = None
         self.market_database = MarketDB(db_working_dir, self.DB_NAME)
         self.matching_engine = None
@@ -339,6 +368,10 @@ class MarketCommunity(Community, BlockListener):
         self.request_cache = RequestCache()
         self.cancelled_orders = set()  # Keep track of cancelled orders so we don't add them again to the orderbook.
         self.sent_matches = set()
+        self.clearing_policies = []
+
+        if self.settings.single_trade:
+            self.clearing_policies.append(SingleTradeClearingPolicy(self))
 
         if self.use_database:
             order_repository = DatabaseOrderRepository(self.mid, self.market_database)
@@ -360,15 +393,16 @@ class MarketCommunity(Community, BlockListener):
             chr(MSG_PROPOSED_TRADE): self.received_proposed_trade,
             chr(MSG_DECLINED_TRADE): self.received_decline_trade,
             chr(MSG_COUNTER_TRADE): self.received_counter_trade,
-            chr(MSG_START_TX): self.received_start_transaction,
+            chr(MSG_ACCEPT_TRADE): self.received_accept_trade,
             chr(MSG_WALLET_INFO): self.received_wallet_info,
-            chr(MSG_PAYMENT): self.received_payment_message,
             chr(MSG_ORDER_QUERY): self.received_order_status_request,
             chr(MSG_ORDER_RESPONSE): self.received_order_status,
             chr(MSG_BOOK_SYNC): self.received_orderbook_sync,
             chr(MSG_PING): self.received_ping,
             chr(MSG_PONG): self.received_pong,
-            chr(MSG_MATCH_DONE): self.received_matched_tx_complete
+            chr(MSG_MATCH_DONE): self.received_matched_tx_complete,
+            chr(MSG_PK_QUERY): self.received_trader_pk_request,
+            chr(MSG_PK_RESPONSE): self.received_trader_pk_response
         })
 
         self.logger.info("Market community initialized with mid %s", hexlify(self.mid))
@@ -411,13 +445,50 @@ class MarketCommunity(Community, BlockListener):
         """
         tx = block.transaction
         if block.type == b"tx_payment":
-            txid = TransactionId(TraderId(unhexlify(tx["payment"]["trader_id"])),
-                                 TransactionNumber(tx["payment"]["transaction_number"]))
+            txid = TransactionId(unhexlify(tx["payment"]["transaction_id"]))
             transaction = self.transaction_manager.find_by_id(txid)
-            return transaction and block.is_valid_tx_payment_block()
-        elif block.type == b"tx_init" or block.type == b"tx_done":
-            txid = TransactionId(TraderId(unhexlify(tx["tx"]["trader_id"])),
-                                 TransactionNumber(tx["tx"]["transaction_number"]))
+            if not transaction or not block.is_valid_tx_payment_block():
+                return False
+
+            # Start polling for the payment
+            asset_id = tx["payment"]["transferred"]["type"]
+            if asset_id not in self.wallets or not self.wallets[asset_id].created:
+                self.logger.warning("Wallet for asset %s not found - not signing payment message", asset_id)
+                return False
+
+            def on_payment_received(_):
+                transaction.add_payment(payment)
+                self.transaction_manager.transaction_repository.update(transaction)
+
+                order = self.order_manager.order_repository.find_by_id(transaction.order_id)
+                order.add_trade(transaction.partner_order_id, payment.transferred_assets)
+                self.order_manager.order_repository.update(order)
+
+                if not transaction.is_payment_complete():
+                    self.send_payment(transaction)
+
+                # TODO MULTIPLE INVOCATIONS!!
+
+                return True
+
+            wallet = self.wallets[asset_id]
+            payment = Payment.from_block(block)
+            transaction_deferred = wallet.monitor_transaction(payment.payment_id.payment_id)
+            return transaction_deferred.addCallback(on_payment_received)
+        elif block.type == b"tx_init":
+            if not block.is_valid_tx_init_done_block():
+                return False
+
+            # Create a transaction, based on the information in the block
+            if not self.transaction_manager.find_by_id(TransactionId(block.hash)):
+                transaction = Transaction.from_tx_init_block(block)
+                transaction.trading_peer = Peer(block.public_key,
+                                                address=self.lookup_ip(transaction.partner_order_id.trader_id))
+                self.transaction_manager.transaction_repository.add(transaction)
+
+            return True
+        elif block.type == b"tx_done":
+            txid = TransactionId(unhexlify(tx["tx"]["transaction_id"]))
             transaction = self.transaction_manager.find_by_id(txid)
             return transaction and block.is_valid_tx_init_done_block()
 
@@ -496,6 +567,13 @@ class MarketCommunity(Community, BlockListener):
 
     @inlineCallbacks
     def unload(self):
+        # Clear match caches
+        for match_cache in self.get_match_caches():
+            if match_cache.schedule_task:
+                match_cache.schedule_task.cancel()
+            if match_cache.schedule_propose:
+                match_cache.schedule_propose.cancel()
+
         self.request_cache.clear()
 
         # Save the ticks to the database
@@ -594,8 +672,8 @@ class MarketCommunity(Community, BlockListener):
 
     def process_tx_init_block(self, block):
         """
-        Process a TradeChain block containing a transaction initialisation
-        :param block: The TradeChain block containing the transaction initialisation
+        Process a TrustChain block containing a transaction initialisation
+        :param block: The TrustChain block containing the transaction initialisation
         """
         if not block.is_valid_tx_init_done_block():
             self._logger.warning("Invalid tx_init block received!")
@@ -603,18 +681,50 @@ class MarketCommunity(Community, BlockListener):
 
         if self.is_matchmaker:
             tx_dict = block.transaction
-            ask_order_id = OrderId(TraderId(unhexlify(tx_dict["ask"]["trader_id"])),
-                                   OrderNumber(tx_dict["ask"]["order_number"]))
-            bid_order_id = OrderId(TraderId(unhexlify(tx_dict["bid"]["trader_id"])),
-                                   OrderNumber(tx_dict["bid"]["order_number"]))
-            self.match_order_ids([ask_order_id, bid_order_id])
+            order_id1 = OrderId(TraderId(unhexlify(tx_dict["tx"]["trader_id"])),
+                                OrderNumber(tx_dict["tx"]["order_number"]))
+            order_id2 = OrderId(TraderId(unhexlify(tx_dict["tx"]["partner_trader_id"])),
+                                OrderNumber(tx_dict["tx"]["partner_order_number"]))
+            self.match_order_ids([order_id1, order_id2])
 
-        if self.record_transactions:
-            self.market_database.insert_or_update_transaction(Transaction.from_block(block.transaction))
+    def process_tx_payment_block(self, block):
+        """
+        Process a TrustChain block containing a payment.
+        :param block: The TrustChain block containing the payment info.
+        """
+        if block.link_public_key == self.my_peer.public_key.key_to_bin():
+            transaction_id = TransactionId(unhexlify(block.transaction["payment"]["transaction_id"]))
+            transaction = self.transaction_manager.find_by_id(transaction_id)
+            if not transaction:
+                self.logger.warning("Could not find transaction associated for signed payment block %s", block)
+                return
+
+            if transaction.is_payment_complete():
+                order = self.order_manager.order_repository.find_by_id(transaction.order_id)
+
+                def on_tx_done_signed(block):
+                    """
+                    We received the signed block from the counterparty, wrap everything up
+                    """
+                    self.send_matched_transaction_completed(transaction, block)
+
+                def build_tx_done_block(other_order_dict):
+                    my_order_dict = order.to_status_dictionary()
+
+                    if order.is_ask():
+                        ask_order_dict = my_order_dict
+                        bid_order_dict = other_order_dict
+                    else:
+                        ask_order_dict = other_order_dict
+                        bid_order_dict = my_order_dict
+
+                    self.create_new_tx_done_block(transaction.trading_peer, ask_order_dict, bid_order_dict, transaction).addCallback(on_tx_done_signed)
+
+                self.send_order_status_request(transaction.partner_order_id).addCallback(build_tx_done_block)
 
     def process_tx_done_block(self, block):
         """
-        Process a TradeChain block containing a transaction completion
+        Process a TrustChain block containing a transaction completion
         :param block: The TradeChain block containing the transaction completion
         """
         if not block.is_valid_tx_init_done_block():
@@ -623,8 +733,7 @@ class MarketCommunity(Community, BlockListener):
 
         if block.link_public_key == self.my_peer.public_key.key_to_bin():
             # If we have signed an incoming tx_done block, notify the matchmaker about this
-            transaction_id = TransactionId(TraderId(unhexlify(block.transaction["tx"]["trader_id"])),
-                                           TransactionNumber(block.transaction["tx"]["transaction_number"]))
+            transaction_id = TransactionId(unhexlify(block.transaction["tx"]["transaction_id"]))
             transaction = self.transaction_manager.find_by_id(transaction_id)
             if transaction:
                 self.send_matched_transaction_completed(transaction, block)
@@ -637,9 +746,6 @@ class MarketCommunity(Community, BlockListener):
             bid_order_id = OrderId(TraderId(unhexlify(tx_dict["bid"]["trader_id"])),
                                    OrderNumber(tx_dict["bid"]["order_number"]))
             self.match_order_ids([ask_order_id, bid_order_id])
-
-        if self.record_transactions:
-            self.market_database.insert_or_update_transaction(Transaction.from_block(block.transaction))
 
     def process_cancel_order_block(self, block):
         """
@@ -872,6 +978,8 @@ class MarketCommunity(Community, BlockListener):
             self.process_tick_block(block)
         elif block.type == b"tx_init":
             self.process_tx_init_block(block)
+        elif block.type == b"tx_payment":
+            self.process_tx_payment_block(block)
         elif block.type == b"tx_done":
             self.process_tx_done_block(block)
         elif block.type == b"cancel_order":
@@ -921,35 +1029,39 @@ class MarketCommunity(Community, BlockListener):
         return self.trustchain.create_source_block(block_type=b'cancel_order', transaction=tx_dict)
 
     @synchronized
-    def create_new_tx_init_block(self, peer, ask_order_dict, bid_order_dict, transaction):
+    def create_new_tx_init_block(self, peer, accepted_trade):
         """
         Create a block on TradeChain defining initiation of a transaction.
 
         :param: peer: The peer to send the block to
         :param: ask_order_dict: A dictionary containing the status of the ask order
         :param: bid_order_dict: A dictionary containing the status of the bid order
-        :param transaction: The transaction that will be initiated
+        :param accepted_trade: Details on the accepted trade
         :type peer: Peer
-        :type ask_order_dict: dict
-        :type bid_order_dict: dict
-        :type transaction: Transaction
+        :type accepted_trade: AcceptedTrade
         :return: A deferred that fires when the transaction counterparty has signed and returned the block.
         :rtype: Deferred
         """
         tx_dict = {
-            "ask": ask_order_dict,
-            "bid": bid_order_dict,
-            "tx": transaction.to_dictionary(),
+            "tx": accepted_trade.to_block_dictionary(),
             "version": self.PROTOCOL_VERSION
         }
         deferred = self.trustchain.sign_block(peer, peer.public_key.key_to_bin(),
                                               block_type=b'tx_init', transaction=tx_dict)
-        return addCallback(deferred, lambda blocks: blocks[0])
+
+        def on_tx_init_signed(blocks):
+            transaction_id = TransactionId(blocks[1].hash)
+            transaction = Transaction.from_accepted_trade(accepted_trade, transaction_id)
+            transaction.trading_peer = peer
+            self.transaction_manager.transaction_repository.add(transaction)
+            return transaction
+
+        return addCallback(deferred, on_tx_init_signed)
 
     @synchronized
     def create_new_tx_payment_block(self, peer, payment):
         """
-        Create a block on TradeChain defining payment during a transaction.
+        Create a block on TrustChain with information about a specific payment.
 
         :param peer: The peer that we did this transaction with
         :param payment: The payment to record
@@ -985,7 +1097,7 @@ class MarketCommunity(Community, BlockListener):
         tx_dict = {
             "ask": ask_order_dict,
             "bid": bid_order_dict,
-            "tx": transaction.to_dictionary(),
+            "tx": transaction.to_block_dictionary(),
             "version": self.PROTOCOL_VERSION
         }
         deferred = self.trustchain.sign_block(peer, peer.public_key.key_to_bin(),
@@ -1108,8 +1220,7 @@ class MarketCommunity(Community, BlockListener):
         """
         Accept an incoming match payload and propose a trade to the counterparty
         """
-        propose_quantity = order.available_quantity
-        if propose_quantity == 0:
+        if order.available_quantity == 0:
             self.logger.info("No available quantity for order %s - not sending outgoing proposal", order.order_id)
 
             # Notify the match cache
@@ -1118,11 +1229,49 @@ class MarketCommunity(Community, BlockListener):
                 cache.received_decline_trade(other_order_id, DeclinedTradeReason.NO_AVAILABLE_QUANTITY)
             return
 
+        # Pre-actively reserve the available quantity in the order
+        propose_quantity = order.available_quantity
+        order.reserve_quantity_for_tick(other_order_id, propose_quantity)
+        self.order_manager.order_repository.update(order)
+
+        def on_clearing_policies_results(results):
+            should_trade = True
+            decline_reason = DeclinedTradeReason.ALREADY_TRADING
+            for success, result in results:
+                if not success:
+                    self.logger.info("Clearing policy failed with exception for order %s - %s", order.order_id, result)
+                    should_trade = False
+                    break
+                elif not result:
+                    self.logger.info("Clearing policy failed for order %s - %s", order.order_id, result)
+                    should_trade = False
+                    break
+
+            if not should_trade:
+                # Release the quantity again
+                order.release_quantity_for_tick(other_order_id, propose_quantity)
+                self.order_manager.order_repository.update(order)
+
+                # Notify the match cache
+                cache = self.request_cache.get(u"match", int(order.order_id.order_number))
+                if cache:
+                    cache.received_decline_trade(other_order_id, decline_reason)
+                return
+
+            # Otherwise, propose!
+            self.propose_trade(order, other_order_id, propose_quantity)
+
+        deferreds = [policy.should_trade(other_order_id.trader_id) for policy in self.clearing_policies]
+        DeferredList(deferreds, consumeErrors=True).addCallback(on_clearing_policies_results)
+
+    def propose_trade(self, order, other_order_id, propose_quantity):
+        propose_quantity_scaled = order.assets.proportional_downscale(first=propose_quantity)
+
         propose_trade = Trade.propose(
             TraderId(self.mid),
             order.order_id,
             other_order_id,
-            order.assets.proportional_downscale(propose_quantity),
+            propose_quantity_scaled,
             Timestamp.now()
         )
 
@@ -1137,18 +1286,10 @@ class MarketCommunity(Community, BlockListener):
                 if cache:
                     cache.received_decline_trade(other_order_id, DeclinedTradeReason.ADDRESS_LOOKUP_FAIL)
 
-        # Reserve the quantity
-        order.reserve_quantity_for_tick(other_order_id, propose_quantity)
-        self.order_manager.order_repository.update(order)
-
         # Fetch the address of the target peer (we are not guaranteed to know it at this point since we might have
         # received the order indirectly)
-        def get_address():
-            err_handler = lambda _: on_peer_address(None)
-            self.get_address_for_trader(propose_trade.recipient_order_id.trader_id) \
-                .addCallbacks(on_peer_address, err_handler)
-
-        reactor.callFromThread(get_address)
+        self.get_address_for_trader(propose_trade.recipient_order_id.trader_id) \
+            .addCallbacks(on_peer_address, lambda _: on_peer_address(None))
 
     def send_decline_match_message(self, order, other_order_id, matchmaker_trader_id, decline_reason):
         address = self.lookup_ip(matchmaker_trader_id)
@@ -1284,48 +1425,71 @@ class MarketCommunity(Community, BlockListener):
                     self.request_cache.pop(u"proposed-trade", int(proposal_id.split(':')[1]))
                     request.on_timeout()
 
-        should_decline = True
-        decline_reason = 0
-        if not order.is_valid:
+        if order.available_quantity == 0:
+            # No quantity available in this order, decline
+            decline_reason = DeclinedTradeReason.ORDER_COMPLETED if order.status == "completed" else DeclinedTradeReason.ORDER_RESERVED
+            declined_trade = Trade.decline(TraderId(self.mid), Timestamp.now(), proposed_trade, decline_reason)
+            self.send_decline_trade(declined_trade)
+            return
+
+        # Pre-actively reserve quantity in the order
+        quantity_in_propose = proposed_trade.assets.first.amount
+        should_counter = quantity_in_propose > order.available_quantity
+        reserve_quantity = min(quantity_in_propose, order.available_quantity)
+        order.reserve_quantity_for_tick(proposed_trade.order_id, reserve_quantity)
+        self.order_manager.order_repository.update(order)
+
+        def on_proposed_trade_outcome(result):
+            should_trade, decline_reason = result
+            if not should_trade:
+                declined_trade = Trade.decline(TraderId(self.mid), Timestamp.now(), proposed_trade, decline_reason)
+                self.logger.debug("Declined trade made for order id: %s and id: %s "
+                                  "(valid? %s, available quantity of order: %s, reserved: %s, traded: %s), reason: %s",
+                                  str(declined_trade.order_id), str(declined_trade.recipient_order_id),
+                                  order.is_valid(), order.available_quantity, order.reserved_quantity,
+                                  order.traded_quantity, decline_reason)
+                self.send_decline_trade(declined_trade)
+                order.release_quantity_for_tick(proposed_trade.order_id, reserve_quantity)
+                self.order_manager.order_repository.update(order)
+            else:
+                if not should_counter:  # Enough quantity left
+                    self.accept_proposed_trade(proposed_trade)
+                else:  # Not all quantity can be traded
+                    new_pair = order.assets.proportional_downscale(first=reserve_quantity)
+                    counter_trade = Trade.counter(TraderId(self.mid), new_pair, Timestamp.now(), proposed_trade)
+                    self.logger.debug("Counter trade made with asset pair %s for proposed trade", counter_trade.assets)
+                    self.send_counter_trade(counter_trade)
+
+        self.should_accept_propose_trade(peer, proposed_trade, order).addCallback(on_proposed_trade_outcome)
+
+    def should_accept_propose_trade(self, peer, proposed_trade, my_order):
+        # First, check some basic conditions
+        should_trade = False
+        decline_reason = DeclinedTradeReason.OTHER
+        if not my_order.is_valid:
             decline_reason = DeclinedTradeReason.ORDER_INVALID
-        elif order.status == "completed":
-            decline_reason = DeclinedTradeReason.ORDER_COMPLETED
-        elif order.status == "expired":
+        elif my_order.status == "expired":
             decline_reason = DeclinedTradeReason.ORDER_EXPIRED
-        elif order.status == "cancelled":
+        elif my_order.status == "cancelled":
             decline_reason = DeclinedTradeReason.ORDER_CANCELLED
-        elif order.available_quantity == 0:
-            decline_reason = DeclinedTradeReason.ORDER_RESERVED
-        elif not order.has_acceptable_price(proposed_trade.assets):
-            self.logger.info("Unacceptable price for order %s - %s vs %s", order.order_id,
-                             proposed_trade.assets, order.assets)
+        elif not my_order.has_acceptable_price(proposed_trade.assets):
+            self.logger.info("Unacceptable price for order %s - %s vs %s", my_order.order_id,
+                             proposed_trade.assets, my_order.assets)
             decline_reason = DeclinedTradeReason.UNACCEPTABLE_PRICE
         else:
-            should_decline = False
+            should_trade = True
 
-        if should_decline:
-            declined_trade = Trade.decline(TraderId(self.mid), Timestamp.now(), proposed_trade, decline_reason)
-            self.logger.debug("Declined trade made for order id: %s and id: %s "
-                              "(valid? %s, available quantity of order: %s, reserved: %s, traded: %s), reason: %s",
-                              str(declined_trade.order_id), str(declined_trade.recipient_order_id),
-                              order.is_valid(), order.available_quantity, order.reserved_quantity,
-                              order.traded_quantity, decline_reason)
-            self.send_decline_trade(declined_trade)
-        else:
-            if order.available_quantity >= proposed_trade.assets.first.amount:  # Enough quantity left
-                order.reserve_quantity_for_tick(proposed_trade.order_id, proposed_trade.assets.first.amount)
-                self.order_manager.order_repository.update(order)
-                self.start_transaction(proposed_trade)
-            else:  # Not all quantity can be traded
-                counter_quantity = order.available_quantity
-                order.reserve_quantity_for_tick(proposed_trade.order_id, counter_quantity)
-                self.order_manager.order_repository.update(order)
+        if not should_trade:
+            return succeed((False, decline_reason))
 
-                new_pair = order.assets.proportional_downscale(counter_quantity)
+        def on_clearing_policies_results(results):
+            should_trade = all([success and result for success, result in results])
+            decline_reason = None if should_trade else DeclinedTradeReason.ALREADY_TRADING
+            return should_trade, decline_reason
 
-                counter_trade = Trade.counter(TraderId(self.mid), new_pair, Timestamp.now(), proposed_trade)
-                self.logger.debug("Counter trade made with asset pair %s for proposed trade", counter_trade.assets)
-                self.send_counter_trade(counter_trade)
+        # Invoke the clearing policies.
+        deferreds = [policy.should_trade(proposed_trade.trader_id) for policy in self.clearing_policies]
+        return DeferredList(deferreds, consumeErrors=True).addCallback(on_clearing_policies_results)
 
     def send_decline_trade(self, declined_trade):
         payload = declined_trade.to_network()
@@ -1352,7 +1516,9 @@ class MarketCommunity(Community, BlockListener):
         request = self.request_cache.pop(u"proposed-trade", declined_trade.proposal_id)
 
         order = self.order_manager.order_repository.find_by_id(declined_trade.recipient_order_id)
-        order.release_quantity_for_tick(declined_trade.order_id, request.proposed_trade.assets.first.amount)
+        proposed_assets = request.proposed_trade.assets
+        proposed_owned = proposed_assets.first.amount
+        order.release_quantity_for_tick(declined_trade.order_id, proposed_owned)
         self.order_manager.order_repository.update(order)
 
         # Just remove the tick with the order id of the other party and try to find a new match
@@ -1419,66 +1585,51 @@ class MarketCommunity(Community, BlockListener):
             self.send_decline_trade(declined_trade)
 
             # Release the quantity from the tick
-            order.release_quantity_for_tick(declined_trade.recipient_order_id,
-                                            request.proposed_trade.assets.first.amount)
+            proposed_assets = request.proposed_trade.assets
+            proposed_owned = proposed_assets.first.amount
+
+            order.release_quantity_for_tick(declined_trade.recipient_order_id, proposed_owned)
             self.order_manager.order_repository.update(order)
         else:
-            order.release_quantity_for_tick(counter_trade.order_id, request.proposed_trade.assets.first.amount)
-            order.reserve_quantity_for_tick(counter_trade.order_id, counter_trade.assets.first.amount)
+            proposed_assets = request.proposed_trade.assets
+            proposed_owned = proposed_assets.first.amount
+            counter_assets = counter_trade.assets
+            counter_owned = counter_assets.first.amount
+
+            order.release_quantity_for_tick(counter_trade.order_id, proposed_owned)
+            order.reserve_quantity_for_tick(counter_trade.order_id, counter_owned)
             self.order_manager.order_repository.update(order)
-            self.start_transaction(counter_trade)
+            self.accept_proposed_trade(counter_trade)
 
-    # Transactions
-    def start_transaction(self, proposed_trade):
-        order = self.order_manager.order_repository.find_by_id(proposed_trade.recipient_order_id)
-        transaction = self.transaction_manager.create_from_proposed_trade(proposed_trade)
-        start_transaction = StartTransaction(TraderId(self.mid), transaction.transaction_id, order.order_id,
-                                             proposed_trade.order_id, proposed_trade.proposal_id,
-                                             proposed_trade.assets, Timestamp.now())
-        self.send_start_transaction(transaction, start_transaction)
-
-    # Start transaction
-    def send_start_transaction(self, transaction, start_transaction):
-        payload = start_transaction.to_network()
+    def accept_proposed_trade(self, proposed_trade):
+        accepted_trade = Trade.accept(TraderId(self.mid), Timestamp.now(), proposed_trade)
+        payload = accepted_trade.to_network()
 
         auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin()).to_pack_list()
-        payload = StartTransactionPayload(*payload).to_pack_list()
+        payload = TradePayload(*payload).to_pack_list()
 
-        packet = self._ez_pack(self._prefix, MSG_START_TX, [auth, payload])
-        self.endpoint.send(self.lookup_ip(transaction.partner_order_id.trader_id), packet)
+        packet = self._ez_pack(self._prefix, MSG_ACCEPT_TRADE, [auth, payload])
+        self.endpoint.send(self.lookup_ip(proposed_trade.order_id.trader_id), packet)
 
-    @lazy_wrapper(StartTransactionPayload)
-    def received_start_transaction(self, peer, payload):
-        start_transaction = StartTransaction.from_network(payload)
+    @lazy_wrapper(TradePayload)
+    def received_accept_trade(self, peer, payload):
+        accepted_trade = AcceptedTrade.from_network(payload)
 
-        if not self.request_cache.has(u"proposed-trade", start_transaction.proposal_id):
+        if not self.request_cache.has(u"proposed-trade", accepted_trade.proposal_id):
+            self.logger.warning("No proposed-trade cache found for proposal id %d", accepted_trade.proposal_id)
             return
 
-        request = self.request_cache.pop(u"proposed-trade", start_transaction.proposal_id)
+        self.request_cache.pop(u"proposed-trade", accepted_trade.proposal_id)
 
-        # The recipient_order_id in the start_transaction message is our own order
-        order = self.order_manager.order_repository.find_by_id(start_transaction.recipient_order_id)
+        order = self.order_manager.order_repository.find_by_id(accepted_trade.recipient_order_id)
         if not order:
             return
 
-        transaction = self.transaction_manager.create_from_start_transaction(start_transaction)
         incoming_address, outgoing_address = self.get_order_addresses(order)
 
-        def build_tx_init_block(other_order_dict):
-            my_order_dict = order.to_status_dictionary()
-
-            if order.is_ask():
-                ask_order_dict = my_order_dict
-                bid_order_dict = other_order_dict
-            else:
-                ask_order_dict = other_order_dict
-                bid_order_dict = my_order_dict
-
-            # Create a tx_init block to capture that we are going to initiate a transaction
-            self.create_new_tx_init_block(peer, ask_order_dict, bid_order_dict, transaction).\
-                addCallback(lambda _: self.send_wallet_info(transaction, incoming_address, outgoing_address))
-
-        self.send_order_status_request(start_transaction.order_id).addCallback(build_tx_init_block)
+        # Create a tx_init block to capture that we are going to initiate a transaction
+        self.create_new_tx_init_block(peer, accepted_trade).\
+            addCallback(lambda transaction: self.send_wallet_info(transaction, incoming_address, outgoing_address))
 
     def send_order_status_request(self, order_id):
         self.logger.debug("Sending order status request to trader %s (number: %d)",
@@ -1558,19 +1709,21 @@ class MarketCommunity(Community, BlockListener):
             incoming_address, outgoing_address = self.get_order_addresses(order)
             self.send_wallet_info(transaction, incoming_address, outgoing_address)
         else:
+            self.logger.info("Wallet info exchanged for transaction %s - starting payments",
+                             transaction.transaction_id.as_hex())
             self.send_payment(transaction)
 
         self.transaction_manager.transaction_repository.update(transaction)
 
     def send_payment(self, transaction):
         order = self.order_manager.order_repository.find_by_id(transaction.order_id)
-        asset_id = transaction.assets.first.asset_id if order.is_ask() else transaction.assets.second.asset_id
+
+        transfer_amount = transaction.next_payment(order.is_ask())
+        asset_id = transfer_amount.asset_id
 
         wallet = self.wallets[asset_id]
         if not wallet or not wallet.created:
             raise RuntimeError("No %s wallet present" % asset_id)
-
-        transfer_amount = transaction.next_payment(order.is_ask())
 
         # While this conditional is not very pretty, the alternative is to move all this logic to the wallet which
         # requires the wallet to know about transactions, the market community and IPv8.
@@ -1581,120 +1734,32 @@ class MarketCommunity(Community, BlockListener):
         else:
             transfer_deferred = wallet.transfer(transfer_amount.amount, str(transaction.partner_incoming_address))
 
+        def on_payment_acknowledged(payment):
+            self.logger.info("Payment with id %s acknowledged by counterparty!", payment.payment_id)
+
+        def on_payment_done(txid):
+            payment = Payment(TraderId(self.mid), transaction.transaction_id, transfer_amount,
+                              wallet.get_address(), str(transaction.partner_incoming_address), PaymentId(txid),
+                              Timestamp.now())
+
+            # Add it to the transaction
+            transaction.add_payment(payment)
+            self.transaction_manager.transaction_repository.update(transaction)
+
+            order.add_trade(transaction.partner_order_id, payment.transferred_assets)
+            self.order_manager.order_repository.update(order)
+
+            self.create_new_tx_payment_block(transaction.trading_peer, payment)\
+                .addCallback(lambda _: on_payment_acknowledged(payment))
+
         def on_payment_error(failure):
             """
-            When a payment fails, log the error and still send a payment message to inform the other party that the
-            payment has failed.
+            When a payment fails, log the error.
             """
             self.logger.error("Payment of %s to %s failed: (%s) %s", transfer_amount,
                               str(transaction.partner_incoming_address), type(failure.value), failure.value)
-            self.send_payment_message(PaymentId(''), transaction, transfer_amount, False)
 
-        success_cb = lambda txid: self.send_payment_message(PaymentId(txid), transaction, transfer_amount, True)
-        transfer_deferred.addCallbacks(success_cb, on_payment_error)
-
-    def send_payment_message(self, payment_id, transaction, transferred_assets, success):
-        if not success:
-            self.abort_transaction(transaction)
-
-        order = self.order_manager.order_repository.find_by_id(transaction.order_id)
-        if success and order.is_ask():  # Release some of the reserved quantity
-            order.add_trade(transaction.partner_order_id, transferred_assets.amount)
-            self.order_manager.order_repository.update(order)
-
-        payment_message = self.transaction_manager.create_payment_message(
-            TraderId(self.mid), payment_id, transaction, transferred_assets, success)
-        self.logger.info("Sending payment message with transferred assets %s (success? %s)",
-                         payment_message.transferred_assets, success)
-
-        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin()).to_pack_list()
-
-        new_payload = PaymentPayload(*payment_message.to_network()).to_pack_list()
-
-        packet = self._ez_pack(self._prefix, MSG_PAYMENT, [auth, new_payload])
-        self.endpoint.send(self.lookup_ip(transaction.partner_order_id.trader_id), packet)
-
-    @lazy_wrapper(PaymentPayload)
-    def received_payment_message(self, peer, payload):
-        payment = Payment.from_network(payload)
-        self.logger.debug("Received payment message with transferred assets %s", payment.transferred_assets)
-        transaction = self.transaction_manager.find_by_id(payment.transaction_id)
-
-        if not transaction or transaction.is_payment_complete():
-            self.logger.warning("Transaction %s for payment message cannot be found", payment.transaction_id)
-            return
-
-        order = self.order_manager.order_repository.find_by_id(transaction.order_id)
-
-        if not order:
-            self.logger.warning("Order %s for payment message cannot be found", transaction.order_id)
-            return
-
-        if not payment.success:
-            self.logger.info("Payment with id %s not successful, aborting transaction", payment.payment_id)
-            transaction.add_payment(payment)
-            self.transaction_manager.transaction_repository.update(transaction)
-            self.abort_transaction(transaction)
-            return
-
-        asset_id = payment.transferred_assets.asset_id
-
-        def monitor_for_transaction():
-            wallet = self.wallets[asset_id]
-            transaction_deferred = wallet.monitor_transaction(payment.payment_id.payment_id)
-            transaction_deferred.addCallback(lambda _: self.received_payment(peer, payment, transaction))
-
-        reactor.callFromThread(monitor_for_transaction)
-
-    def received_payment(self, peer, payment, transaction):
-        self.logger.info("Received payment with id %s (asset pair %s)", payment.payment_id, payment.transferred_assets)
-        transaction.add_payment(payment)
-        self.transaction_manager.transaction_repository.update(transaction)
-        order = self.order_manager.order_repository.find_by_id(transaction.order_id)
-
-        if payment.transferred_assets.amount > 0 and not order.is_ask():  # Release some of the reserved quantity
-            order.add_trade(transaction.partner_order_id, payment.transferred_assets.amount)
-            self.order_manager.order_repository.update(order)
-
-        def on_tx_done_signed(block):
-            """
-            We received the signed block from the counterparty, wrap everything up
-            """
-            self.send_matched_transaction_completed(transaction, block)
-
-        def build_tx_done_block(other_order_dict):
-            my_order_dict = order.to_status_dictionary()
-
-            if order.is_ask():
-                ask_order_dict = my_order_dict
-                bid_order_dict = other_order_dict
-            else:
-                ask_order_dict = other_order_dict
-                bid_order_dict = my_order_dict
-
-            self.create_new_tx_done_block(peer, ask_order_dict, bid_order_dict, transaction)\
-                .addCallback(on_tx_done_signed)
-
-        # Record this payment on TradeChain
-        def on_payment_recorded(_):
-            if not transaction.is_payment_complete():
-                self.send_payment(transaction)
-            else:
-                self.send_order_status_request(transaction.partner_order_id).addCallback(build_tx_done_block)
-
-        self.create_new_tx_payment_block(peer, payment).addCallback(on_payment_recorded)
-
-    def abort_transaction(self, transaction):
-        """
-        Abort a specific transaction by releasing all reserved quantity for this order.
-        """
-        self.logger.error("Aborting transaction %s", transaction.transaction_id)
-        order = self.order_manager.order_repository.find_by_id(transaction.order_id)
-        if (transaction.assets.first.amount - transaction.transferred_assets.first.amount) > 0:
-            order.release_quantity_for_tick(transaction.partner_order_id,
-                                            transaction.assets.first.amount -
-                                            transaction.transferred_assets.first.amount)
-            self.order_manager.order_repository.update(order)
+        transfer_deferred.addCallbacks(on_payment_done, on_payment_error)
 
     def send_matched_transaction_completed(self, transaction, block):
         """
@@ -1736,6 +1801,37 @@ class MarketCommunity(Community, BlockListener):
         tick_entry_sender = self.order_book.get_tick(order_id)
         if tick_entry_sender:
             self.match(tick_entry_sender.tick)
+
+    def send_trader_pk_request(self, trader_id):
+        if trader_id in self.pk_register:
+            return succeed(self.pk_register[trader_id])
+
+        self.logger.debug("Sending public key status request to trader %s", trader_id.as_hex())
+
+        request_deferred = Deferred()
+        cache = self.request_cache.add(PublicKeyRequestCache(self, trader_id, request_deferred))
+
+        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin()).to_pack_list()
+        payload = PublicKeyPayload(TraderId(self.mid), Timestamp.now(), cache.number).to_pack_list()
+
+        packet = self._ez_pack(self._prefix, MSG_PK_QUERY, [auth, payload])
+        self.endpoint.send(self.lookup_ip(trader_id), packet)
+
+        return request_deferred
+
+    @lazy_wrapper(PublicKeyPayload)
+    def received_trader_pk_request(self, peer, payload):
+        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin()).to_pack_list()
+        new_payload = PublicKeyPayload(TraderId(self.mid), Timestamp.now(), payload.identifier).to_pack_list()
+
+        packet = self._ez_pack(self._prefix, MSG_PK_RESPONSE, [auth, new_payload])
+        self.endpoint.send(peer.address, packet)
+
+    @lazy_wrapper(PublicKeyPayload)
+    def received_trader_pk_response(self, peer, payload):
+        request = self.request_cache.pop(u"pk-request", payload.identifier)
+        self.pk_register[request.trader_id] = peer.public_key
+        request.request_deferred.callback(peer.public_key)
 
 
 class MarketTestnetCommunity(MarketCommunity):

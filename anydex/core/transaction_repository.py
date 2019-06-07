@@ -2,7 +2,7 @@ import logging
 from abc import ABCMeta, abstractmethod
 
 from anydex.core.message import TraderId
-from anydex.core.transaction import TransactionNumber, TransactionId
+from anydex.core.transaction import TransactionId
 
 
 class TransactionRepository(object):
@@ -36,10 +36,6 @@ class TransactionRepository(object):
 
     @abstractmethod
     def delete_by_id(self, transaction_id):
-        return
-
-    @abstractmethod
-    def next_identity(self):
         return
 
 
@@ -79,8 +75,8 @@ class MemoryTransactionRepository(TransactionRepository):
         """
         :type transaction: Transaction
         """
-        self._logger.debug(
-            "Transaction with the id: " + str(transaction.transaction_id) + " was added to the transaction repository")
+        self._logger.debug("Transaction with the id: %s was added to the transaction repository",
+                           transaction.transaction_id.as_hex())
 
         self._transactions[transaction.transaction_id] = transaction
 
@@ -88,8 +84,8 @@ class MemoryTransactionRepository(TransactionRepository):
         """
         :type transaction: Transaction
         """
-        self._logger.debug("Transaction with the id: " + str(
-            transaction.transaction_id) + " was updated to the transaction repository")
+        self._logger.debug("Transaction with the id: %s was updated in the transaction repository",
+                           transaction.transaction_id.as_hex())
 
         self._transactions[transaction.transaction_id] = transaction
 
@@ -97,17 +93,10 @@ class MemoryTransactionRepository(TransactionRepository):
         """
         :type transaction_id: TransactionId
         """
-        self._logger.debug(
-            "Transaction with the id: " + str(transaction_id) + " was deleted from the transaction repository")
+        self._logger.debug("Transaction with the id: %s was deleted from the transaction repository",
+                           transaction_id.as_hex())
 
         del self._transactions[transaction_id]
-
-    def next_identity(self):
-        """
-        :rtype: TransactionId
-        """
-        self._next_id += 1
-        return TransactionId(TraderId(self._mid), TransactionNumber(self._next_id))
 
 
 class DatabaseTransactionRepository(TransactionRepository):
@@ -160,9 +149,3 @@ class DatabaseTransactionRepository(TransactionRepository):
         :param transaction_id: The id of the transaction to remove
         """
         self.persistence.delete_transaction(transaction_id)
-
-    def next_identity(self):
-        """
-        :rtype: TransactionId
-        """
-        return TransactionId(TraderId(self._mid), TransactionNumber(self.persistence.get_next_transaction_number()))

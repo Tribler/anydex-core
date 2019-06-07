@@ -7,7 +7,7 @@ from anydex.core.message import TraderId
 from anydex.core.payment import Payment
 from anydex.core.payment_id import PaymentId
 from anydex.core.timestamp import Timestamp
-from anydex.core.transaction import TransactionId, TransactionNumber
+from anydex.core.transaction import TransactionId
 from anydex.core.wallet_address import WalletAddress
 
 
@@ -17,49 +17,18 @@ class PaymentTestSuite(unittest.TestCase):
     def setUp(self):
         # Object creation
         self.payment = Payment(TraderId(b'0' * 20),
-                               TransactionId(TraderId(b'2' * 20), TransactionNumber(2)),
+                               TransactionId(b'a' * 32),
                                AssetAmount(3, 'BTC'),
                                WalletAddress('a'), WalletAddress('b'),
-                               PaymentId('aaa'), Timestamp(4000), True)
-
-    def test_from_network(self):
-        # Test for from network
-        data = Payment.from_network(
-            type('Data', (object,), {"trader_id": TraderId(b'0' * 20),
-                                     "transaction_id": TransactionId(TraderId(b'2' * 20), TransactionNumber(2)),
-                                     "transferred_assets": AssetAmount(3, 'BTC'),
-                                     "address_from": WalletAddress('a'),
-                                     "address_to": WalletAddress('b'),
-                                     "payment_id": PaymentId('aaa'),
-                                     "timestamp": Timestamp(4000),
-                                     "success": True}))
-
-        self.assertEquals(TraderId(b'0' * 20), data.trader_id)
-        self.assertEquals(TransactionId(TraderId(b'2' * 20), TransactionNumber(2)), data.transaction_id)
-        self.assertEquals(AssetAmount(3, 'BTC'), data.transferred_assets)
-        self.assertEquals(Timestamp(4000), data.timestamp)
-        self.assertTrue(data.success)
-
-    def test_to_network(self):
-        # Test for to network
-        data = self.payment.to_network()
-
-        self.assertEquals(data[0], TraderId(b'0' * 20))
-        self.assertEquals(data[1], Timestamp(4000))
-        self.assertEquals(data[2], TransactionId(TraderId(b'2' * 20), TransactionNumber(2)))
-        self.assertEquals(data[3], AssetAmount(3, 'BTC'))
-        self.assertEquals(data[4], WalletAddress('a'))
-        self.assertEquals(data[5], WalletAddress('b'))
-        self.assertEquals(data[6], PaymentId('aaa'))
-        self.assertEquals(data[7], True)
+                               PaymentId('aaa'), Timestamp(4000))
 
     def test_to_dictionary(self):
         """
         Test the dictionary representation of a payment
         """
         self.assertDictEqual(self.payment.to_dictionary(), {
-            "trader_id": "32" * 20,
-            "transaction_number": 2,
+            "trader_id": "30" * 20,
+            "transaction_id": "61" * 32,
             "transferred": {
                 "amount": 3,
                 "type": "BTC"
@@ -68,5 +37,4 @@ class PaymentTestSuite(unittest.TestCase):
             "address_from": 'a',
             "address_to": 'b',
             "timestamp": 4000,
-            "success": True
         })

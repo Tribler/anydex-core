@@ -10,69 +10,8 @@ from anydex.core.payment import Payment
 from anydex.core.payment_id import PaymentId
 from anydex.core.timestamp import Timestamp
 from anydex.core.trade import Trade
-from anydex.core.transaction import StartTransaction, Transaction, TransactionId, TransactionNumber
+from anydex.core.transaction import Transaction, TransactionId
 from anydex.core.wallet_address import WalletAddress
-
-
-class TransactionNumberTestSuite(unittest.TestCase):
-    """Message number test cases."""
-
-    def setUp(self):
-        # Object creation
-        self.transaction_number = TransactionNumber(1)
-        self.transaction_number2 = TransactionNumber(1)
-        self.transaction_number3 = TransactionNumber(3)
-
-    def test_conversion(self):
-        # Test for conversions
-        self.assertEqual(1, int(self.transaction_number))
-        self.assertEqual('1', str(self.transaction_number))
-
-    def test_init(self):
-        # Test for init validation
-        with self.assertRaises(ValueError):
-            TransactionNumber(1.0)
-
-    def test_equality(self):
-        # Test for equality
-        self.assertTrue(self.transaction_number == self.transaction_number2)
-        self.assertTrue(self.transaction_number != self.transaction_number3)
-        self.assertFalse(self.transaction_number == 6)
-
-    def test_hash(self):
-        # Test for hashes
-        self.assertEqual(self.transaction_number.__hash__(), self.transaction_number2.__hash__())
-        self.assertNotEqual(self.transaction_number.__hash__(), self.transaction_number3.__hash__())
-
-
-class TransactionIdTestSuite(unittest.TestCase):
-    """Transaction ID test cases."""
-
-    def setUp(self):
-        # Object creation
-        self.transaction_id = TransactionId(TraderId(b'0' * 20), TransactionNumber(1))
-        self.transaction_id2 = TransactionId(TraderId(b'0' * 20), TransactionNumber(1))
-        self.transaction_id3 = TransactionId(TraderId(b'0' * 20), TransactionNumber(2))
-
-    def test_properties(self):
-        # Test for properties
-        self.assertEqual(TraderId(b'0' * 20), self.transaction_id.trader_id)
-        self.assertEqual(TransactionNumber(1), self.transaction_id.transaction_number)
-
-    def test_conversion(self):
-        # Test for conversions
-        self.assertEqual('%s.1' % ("30" * 20), str(self.transaction_id))
-
-    def test_equality(self):
-        # Test for equality
-        self.assertTrue(self.transaction_id == self.transaction_id2)
-        self.assertTrue(self.transaction_id != self.transaction_id3)
-        self.assertFalse(self.transaction_id == 6)
-
-    def test_hash(self):
-        # Test for hashes
-        self.assertEqual(self.transaction_id.__hash__(), self.transaction_id2.__hash__())
-        self.assertNotEqual(self.transaction_id.__hash__(), self.transaction_id3.__hash__())
 
 
 class TransactionTestSuite(unittest.TestCase):
@@ -80,7 +19,8 @@ class TransactionTestSuite(unittest.TestCase):
 
     def setUp(self):
         # Object creation
-        self.transaction_id = TransactionId(TraderId(b'0' * 20), TransactionNumber(1))
+        self.maxDiff = None
+        self.transaction_id = TransactionId(b'a' * 32)
         self.transaction = Transaction(self.transaction_id, AssetPair(AssetAmount(100, 'BTC'), AssetAmount(100, 'MB')),
                                        OrderId(TraderId(b'3' * 20), OrderNumber(2)),
                                        OrderId(TraderId(b'2' * 20), OrderNumber(1)), Timestamp(0))
@@ -88,16 +28,12 @@ class TransactionTestSuite(unittest.TestCase):
                                             OrderId(TraderId(b'0' * 20), OrderNumber(2)),
                                             OrderId(TraderId(b'1' * 20), OrderNumber(3)),
                                             AssetPair(AssetAmount(100, 'BTC'), AssetAmount(100, 'MB')), Timestamp(0))
-        self.payment = Payment(TraderId(b'0' * 20), TransactionId(TraderId(b'2' * 20), TransactionNumber(2)),
-                               AssetAmount(3, 'MB'), WalletAddress('a'), WalletAddress('b'),
-                               PaymentId('aaa'), Timestamp(4), True)
-
-    def test_from_proposed_trade(self):
-        """
-        Test creating a transaction from a proposed trade
-        """
-        transaction = Transaction.from_proposed_trade(self.proposed_trade, self.transaction_id)
-        self.assertEqual(transaction.assets, self.transaction.assets)
+        self.payment = Payment(TraderId(b'0' * 20), TransactionId(b'a' * 32),
+                               AssetAmount(100, 'MB'), WalletAddress('a'), WalletAddress('b'),
+                               PaymentId('aaa'), Timestamp(4))
+        self.payment2 = Payment(TraderId(b'0' * 20), TransactionId(b'a' * 32),
+                                AssetAmount(100, 'BTC'), WalletAddress('a'), WalletAddress('b'),
+                                PaymentId('aaa'), Timestamp(4))
 
     def test_add_payment(self):
         """
@@ -105,7 +41,7 @@ class TransactionTestSuite(unittest.TestCase):
         """
         self.transaction.add_payment(self.payment)
         self.assertEqual(self.transaction.transferred_assets.first.amount, 0)
-        self.assertEqual(self.transaction.transferred_assets.second.amount, 3)
+        self.assertEqual(self.transaction.transferred_assets.second.amount, 100)
         self.assertTrue(self.transaction.payments)
 
     def test_next_payment(self):
@@ -129,13 +65,12 @@ class TransactionTestSuite(unittest.TestCase):
         """
         Test the to dictionary method of a transaction
         """
-        self.assertDictEqual(self.transaction.to_dictionary(), {
-            'trader_id': "30" * 20,
-            'transaction_number': 1,
+        self.assertDictEqual(self.transaction.to_block_dictionary(), {
+            'trader_id': "33" * 20,
+            'transaction_id': "61" * 32,
             'order_number': 2,
             'partner_trader_id': "32" * 20,
             'partner_order_number': 1,
-            'payment_complete': False,
             'assets': {
                 'first': {
                     'amount': 100,
@@ -157,7 +92,6 @@ class TransactionTestSuite(unittest.TestCase):
                 }
             },
             'timestamp': 0,
-            'status': 'pending'
         })
 
     def test_status(self):
@@ -166,97 +100,6 @@ class TransactionTestSuite(unittest.TestCase):
         """
         self.assertEqual(self.transaction.status, 'pending')
 
-        self.payment._success = False
         self.transaction.add_payment(self.payment)
-        self.assertEqual(self.transaction.status, 'error')
-
-
-class StartTransactionTestSuite(unittest.TestCase):
-    """Start transaction test cases."""
-
-    def setUp(self):
-        # Object creation
-        self.start_transaction = StartTransaction(TraderId(b'0' * 20),
-                                                  TransactionId(TraderId(b'0' * 20), TransactionNumber(1)),
-                                                  OrderId(TraderId(b'0' * 20), OrderNumber(1)),
-                                                  OrderId(TraderId(b'1' * 20), OrderNumber(1)), 1234,
-                                                  AssetPair(AssetAmount(30, 'BTC'), AssetAmount(40, 'MC')),
-                                                  Timestamp(0))
-
-    def test_from_network(self):
-        # Test for from network
-        data = StartTransaction.from_network(
-            type('Data', (object,), {"trader_id": TraderId(b'0' * 20),
-                                     "transaction_id": TransactionId(TraderId(b'0' * 20), TransactionNumber(1)),
-                                     "order_id": OrderId(TraderId(b'0' * 20), OrderNumber(1)),
-                                     "recipient_order_id": OrderId(TraderId(b'1' * 20), OrderNumber(2)),
-                                     "proposal_id": 1235,
-                                     "assets": AssetPair(AssetAmount(30, 'BTC'), AssetAmount(40, 'MC')),
-                                     "timestamp": Timestamp(0)}))
-
-        self.assertEquals(TraderId(b'0' * 20), data.trader_id)
-        self.assertEquals(TransactionId(TraderId(b'0' * 20), TransactionNumber(1)), data.transaction_id)
-        self.assertEquals(OrderId(TraderId(b'0' * 20), OrderNumber(1)), data.order_id)
-        self.assertEquals(OrderId(TraderId(b'1' * 20), OrderNumber(2)), data.recipient_order_id)
-        self.assertEquals(1235, data.proposal_id)
-        self.assertEquals(Timestamp(0), data.timestamp)
-
-    def test_to_network(self):
-        """
-        Test the conversion of a StartTransaction object to the network
-        """
-        data = self.start_transaction.to_network()
-        self.assertEqual(data[0], self.start_transaction.trader_id)
-
-    def test_from_block(self):
-        """
-        Test the from block method of a transaction
-        """
-        block = {
-            'tx': {
-                'payment_complete': False,
-                'status': 'pending',
-                'partner_trader_id': '1111111111111111111111111111111111111111',
-                'trader_id': '0000000000000000000000000000000000000000',
-                'timestamp': 0,
-                'transferred': {
-                    'second': {
-                        'amount': 0,
-                        'type': 'MB'
-                    },
-                    'first': {
-                        'amount': 0,
-                        'type': 'BTC'
-                    }
-                },
-                'partner_order_number': 1,
-                'order_number': 1,
-                'transaction_number': 1,
-                'assets': {
-                    'second': {
-                        'amount': 30,
-                        'type': 'MB'
-                    },
-                    'first': {
-                        'amount': 30,
-                        'type': 'BTC'
-                    }
-                }
-            }
-        }
-
-        transaction = Transaction.from_block(block)
-
-        self.assertEqual(block['tx']['trader_id'], transaction.transaction_id.trader_id.as_hex())
-        self.assertEqual(block['tx']['transaction_number'], int(transaction.transaction_id.transaction_number))
-        self.assertEqual(block['tx']['partner_trader_id'], transaction.partner_order_id.trader_id.as_hex())
-        self.assertEqual(block['tx']['partner_order_number'], int(transaction.partner_order_id.order_number))
-        self.assertEqual(block['tx']['timestamp'], int(transaction.timestamp))
-        self.assertEqual(block['tx']['assets']['first']['amount'], transaction.assets.first.amount)
-        self.assertEqual(block['tx']['assets']['first']['type'], transaction.assets.first.asset_id)
-        self.assertEqual(block['tx']['assets']['second']['amount'], transaction.assets.second.amount)
-        self.assertEqual(block['tx']['assets']['second']['type'], transaction.assets.second.asset_id)
-        self.assertEqual(block['tx']['transferred']['first']['amount'], transaction.transferred_assets.first.amount)
-        self.assertEqual(block['tx']['transferred']['first']['type'], transaction.transferred_assets.first.asset_id)
-        self.assertEqual(block['tx']['transferred']['second']['amount'], transaction.transferred_assets.second.amount)
-        self.assertEqual(block['tx']['transferred']['second']['type'], transaction.transferred_assets.second.asset_id)
+        self.transaction.add_payment(self.payment2)
+        self.assertEqual(self.transaction.status, 'completed')

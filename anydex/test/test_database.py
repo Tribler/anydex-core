@@ -6,9 +6,9 @@ import six
 
 from twisted.internet.defer import inlineCallbacks
 
-from anydex.test.base import AbstractServer
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
+from anydex.core.database import LATEST_DB_VERSION, MarketDB
 from anydex.core.message import TraderId
 from anydex.core.order import Order, OrderId, OrderNumber
 from anydex.core.payment import Payment
@@ -16,9 +16,9 @@ from anydex.core.payment_id import PaymentId
 from anydex.core.tick import Tick
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
-from anydex.core.transaction import Transaction, TransactionId, TransactionNumber
+from anydex.core.transaction import Transaction, TransactionId
 from anydex.core.wallet_address import WalletAddress
-from anydex.core.database import LATEST_DB_VERSION, MarketDB
+from anydex.test.base import AbstractServer
 
 
 class TestDatabase(AbstractServer):
@@ -41,13 +41,13 @@ class TestDatabase(AbstractServer):
                             Timeout(3600), Timestamp.now(), False)
         self.order2.reserve_quantity_for_tick(OrderId(TraderId(b'3' * 20), OrderNumber(4)), 3)
 
-        self.transaction_id1 = TransactionId(TraderId(b'0' * 20), TransactionNumber(4))
+        self.transaction_id1 = TransactionId(b'a' * 32)
         self.transaction1 = Transaction(self.transaction_id1, AssetPair(AssetAmount(100, 'BTC'), AssetAmount(30, 'MB')),
                                         OrderId(TraderId(b'0' * 20), OrderNumber(1)),
                                         OrderId(TraderId(b'1' * 20), OrderNumber(2)), Timestamp(20000))
 
         self.payment1 = Payment(TraderId(b'0' * 20), self.transaction_id1, AssetAmount(5, 'BTC'),
-                                WalletAddress('abc'), WalletAddress('def'), PaymentId("abc"), Timestamp(20000), False)
+                                WalletAddress('abc'), WalletAddress('def'), PaymentId("abc"), Timestamp(20000))
 
         self.transaction1.add_payment(self.payment1)
 
@@ -133,7 +133,7 @@ class TestDatabase(AbstractServer):
         """
         Test the retrieval of a specific transaction
         """
-        transaction_id = TransactionId(TraderId(b'0' * 20), TransactionNumber(4))
+        transaction_id = TransactionId(b'a' * 32)
         self.assertIsNone(self.database.get_transaction(transaction_id))
         self.database.add_transaction(self.transaction1)
         self.assertIsNotNone(self.database.get_transaction(transaction_id))
@@ -146,14 +146,6 @@ class TestDatabase(AbstractServer):
         self.assertEqual(len(self.database.get_all_transactions()), 1)
         self.database.delete_transaction(self.transaction_id1)
         self.assertEqual(len(self.database.get_all_transactions()), 0)
-
-    def test_get_next_transaction_number(self):
-        """
-        Test the retrieval of the next transaction number from the database
-        """
-        self.assertEqual(self.database.get_next_transaction_number(), 1)
-        self.database.add_transaction(self.transaction1)
-        self.assertEqual(self.database.get_next_transaction_number(), 5)
 
     def test_add_get_payment(self):
         """
@@ -194,4 +186,4 @@ class TestDatabase(AbstractServer):
         self.database.execute(u"DROP TABLE ticks;")
         self.database.execute(u"CREATE TABLE orders(x INTEGER PRIMARY KEY ASC);")
         self.database.execute(u"CREATE TABLE ticks(x INTEGER PRIMARY KEY ASC);")
-        self.assertEqual(self.database.check_database(u"1"), 4)
+        self.assertEqual(self.database.check_database(u"1"), 5)
