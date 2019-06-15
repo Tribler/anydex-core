@@ -9,7 +9,7 @@ from twisted.internet.defer import Deferred, fail, inlineCallbacks, succeed
 from twisted.internet.task import LoopingCall
 from twisted.python.failure import Failure
 
-from anydex import wallet as bitcoinlib_main
+from anydex.wallet import bitcoinlib_main as bitcoinlib_main
 from anydex.wallet.wallet import InsufficientFunds, Wallet
 
 
