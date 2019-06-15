@@ -1,14 +1,15 @@
 from __future__ import absolute_import
 
-from six.moves import xrange
 import string
 from random import choice
+
+from six.moves import xrange
 
 from twisted.internet import reactor
 from twisted.internet.defer import succeed
 from twisted.internet.task import deferLater
 
-from anydex.wallet.wallet import Wallet, InsufficientFunds
+from anydex.wallet.wallet import InsufficientFunds, Wallet
 
 
 class BaseDummyWallet(Wallet):
@@ -44,6 +45,7 @@ class BaseDummyWallet(Wallet):
         })
 
     def transfer(self, quantity, candidate):
+        self._logger.info("Transferring %s %s to %s from dummy wallet", quantity, self.get_identifier(), candidate)
         def on_balance(balance):
             if balance['available'] < quantity:
                 raise InsufficientFunds()

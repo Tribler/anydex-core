@@ -5,9 +5,8 @@ from binascii import unhexlify
 from twisted.web import http
 
 import anydex.util.json_util as json
+from anydex.core.transaction import TransactionId
 from anydex.restapi.base_market_endpoint import BaseMarketEndpoint
-from anydex.core.message import TraderId
-from anydex.core.transaction import TransactionId, TransactionNumber
 
 
 class TransactionsEndpoint(BaseMarketEndpoint):
@@ -16,7 +15,7 @@ class TransactionsEndpoint(BaseMarketEndpoint):
     """
 
     def getChild(self, path, request):
-        return TransactionSpecificTraderEndpoint(self.session, path)
+        return SpecificTransactionEndpoint(self.session, path)
 
     def render_GET(self, request):
         """
@@ -40,7 +39,6 @@ class TransactionsEndpoint(BaseMarketEndpoint):
                         "order_number": 4,
                         "partner_trader_id": "34c406358ba05e5883a75da3f009477e4ca699a9",
                         "partner_order_number": 1,
-                        "transaction_number": 3,
                         "assets" {
                             "first": {
                                 "amount": 3,
@@ -70,28 +68,14 @@ class TransactionsEndpoint(BaseMarketEndpoint):
         return json.twisted_dumps({"transactions": [transaction.to_dictionary() for transaction in transactions]})
 
 
-class TransactionSpecificTraderEndpoint(BaseMarketEndpoint):
+class SpecificTransactionEndpoint(BaseMarketEndpoint):
     """
     This class handles requests for a specific transaction.
     """
 
     def __init__(self, session, path):
         BaseMarketEndpoint.__init__(self, session)
-        self.transaction_trader_id = path
-
-    def getChild(self, path, request):
-        return TransactionSpecificNumberEndpoint(self.session, self.transaction_trader_id, path)
-
-
-class TransactionSpecificNumberEndpoint(BaseMarketEndpoint):
-    """
-    This class handles requests for a transaction with a specific number.
-    """
-
-    def __init__(self, session, transaction_trader_id, path):
-        BaseMarketEndpoint.__init__(self, session)
-        self.transaction_trader_id = transaction_trader_id
-        self.transaction_number = path
+        self.transaction_id = path
 
         child_handler_dict = {b"payments": TransactionPaymentsEndpoint}
         for path, child_cls in child_handler_dict.items():
@@ -103,14 +87,13 @@ class TransactionPaymentsEndpoint(BaseMarketEndpoint):
     This class handles requests for the payments of a specific transaction.
     """
 
-    def __init__(self, session, transaction_trader_id, transaction_number):
+    def __init__(self, session, transaction_id):
         BaseMarketEndpoint.__init__(self, session)
-        self.transaction_trader_id = transaction_trader_id
-        self.transaction_number = transaction_number
+        self.transaction_id = TransactionId(unhexlify(transaction_id))
 
     def render_GET(self, request):
         """
-        .. http:get:: /market/transactions/(string:trader_id)/(string:transaction_number)/payments
+        .. http:get:: /market/transactions/(string:transaction_id)/payments
 
         A GET request to this endpoint will return all payments tied to a specific transaction.
 
@@ -141,8 +124,7 @@ class TransactionPaymentsEndpoint(BaseMarketEndpoint):
                     ]
                 }
         """
-        transaction_id = TransactionId(TraderId(unhexlify(self.transaction_trader_id)),
-                                       TransactionNumber(int(self.transaction_number)))
+        transaction_id = TransactionId(unhexlify())
         transaction = self.get_market_community().transaction_manager.find_by_id(transaction_id)
 
         if not transaction:

@@ -3,6 +3,10 @@ from __future__ import absolute_import
 import time
 from binascii import hexlify, unhexlify
 
+from ipv8.attestation.trustchain.block import GENESIS_HASH
+from ipv8.database import database_blob
+from ipv8.util import old_round
+
 from six import text_type
 
 from anydex.core import MAX_ORDER_TIMEOUT
@@ -12,9 +16,6 @@ from anydex.core.message import TraderId
 from anydex.core.order import OrderId, OrderNumber
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
-from ipv8.attestation.trustchain.block import GENESIS_HASH
-from ipv8.database import database_blob
-from ipv8.util import old_round
 
 
 class Tick(object):
@@ -240,7 +241,7 @@ class Ask(Tick):
         """
         Restore an ask from a TrustChain block
 
-        :param data: TrustChainBlock
+        :param block: TrustChainBlock
         :return: Restored ask
         :rtype: Ask
         """

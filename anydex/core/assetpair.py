@@ -48,15 +48,22 @@ class AssetPair(object):
         """
         return Price(self.second.amount, self.first.amount, self.second.asset_id, self.first.asset_id)
 
-    def proportional_downscale(self, new_amount):
+    def proportional_downscale(self, first=None, second=None):
         """
         This method constructs a new AssetPair where the ratio between the first/second asset is preserved.
         One should specify a new amount for the first asset.
         For instance, if we have an asset pair (4 BTC, 8 MB), the price is 8/4 = 2 MB/BTC.
         If we now change the amount of the first asset from 4 BTC to 1 BTC, the new AssetPair becomes (1 BTC, 2 MB).
+        Likewise, if the second asset is changed to 4, the new AssetPair becomes (2 BTC, 4 MB)
         """
-        return AssetPair(AssetAmount(new_amount, self.first.asset_id),
-                         AssetAmount(long(self.price.amount * new_amount), self.second.asset_id))
+        if first:
+            return AssetPair(AssetAmount(first, self.first.asset_id),
+                             AssetAmount(long(self.price.amount * first), self.second.asset_id))
+        elif second:
+            return AssetPair(AssetAmount(long(second / self.price.amount), self.first.asset_id),
+                             AssetAmount(second, self.second.asset_id))
+        else:
+            raise ValueError("No first/second provided in proportional downscale!")
 
     def __str__(self):
         return "%s %s" % (self.first, self.second)

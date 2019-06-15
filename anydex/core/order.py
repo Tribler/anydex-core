@@ -108,6 +108,7 @@ class Order(object):
         self._assets = assets
         self._reserved_quantity = 0
         self._traded_quantity = 0
+        self._received_quantity = 0
         self._timeout = timeout
         self._timestamp = timestamp
         self._completed_timestamp = None
@@ -123,13 +124,14 @@ class Order(object):
         Create an Order object based on information in the database.
         """
         (trader_id, order_number, asset1_amount, asset1_type, asset2_amount, asset2_type, traded_quantity,
-         timeout, order_timestamp, completed_timestamp, is_ask, cancelled, verified) = data
+         received_quantity, timeout, order_timestamp, completed_timestamp, is_ask, cancelled, verified) = data
 
         order_id = OrderId(TraderId(bytes(trader_id)), OrderNumber(order_number))
         order = cls(order_id, AssetPair(AssetAmount(asset1_amount, str(asset1_type)),
                                         AssetAmount(asset2_amount, str(asset2_type))),
                     Timeout(timeout), Timestamp(order_timestamp), bool(is_ask))
         order._traded_quantity = traded_quantity
+        order._received_quantity = received_quantity
         order._cancelled = bool(cancelled)
         order._verified = verified
         if completed_timestamp:
@@ -149,8 +151,9 @@ class Order(object):
         completed_timestamp = int(self.completed_timestamp) if self.completed_timestamp else None
         return (database_blob(bytes(self.order_id.trader_id)), text_type(self.order_id.order_number),
                 self.assets.first.amount, text_type(self.assets.first.asset_id), self.assets.second.amount,
-                text_type(self.assets.second.asset_id), self.traded_quantity, int(self.timeout),
-                int(self.timestamp), completed_timestamp, self.is_ask(), self._cancelled, self._verified)
+                text_type(self.assets.second.asset_id), self.traded_quantity, self._received_quantity,
+                int(self.timeout), int(self.timestamp), completed_timestamp, self.is_ask(), self._cancelled,
+                self._verified)
 
     @property
     def reserved_ticks(self):
@@ -183,7 +186,7 @@ class Order(object):
     @property
     def total_quantity(self):
         """
-        Return the total assets to buy/sell in the order
+        Return the total amount of assets.
         :rtype: long
         """
         return self.assets.first.amount
@@ -194,7 +197,7 @@ class Order(object):
         Return the quantity that is not reserved
         :rtype: long
         """
-        return self.assets.first.amount - self._reserved_quantity - self._traded_quantity
+        return self.total_quantity - self._reserved_quantity - self._traded_quantity
 
     @property
     def reserved_quantity(self):
@@ -260,10 +263,11 @@ class Order(object):
 
     def is_complete(self):
         """
-        :return: True if the order is completed.
+        :return: True if the order is completed. We consider the order completed if we have received the assets
+        we are interested in.
         :rtype: bool
         """
-        return self._traded_quantity >= self.assets.first.amount
+        return self._traded_quantity >= self.assets.first.amount and self._received_quantity >= self.assets.second.amount
 
     @property
     def status(self):
@@ -358,12 +362,15 @@ class Order(object):
     def cancel(self):
         self._cancelled = True
 
-    def add_trade(self, other_order_id, quantity):
+    def add_trade(self, other_order_id, transferred_assets):
         self._logger.debug("Adding trade for order %s with quantity %s (other id: %s)",
-                           str(self.order_id), quantity, str(other_order_id))
-        self._traded_quantity += quantity
-        self.release_quantity_for_tick(other_order_id, quantity)
-        assert self.available_quantity >= 0, str(self.available_quantity)
+                           str(self.order_id), transferred_assets, str(other_order_id))
+
+        if transferred_assets.asset_id == self.assets.first.asset_id:
+            self._traded_quantity += transferred_assets.amount
+            self.release_quantity_for_tick(other_order_id, transferred_assets.amount)
+        else:
+            self._received_quantity += transferred_assets.amount
 
         if self.is_complete():
             self._completed_timestamp = Timestamp.now()

@@ -13,7 +13,7 @@ from anydex.core.tick import Tick
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
 from anydex.core.trade import Trade
-from anydex.core.transaction import Transaction, TransactionId, TransactionNumber
+from anydex.core.transaction import Transaction, TransactionId
 
 
 class OrderTestSuite(unittest.TestCase):
@@ -21,7 +21,7 @@ class OrderTestSuite(unittest.TestCase):
 
     def setUp(self):
         # Object creation
-        self.transaction_id = TransactionId(TraderId(b'0' * 20), TransactionNumber(1))
+        self.transaction_id = TransactionId(b'a' * 32)
         self.transaction = Transaction(self.transaction_id, AssetPair(AssetAmount(100, 'BTC'), AssetAmount(30, 'MC')),
                                        OrderId(TraderId(b'0' * 20), OrderNumber(2)),
                                        OrderId(TraderId(b'1' * 20), OrderNumber(1)), Timestamp(0))
@@ -39,11 +39,11 @@ class OrderTestSuite(unittest.TestCase):
 
         self.order_timestamp = Timestamp.now()
         self.order = Order(OrderId(TraderId(b'0' * 20), OrderNumber(3)),
-                           AssetPair(AssetAmount(50, 'BTC'), AssetAmount(5, 'MC')),
+                           AssetPair(AssetAmount(50, 'BTC'), AssetAmount(40, 'MC')),
                            Timeout(5000), self.order_timestamp, False)
         self.order.set_verified()
         self.order2 = Order(OrderId(TraderId(b'0' * 20), OrderNumber(4)),
-                            AssetPair(AssetAmount(50, 'BTC'), AssetAmount(5, 'MC')),
+                            AssetPair(AssetAmount(50, 'BTC'), AssetAmount(10, 'MC')),
                             Timeout(5), Timestamp(int(old_round(time.time() * 1000)) - 1000 * 1000), True)
         self.order2.set_verified()
 
@@ -53,11 +53,12 @@ class OrderTestSuite(unittest.TestCase):
         """
         self.order.reserve_quantity_for_tick(OrderId(TraderId(b'5' * 20), OrderNumber(1)), 10)
         self.assertEquals(self.order.traded_quantity, 0)
-        self.order.add_trade(OrderId(TraderId(b'5' * 20), OrderNumber(1)), 10)
+        self.order.add_trade(OrderId(TraderId(b'5' * 20), OrderNumber(1)), AssetAmount(10, 'BTC'))
         self.assertEquals(self.order.traded_quantity, 10)
 
         self.order.reserve_quantity_for_tick(OrderId(TraderId(b'6' * 20), OrderNumber(1)), 40)
-        self.order.add_trade(OrderId(TraderId(b'6' * 20), OrderNumber(1)), 40)
+        self.order.add_trade(OrderId(TraderId(b'6' * 20), OrderNumber(1)), AssetAmount(40, 'MC'))
+        self.order.add_trade(OrderId(TraderId(b'6' * 20), OrderNumber(1)), AssetAmount(40, 'BTC'))
         self.assertTrue(self.order.is_complete())
         self.assertFalse(self.order.cancelled)
 
@@ -137,7 +138,9 @@ class OrderTestSuite(unittest.TestCase):
         self.assertEqual(self.order.status, "open")
         self.order._timeout = Timeout(0)
         self.assertEqual(self.order.status, "expired")
-        self.order._traded_quantity = self.order.total_quantity
+        self.order._timeout = Timeout(3600)
+        self.order._traded_quantity = self.order.assets.first.amount
+        self.order._received_quantity = self.order.assets.second.amount
         self.assertEqual(self.order.status, "completed")
         self.order._cancelled = True
         self.assertEqual(self.order.status, "cancelled")
@@ -158,7 +161,7 @@ class OrderTestSuite(unittest.TestCase):
                     "type": "BTC",
                 },
                 "second": {
-                    "amount": 5,
+                    "amount": 40,
                     "type": "MC"
                 }
             },

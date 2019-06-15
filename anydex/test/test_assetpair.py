@@ -12,8 +12,9 @@ class TestAssetPair(unittest.TestCase):
     def setUp(self):
         # Object creation
         self.assetpair1 = AssetPair(AssetAmount(2, 'BTC'), AssetAmount(2, 'MB'))
-        self.assetpair2 = AssetPair(AssetAmount(4, 'BTC'), AssetAmount(2, 'MB'))
+        self.assetpair2 = AssetPair(AssetAmount(4, 'BTC'), AssetAmount(8, 'MB'))
         self.assetpair3 = AssetPair(AssetAmount(2, 'BTC'), AssetAmount(2, 'MB'))
+        self.assetpair4 = AssetPair(AssetAmount(10, 'DUM1'), AssetAmount(13, 'DUM2'))
 
     def test_init(self):
         """
@@ -64,13 +65,16 @@ class TestAssetPair(unittest.TestCase):
         Test creating a price from an asset pair
         """
         self.assertEqual(self.assetpair1.price.amount, 1)
-        self.assertEqual(self.assetpair2.price.amount, 0.5)
+        self.assertEqual(self.assetpair2.price.amount, 2)
 
     def test_proportional_downscale(self):
         """
         Test the method to proportionally scale down an asset pair
         """
-        self.assertEqual(self.assetpair2.proportional_downscale(2).second.amount, 1)
+        self.assertEqual(self.assetpair2.proportional_downscale(first=1).second.amount, 2)
+        self.assertEqual(self.assetpair2.proportional_downscale(second=4).first.amount, 2)
+        self.assertEqual(self.assetpair4.proportional_downscale(first=10).second.amount, 13)
+        self.assertEqual(self.assetpair4.proportional_downscale(second=13).first.amount, 10)
 
     def test_to_str(self):
         """

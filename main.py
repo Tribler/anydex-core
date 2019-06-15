@@ -37,6 +37,7 @@ class Options(usage.Options):
     ]
     optFlags = [
         ["no-rest-api", "a", "Autonomous: disable the REST api"],
+        ["no-matchmaker", "--no-matchmaker", "disable matchmaker functionality"],
         ["statistics", "s", "Enable IPv8 overlay statistics"],
         ["testnet", "t", "Join the testnet"],
     ]
@@ -97,7 +98,7 @@ class AnyDexServiceMaker(object):
 
         if not options['no-rest-api']:
             self.restapi = RESTManager(self.ipv8)
-            reactor.callLater(0.0, self.restapi.start)
+            reactor.callLater(0.0, self.restapi.start, options['apiport'])
 
             factory = WebSocketServerFactory(u"ws://127.0.0.1:9000")
             factory.protocol = AnyDexWebsocketProtocol
@@ -123,7 +124,8 @@ class AnyDexServiceMaker(object):
                                              dht=self.dht,
                                              wallets=self.wallets,
                                              working_directory=options["statedir"],
-                                             record_transactions=False)
+                                             record_transactions=False,
+                                             is_matchmaker=not options["no-matchmaker"])
 
         self.ipv8.overlays.append(self.market)
         self.ipv8.strategies.append((RandomWalk(self.market), 20))

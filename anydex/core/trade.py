@@ -80,6 +80,29 @@ class Trade(Message):
         )
 
     @classmethod
+    def accept(cls, trader_id, timestamp, proposed_trade):
+        """
+        Accept a trade from another node
+
+        :param trader_id: String representing the trader id
+        :param timestamp: A timestamp when the trade was declined
+        :param proposed_trade: A proposed trade that needs to be declined
+        :type trader_id: TraderId
+        :type timestamp: Timestamp
+        :type proposed_trade: ProposedTrade
+        :return: An object representing an accepted trade
+        :rtype: AcceptedTrade
+        """
+        return AcceptedTrade(
+            trader_id,
+            proposed_trade.recipient_order_id,
+            proposed_trade.order_id,
+            proposed_trade.proposal_id,
+            proposed_trade.assets,
+            timestamp,
+        )
+
+    @classmethod
     def counter(cls, trader_id, assets, timestamp, proposed_trade):
         """
         Counter a trade from another node
@@ -306,3 +329,22 @@ class DeclinedTrade(Trade):
             self._proposal_id,
             self._decline_reason
         )
+
+
+class AcceptedTrade(ProposedTrade):
+    """
+    Accepted trades are made when a trade proposal or counter proposal is accepted.
+    """
+
+    def to_block_dictionary(self):
+        """
+        Return a representation that can be included in a tx_init / tx_done block.
+        """
+        return {
+            "trader_id": self.recipient_order_id.trader_id.as_hex(),
+            "order_number": int(self.recipient_order_id.order_number),
+            "partner_trader_id": self.trader_id.as_hex(),
+            "partner_order_number": int(self.order_id.order_number),
+            "assets": self.assets.to_dictionary(),
+            "timestamp": int(self.timestamp)
+        }
