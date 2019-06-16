@@ -16,7 +16,7 @@ class RootEndpoint(BaseEndpoint):
     It will dispatch requests regarding torrents, channels, settings etc to the right child endpoint.
     """
 
-    def __init__(self, session):
+    def __init__(self, session, enable_ipv8_endpoints=True):
         """
         During the initialization of the REST API, we only start the event sockets and the state endpoint.
         We enable the other endpoints after completing the starting procedure.
@@ -31,7 +31,10 @@ class RootEndpoint(BaseEndpoint):
             b"orders": OrdersEndpoint,
             b"matchmakers": MatchmakersEndpoint,
             b"state": StateEndpoint,
-            b"ipv8": IPv8RootEndpoint,
         }
+
         for path, child_cls in child_handler_dict.items():
             self.putChild(path, child_cls(self.session))
+
+        if enable_ipv8_endpoints:
+            self.putChild(b"ipv8", IPv8RootEndpoint(self.session))
