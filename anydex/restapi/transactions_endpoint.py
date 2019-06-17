@@ -65,7 +65,7 @@ class TransactionsEndpoint(BaseMarketEndpoint):
                 }
         """
         transactions = self.get_market_community().transaction_manager.find_all()
-        return json.twisted_dumps({"transactions": [transaction.to_dictionary() for transaction in transactions]})
+        return json.twisted_dumps({"transactions": [transaction.to_block_dictionary() for transaction in transactions]})
 
 
 class SpecificTransactionEndpoint(BaseMarketEndpoint):
@@ -79,7 +79,7 @@ class SpecificTransactionEndpoint(BaseMarketEndpoint):
 
         child_handler_dict = {b"payments": TransactionPaymentsEndpoint}
         for path, child_cls in child_handler_dict.items():
-            self.putChild(path, child_cls(self.session, self.transaction_trader_id, self.transaction_number))
+            self.putChild(path, child_cls(self.session, self.transaction_id))
 
 
 class TransactionPaymentsEndpoint(BaseMarketEndpoint):
@@ -124,8 +124,7 @@ class TransactionPaymentsEndpoint(BaseMarketEndpoint):
                     ]
                 }
         """
-        transaction_id = TransactionId(unhexlify())
-        transaction = self.get_market_community().transaction_manager.find_by_id(transaction_id)
+        transaction = self.get_market_community().transaction_manager.find_by_id(self.transaction_id)
 
         if not transaction:
             request.setResponseCode(http.NOT_FOUND)
