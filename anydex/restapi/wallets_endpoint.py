@@ -80,14 +80,14 @@ class WalletsEndpoint(BaseMarketEndpoint):
         return WalletEndpoint(self.session, path)
 
 
-class WalletEndpoint(resource.Resource):
+class WalletEndpoint(BaseMarketEndpoint):
     """
     This class represents the endpoint for a single wallet.
     """
     def __init__(self, session, identifier):
-        resource.Resource.__init__(self)
+        BaseMarketEndpoint.__init__(self, session)
         self.session = session
-        self.identifier = identifier.upper()
+        self.identifier = identifier.upper().decode('utf-8')
 
         child_handler_dict = {
             b"balance": WalletBalanceEndpoint,
@@ -136,13 +136,13 @@ class WalletEndpoint(resource.Resource):
         return NOT_DONE_YET
 
 
-class WalletBalanceEndpoint(resource.Resource):
+class WalletBalanceEndpoint(BaseMarketEndpoint):
     """
     This class handles requests regarding the balance in a wallet.
     """
 
     def __init__(self, session, identifier):
-        resource.Resource.__init__(self)
+        BaseMarketEndpoint.__init__(self, session)
         self.session = session
         self.identifier = identifier
 
@@ -174,18 +174,18 @@ class WalletBalanceEndpoint(resource.Resource):
             request.write(json.twisted_dumps({"balance": balance}))
             request.finish()
 
-            self.get_market_community().wallets[self.identifier].get_balance().addCallback(on_balance)
+        self.get_market_community().wallets[self.identifier].get_balance().addCallback(on_balance)
 
         return NOT_DONE_YET
 
 
-class WalletTransactionsEndpoint(resource.Resource):
+class WalletTransactionsEndpoint(BaseMarketEndpoint):
     """
     This class handles requests regarding the transactions of a wallet.
     """
 
     def __init__(self, session, identifier):
-        resource.Resource.__init__(self)
+        BaseMarketEndpoint.__init__(self, session)
         self.session = session
         self.identifier = identifier
 
@@ -223,18 +223,18 @@ class WalletTransactionsEndpoint(resource.Resource):
             request.write(json.twisted_dumps({"transactions": transactions}))
             request.finish()
 
-            self.get_market_community().wallets[self.identifier].get_transactions().addCallback(on_transactions)
+        self.get_market_community().wallets[self.identifier].get_transactions().addCallback(on_transactions)
 
         return NOT_DONE_YET
 
 
-class WalletTransferEndpoint(resource.Resource):
+class WalletTransferEndpoint(BaseMarketEndpoint):
     """
     This class handles requests regarding transferring money by a wallet.
     """
 
     def __init__(self, session, identifier):
-        resource.Resource.__init__(self)
+        BaseMarketEndpoint.__init__(self, session)
         self.session = session
         self.identifier = identifier
 
@@ -272,7 +272,7 @@ class WalletTransferEndpoint(resource.Resource):
             request.setResponseCode(http.BAD_REQUEST)
             return json.twisted_dumps({"error": "this wallet is not created"})
 
-        if 'amount' not in parameters or 'destination' not in parameters:
+        if b'amount' not in parameters or b'destination' not in parameters:
             request.setResponseCode(http.BAD_REQUEST)
             return json.twisted_dumps({"error": "an amount and a destination address are required"})
 
@@ -285,7 +285,7 @@ class WalletTransferEndpoint(resource.Resource):
             request.write(json.twisted_dumps({"txid": "", "error": error.getErrorMessage()}))
             request.finish()
 
-        wallet.transfer(parameters['amount'][0], parameters['destination'][0]).addCallback(on_transferred)\
+        wallet.transfer(parameters[b'amount'][0], parameters[b'destination'][0]).addCallback(on_transferred)\
             .addErrback(on_transfer_error)
 
         return NOT_DONE_YET

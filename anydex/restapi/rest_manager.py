@@ -2,12 +2,12 @@ from __future__ import absolute_import
 
 import logging
 
+from ipv8.REST.rest_manager import RESTRequest
+from ipv8.taskmanager import TaskManager
+
 from twisted.internet import reactor
 from twisted.internet.defer import maybeDeferred
 from twisted.web import server
-
-from ipv8.REST.rest_manager import RESTRequest
-from ipv8.taskmanager import TaskManager
 
 from anydex.restapi.root_endpoint import RootEndpoint
 
@@ -23,11 +23,13 @@ class RESTManager(TaskManager):
         self.session = session
         self.site = None
         self.root_endpoint = None
+        self.port = None
 
     def start(self, port=8090):
         """
         Starts the HTTP API with the listen port as specified in the session configuration.
         """
+        self.port = port
         self.root_endpoint = RootEndpoint(self.session)
         site = server.Site(resource=self.root_endpoint)
         site.requestFactory = RESTRequest
