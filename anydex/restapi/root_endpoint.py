@@ -8,6 +8,7 @@ from anydex.restapi.matchmakers_endpoint import MatchmakersEndpoint
 from anydex.restapi.orders_endpoint import OrdersEndpoint
 from anydex.restapi.state_endpoint import StateEndpoint
 from anydex.restapi.transactions_endpoint import TransactionsEndpoint
+from anydex.restapi.wallets_endpoint import WalletsEndpoint
 
 
 class RootEndpoint(BaseEndpoint):
@@ -31,6 +32,7 @@ class RootEndpoint(BaseEndpoint):
             b"orders": OrdersEndpoint,
             b"matchmakers": MatchmakersEndpoint,
             b"state": StateEndpoint,
+            b"wallets": WalletsEndpoint
         }
 
         for path, child_cls in child_handler_dict.items():
