@@ -8,3 +8,5 @@ _trial_temp.lock
 anydex/test/temp/**
 .coverage
 cover/**
+build/**
+dist/**
