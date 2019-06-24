@@ -41,7 +41,7 @@ class TrustchainWallet(Wallet, BlockListener):
         In our current design, only the person that should pay bytes to others initiates a signing request.
         This is true when considering payouts in the tunnels and when buying bytes on the market.
         """
-        return block.transaction["down"] >= MIN_TRANSACTION_SIZE
+        return block.transaction[b"down"] >= MIN_TRANSACTION_SIZE
 
     def received_block(self, block):
         pass
@@ -70,7 +70,7 @@ class TrustchainWallet(Wallet, BlockListener):
 
         block = self.trustchain.persistence.get_latest(peer.public_key.key_to_bin(), block_type=b'tribler_bandwidth')
         if block:
-            return block.transaction['total_up'] - block.transaction['total_down']
+            return block.transaction[b'total_up'] - block.transaction[b'total_down']
 
         return 0
 
@@ -92,7 +92,7 @@ class TrustchainWallet(Wallet, BlockListener):
         return self.get_balance().addCallback(on_balance)
 
     def create_transfer_block(self, peer, quantity):
-        transaction = {"up": 0, "down": int(quantity * MEGA_DIV)}
+        transaction = {b"up": 0, b"down": int(quantity * MEGA_DIV)}
         deferred = self.trustchain.sign_block(peer, peer.public_key.key_to_bin(),
                                               block_type=b'tribler_bandwidth', transaction=transaction)
         addCallback(deferred, lambda _: None)
@@ -160,9 +160,9 @@ class TrustchainWallet(Wallet, BlockListener):
         peers_helped_you = set()
         for block in self.trustchain.persistence.get_latest_blocks(public_key, limit=-1,
                                                                    block_types=[b'tribler_bandwidth']):
-            if int(block.transaction["up"]) > 0:
+            if int(block.transaction[b"up"]) > 0:
                 peers_you_helped.add(block.link_public_key)
-            if int(block.transaction["down"]) > 0:
+            if int(block.transaction[b"down"]) > 0:
                 peers_helped_you.add(block.link_public_key)
         return len(peers_you_helped), len(peers_helped_you)
 
@@ -181,13 +181,13 @@ class TrustchainWallet(Wallet, BlockListener):
         statistics["peers_that_helped_pk"] = interacts[1] if interacts[1] is not None else 0
         if latest_block:
             statistics["total_blocks"] = latest_block.sequence_number
-            statistics["total_up"] = latest_block.transaction["total_up"]
-            statistics["total_down"] = latest_block.transaction["total_down"]
+            statistics["total_up"] = latest_block.transaction[b"total_up"]
+            statistics["total_down"] = latest_block.transaction[b"total_down"]
             statistics["latest_block"] = dict(latest_block)
 
             # Set up/down
-            statistics["latest_block"]["up"] = latest_block.transaction["up"]
-            statistics["latest_block"]["down"] = latest_block.transaction["down"]
+            statistics["latest_block"]["up"] = latest_block.transaction[b"up"]
+            statistics["latest_block"]["down"] = latest_block.transaction[b"down"]
         else:
             statistics["total_blocks"] = 0
             statistics["total_up"] = 0
@@ -209,15 +209,15 @@ class TrustchainWallet(Wallet, BlockListener):
         transaction = {
             'up': 0,
             'down': amount,
-            'type': 'tribler_bandwidth'
+            'type': b'tribler_bandwidth'
         }
 
         # Create the two half blocks that form the transaction
-        local_half_block = TriblerBandwidthBlock.create('tribler_bandwidth', transaction, self.trustchain.persistence,
+        local_half_block = TriblerBandwidthBlock.create(b'tribler_bandwidth', transaction, self.trustchain.persistence,
                                                         self.trustchain.my_peer.public_key.key_to_bin(),
                                                         link_pk=tmp_peer.public_key.key_to_bin())
         local_half_block.sign(self.trustchain.my_peer.key)
-        tmp_half_block = TriblerBandwidthBlock.create('tribler_bandwidth', transaction, self.trustchain.persistence,
+        tmp_half_block = TriblerBandwidthBlock.create(b'tribler_bandwidth', transaction, self.trustchain.persistence,
                                                       tmp_peer.public_key.key_to_bin(),
                                                       link=local_half_block,
                                                       link_pk=self.trustchain.my_peer.public_key.key_to_bin())

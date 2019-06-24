@@ -51,6 +51,10 @@ class TestDatabase(AbstractServer):
 
         self.transaction1.add_payment(self.payment1)
 
+    def tearDown(self):
+        self.database.close()
+        super(TestDatabase, self).tearDown()
+
     def test_add_get_order(self):
         """
         Test the insertion and retrieval of an order in the database

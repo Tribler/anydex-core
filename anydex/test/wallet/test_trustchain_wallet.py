@@ -50,10 +50,10 @@ class TestTrustchainWallet(TestBase):
 
         his_pubkey = self.nodes[0].network.verified_peers[0].public_key.key_to_bin()
         tx = {
-            'up': 20 * 1024 * 1024,
-            'down': 5 * 1024 * 1024,
-            'total_up': 20 * 1024 * 1024,
-            'total_down': 5 * 1024 * 1024
+            b'up': 20 * 1024 * 1024,
+            b'down': 5 * 1024 * 1024,
+            b'total_up': 20 * 1024 * 1024,
+            b'total_down': 5 * 1024 * 1024
         }
         self.nodes[0].overlay.sign_block(self.nodes[0].network.verified_peers[0], public_key=his_pubkey,
                                          block_type=b'tribler_bandwidth', transaction=tx)
@@ -94,10 +94,10 @@ class TestTrustchainWallet(TestBase):
 
         # Now create the transaction
         transaction = {
-            'up': 20 * 1024 * 1024,
-            'down': 5 * 1024 * 1024,
-            'total_up': 20 * 1024 * 1024,
-            'total_down': 5 * 1024 * 1024
+            b'up': 20 * 1024 * 1024,
+            b'down': 5 * 1024 * 1024,
+            b'total_up': 20 * 1024 * 1024,
+            b'total_down': 5 * 1024 * 1024
         }
         self.nodes[1].overlay.sign_block(self.nodes[1].network.verified_peers[0], public_key=his_pubkey,
                                          block_type=b'tribler_bandwidth', transaction=transaction)
@@ -111,10 +111,10 @@ class TestTrustchainWallet(TestBase):
         Test monitoring a transaction that already exists
         """
         transaction = {
-            'up': 20 * 1024 * 1024,
-            'down': 5 * 1024 * 1024,
-            'total_up': 20 * 1024 * 1024,
-            'total_down': 5 * 1024 * 1024
+            b'up': 20 * 1024 * 1024,
+            b'down': 5 * 1024 * 1024,
+            b'total_up': 20 * 1024 * 1024,
+            b'total_down': 5 * 1024 * 1024
         }
         his_pubkey = self.nodes[0].overlay.my_peer.public_key.key_to_bin()
         yield self.nodes[1].overlay.sign_block(self.nodes[1].network.verified_peers[0], public_key=his_pubkey,
