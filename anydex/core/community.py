@@ -341,8 +341,9 @@ class MarketCommunity(Community, BlockListener):
         self.wallets = kwargs.pop('wallets', {})
         self.trustchain = kwargs.pop('trustchain')
         self.record_transactions = kwargs.pop('record_transactions', False)
-        self.trustchain.settings.broadcast_blocks = False
-        self.trustchain.add_listener(self, [b'ask', b'bid', b'cancel_order', b'tx_init', b'tx_payment', b'tx_done'])
+        market_block_types = [b'ask', b'bid', b'cancel_order', b'tx_init', b'tx_payment', b'tx_done']
+        self.trustchain.settings.block_types_bc_disabled |= set(market_block_types)
+        self.trustchain.add_listener(self, market_block_types)
         self.dht = kwargs.pop('dht', None)
         self.use_database = kwargs.pop('use_database', True)
         self.settings = MarketSettings()
