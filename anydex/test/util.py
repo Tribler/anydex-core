@@ -10,6 +10,7 @@ import random
 import socket
 import struct
 import sys
+from asyncio import get_event_loop
 
 from twisted.python.log import addObserver
 
@@ -84,30 +85,24 @@ class UnhandledExceptionCatcher(object):
             raise Exception("Test raised %d unhandled exceptions, last one was: %s" % (exc_counter, last_exc))
 
 
-class UnhandledTwistedExceptionCatcher(object):
+class UnhandledAsyncioExceptionCatcher(object):
 
     def __init__(self):
-        self._twisted_exceptions = []
+        self._asyncio_exceptions = []
 
-        def unhandled_error_observer(event):
-            if event['isError']:
-                if 'log_legacy' in event and 'log_text' in event:
-                    self._twisted_exceptions.append(event['log_text'])
-                elif 'log_failure' in event:
-                    self._twisted_exceptions.append(str(event['log_failure']))
-                else:
-                    self._twisted_exceptions.append('\n'.join("%r: %r" % (key, value)
-                                                              for key, value in event.items()))
+        def unhandled_error_observer(loop, context):
+            text = str(context.get('exception', '')) or context['message']
+            self._asyncio_exceptions.append(text)
 
-        addObserver(unhandled_error_observer)
+        get_event_loop().set_exception_handler(unhandled_error_observer)
 
     def check_exceptions(self):
-        exceptions = self._twisted_exceptions
-        self._twisted_exceptions = []
-        num_twisted_exceptions = len(exceptions)
-        if num_twisted_exceptions > 0:
-            raise Exception("Test raised %d unhandled Twisted exceptions:\n%s"
-                            % (num_twisted_exceptions, '\n-------------------\n'.join(exceptions)))
+        exceptions = self._asyncio_exceptions
+        self._asyncio_exceptions = []
+        num_exceptions = len(exceptions)
+        if num_exceptions > 0:
+            raise Exception("Test raised %d unhandled asyncio exceptions:\n%s"
+                            % (num_exceptions, '\n-------------------\n'.join(exceptions)))
 
 
 class MockObject(object):
@@ -228,7 +223,7 @@ def autodetect_socket_style():
 
 
 _catcher = UnhandledExceptionCatcher()
-_twisted_catcher = UnhandledTwistedExceptionCatcher()
+_asyncio_catcher = UnhandledAsyncioExceptionCatcher()
 
 process_unhandled_exceptions = _catcher.check_exceptions
-process_unhandled_twisted_exceptions = _twisted_catcher.check_exceptions
+process_unhandled_asyncio_exceptions = _asyncio_catcher.check_exceptions

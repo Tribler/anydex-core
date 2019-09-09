@@ -1,13 +1,13 @@
 from __future__ import absolute_import
 
-from twisted.web import http
-from twisted.web.server import NOT_DONE_YET
+from aiohttp import web
 
-import anydex.util.json_util as json
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
 from anydex.restapi import get_param, has_param
 from anydex.restapi.base_market_endpoint import BaseMarketEndpoint
+
+from ipv8.REST.base_endpoint import Response, HTTP_BAD_REQUEST
 
 
 class BaseAsksBidsEndpoint(BaseMarketEndpoint):
@@ -21,15 +21,13 @@ class BaseAsksBidsEndpoint(BaseMarketEndpoint):
         Create an ask/bid from the provided parameters in a request. This method returns a tuple with the price,
         quantity and timeout of the ask/bid.
         """
-        timeout = 3600
-        if has_param(parameters, b'timeout'):
-            timeout = int(get_param(parameters, b'timeout'))
+        timeout = int(parameters.get('timeout', 3600))
 
-        first_asset_amount = int(get_param(parameters, b'first_asset_amount'))
-        second_asset_amount = int(get_param(parameters, b'second_asset_amount'))
+        first_asset_amount = int(parameters['first_asset_amount'])
+        second_asset_amount = int(parameters['second_asset_amount'])
 
-        first_asset_type = get_param(parameters, b'first_asset_type').decode('utf-8')
-        second_asset_type = get_param(parameters, b'second_asset_type').decode('utf-8')
+        first_asset_type = parameters['first_asset_type']
+        second_asset_type = parameters['second_asset_type']
 
         return AssetPair(AssetAmount(first_asset_amount, first_asset_type),
                          AssetAmount(second_asset_amount, second_asset_type)), timeout
@@ -40,7 +38,11 @@ class AsksEndpoint(BaseAsksBidsEndpoint):
     This class handles requests regarding asks in the market community.
     """
 
-    def render_GET(self, request):
+    def setup_routes(self):
+        self.app.add_routes([web.get('', self.get_asks),
+                             web.put('', self.create_ask)])
+
+    async def get_asks(self, request):
         """
         .. http:get:: /market/asks
 
@@ -79,9 +81,9 @@ class AsksEndpoint(BaseAsksBidsEndpoint):
                     }, ...]
                 }
         """
-        return json.twisted_dumps({"asks": self.get_market_community().order_book.asks.get_list_representation()})
+        return Response({"asks": self.get_market_community().order_book.asks.get_list_representation()})
 
-    def render_PUT(self, request):
+    async def create_ask(self, request):
         """
         .. http:put:: /market/asks
 
@@ -115,31 +117,22 @@ class AsksEndpoint(BaseAsksBidsEndpoint):
                     "trader_id": "9695c9e15201d08586e4230f4a8524799ebcb2d7"
                 }
         """
-        parameters = http.parse_qs(request.content.read(), 1)
+        parameters = await request.post()
 
-        if not has_param(parameters, b'first_asset_amount') or not has_param(parameters, b'second_asset_amount'):
-            request.setResponseCode(http.BAD_REQUEST)
-            return json.twisted_dumps({"error": "asset amount parameter missing"})
+        if 'first_asset_amount' not in parameters or 'second_asset_amount' not in parameters:
+            return Response({"error": "asset amount parameter missing"}, status=HTTP_BAD_REQUEST)
 
-        if not has_param(parameters, b'first_asset_type') or not has_param(parameters, b'second_asset_type'):
-            request.setResponseCode(http.BAD_REQUEST)
-            return json.twisted_dumps({"error": "asset type parameter missing"})
+        if 'first_asset_type' not in parameters or 'second_asset_type' not in parameters:
+            return Response({"error": "asset type parameter missing"}, status=HTTP_BAD_REQUEST)
 
-        def on_ask_created(ask):
-            if not request.finished:
-                request.write(json.twisted_dumps({
-                    'assets': ask.assets.to_dictionary(),
-                    'timestamp': int(ask.timestamp),
-                    'trader_id': ask.order_id.trader_id.as_hex(),
-                    'order_number': int(ask.order_id.order_number),
-                    'timeout': int(ask.timeout)
-                }))
-                request.finish()
-
-        self.get_market_community().create_ask(*BaseAsksBidsEndpoint.create_ask_bid_from_params(parameters))\
-            .addCallback(on_ask_created)
-
-        return NOT_DONE_YET
+        ask = await self.get_market_community().create_ask(*BaseAsksBidsEndpoint.create_ask_bid_from_params(parameters))
+        return Response({
+                'assets': ask.assets.to_dictionary(),
+                'timestamp': int(ask.timestamp),
+                'trader_id': ask.order_id.trader_id.as_hex(),
+                'order_number': int(ask.order_id.order_number),
+                'timeout': int(ask.timeout)
+        })
 
 
 class BidsEndpoint(BaseAsksBidsEndpoint):
@@ -147,7 +140,11 @@ class BidsEndpoint(BaseAsksBidsEndpoint):
     This class handles requests regarding bids in the market community.
     """
 
-    def render_GET(self, request):
+    def setup_routes(self):
+        self.app.add_routes([web.get('', self.get_bids),
+                             web.put('', self.create_bid)])
+
+    async def get_bids(self, request):
         """
         .. http:get:: /market/bids
 
@@ -186,9 +183,9 @@ class BidsEndpoint(BaseAsksBidsEndpoint):
                     }, ...]
                 }
         """
-        return json.twisted_dumps({"bids": self.get_market_community().order_book.bids.get_list_representation()})
+        return Response({"bids": self.get_market_community().order_book.bids.get_list_representation()})
 
-    def render_PUT(self, request):
+    async def create_bid(self, request):
         """
         .. http:put:: /market/bids
 
@@ -222,28 +219,19 @@ class BidsEndpoint(BaseAsksBidsEndpoint):
                     "trader_id": "9695c9e15201d08586e4230f4a8524799ebcb2d7"
                 }
         """
-        parameters = http.parse_qs(request.content.read(), 1)
+        parameters = await request.post()
 
-        if not has_param(parameters, b'first_asset_amount') or not has_param(parameters, b'second_asset_amount'):
-            request.setResponseCode(http.BAD_REQUEST)
-            return json.twisted_dumps({"error": "asset amount parameter missing"})
+        if 'first_asset_amount' not in parameters or 'second_asset_amount' not in parameters:
+            return Response({"error": "asset amount parameter missing"}, status=HTTP_BAD_REQUEST)
 
-        if not has_param(parameters, b'first_asset_type') or not has_param(parameters, b'second_asset_type'):
-            request.setResponseCode(http.BAD_REQUEST)
-            return json.twisted_dumps({"error": "asset type parameter missing"})
+        if 'first_asset_type' not in parameters or 'second_asset_type' not in parameters:
+            return Response({"error": "asset type parameter missing"}, status=HTTP_BAD_REQUEST)
 
-        def on_bid_created(bid):
-            if not request.finished:
-                request.write(json.twisted_dumps({
-                    'assets': bid.assets.to_dictionary(),
-                    'timestamp': int(bid.timestamp),
-                    'trader_id': bid.order_id.trader_id.as_hex(),
-                    'order_number': int(bid.order_id.order_number),
-                    'timeout': int(bid.timeout)
-                }))
-                request.finish()
-
-        self.get_market_community().create_bid(*BaseAsksBidsEndpoint.create_ask_bid_from_params(parameters))\
-            .addCallback(on_bid_created)
-
-        return NOT_DONE_YET
+        bid = await self.get_market_community().create_bid(*BaseAsksBidsEndpoint.create_ask_bid_from_params(parameters))
+        return Response({
+                'assets': bid.assets.to_dictionary(),
+                'timestamp': int(bid.timestamp),
+                'trader_id': bid.order_id.trader_id.as_hex(),
+                'order_number': int(bid.order_id.order_number),
+                'timeout': int(bid.timeout)
+        })

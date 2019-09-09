@@ -1,15 +1,14 @@
 from __future__ import absolute_import
 
 import string
+from asyncio import Future, ensure_future
 from random import choice
 
 from six.moves import xrange
 
-from twisted.internet import reactor
-from twisted.internet.defer import succeed
-from twisted.internet.task import deferLater
-
 from anydex.wallet.wallet import InsufficientFunds, Wallet
+
+from ipv8.util import succeed, call_later
 
 
 class BaseDummyWallet(Wallet):
@@ -45,10 +44,14 @@ class BaseDummyWallet(Wallet):
         })
 
     def transfer(self, quantity, candidate):
+        result_future = Future()
+
         self._logger.info("Transferring %s %s to %s from dummy wallet", quantity, self.get_identifier(), candidate)
-        def on_balance(balance):
+        def on_balance(future):
+            balance = future.result()
             if balance['available'] < quantity:
-                raise InsufficientFunds()
+                result_future.set_exception(InsufficientFunds())
+                return
 
             self.balance -= quantity
 
@@ -64,9 +67,10 @@ class BaseDummyWallet(Wallet):
                 'description': ''
             })
 
-            return succeed(str(quantity))
+            result_future.set_result(str(quantity))
 
-        return self.get_balance().addCallback(on_balance)
+        ensure_future(self.get_balance()).add_done_callback(on_balance)
+        return result_future
 
     def monitor_transaction(self, transaction_id):
         """
@@ -88,9 +92,9 @@ class BaseDummyWallet(Wallet):
             self.balance += float(str(transaction_id))  # txid = amount of money transferred
 
         if self.MONITOR_DELAY == 0:
-            return succeed(None).addCallback(lambda _: on_transaction_done())
+            return succeed(on_transaction_done())
         else:
-            return deferLater(reactor, self.MONITOR_DELAY, on_transaction_done)
+            return call_later(self.MONITOR_DELAY, on_transaction_done)
 
     def get_address(self):
         return self.address

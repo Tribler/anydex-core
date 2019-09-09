@@ -1,7 +1,5 @@
 from __future__ import absolute_import
 
-from twisted.internet.defer import inlineCallbacks
-
 from anydex.test.base import AbstractServer
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
@@ -17,9 +15,8 @@ from anydex.core.timestamp import Timestamp
 class PriceTimeStrategyTestSuite(AbstractServer):
     """Price time strategy test cases."""
 
-    @inlineCallbacks
-    def setUp(self):
-        yield super(PriceTimeStrategyTestSuite, self).setUp()
+    async def setUp(self):
+        super(PriceTimeStrategyTestSuite, self).setUp()
         # Object creation
         self.ask = Ask(OrderId(TraderId(b'0' * 20), OrderNumber(1)),
                        AssetPair(AssetAmount(3000, 'BTC'), AssetAmount(30, 'MB')), Timeout(100), Timestamp.now())
@@ -53,10 +50,9 @@ class PriceTimeStrategyTestSuite(AbstractServer):
         self.order_book = OrderBook()
         self.price_time_strategy = PriceTimeStrategy(self.order_book)
 
-    @inlineCallbacks
-    def tearDown(self):
-        self.order_book.shutdown_task_manager()
-        yield super(PriceTimeStrategyTestSuite, self).tearDown()
+    async def tearDown(self):
+        await self.order_book.shutdown_task_manager()
+        await super(PriceTimeStrategyTestSuite, self).tearDown()
 
     def test_empty_match_order(self):
         """
@@ -164,9 +160,8 @@ class PriceTimeStrategyTestSuite(AbstractServer):
 class MatchingEngineTestSuite(AbstractServer):
     """Matching engine test cases."""
 
-    @inlineCallbacks
-    def setUp(self):
-        yield super(MatchingEngineTestSuite, self).setUp()
+    async def setUp(self):
+        super(MatchingEngineTestSuite, self).setUp()
         # Object creation
         self.ask = Ask(OrderId(TraderId(b'2' * 20), OrderNumber(1)),
                        AssetPair(AssetAmount(3000, 'BTC'), AssetAmount(30, 'MB')), Timeout(30), Timestamp.now())
@@ -202,10 +197,9 @@ class MatchingEngineTestSuite(AbstractServer):
         self.bid_count += 1
         return new_bid
 
-    @inlineCallbacks
-    def tearDown(self):
-        self.order_book.shutdown_task_manager()
-        yield super(MatchingEngineTestSuite, self).tearDown()
+    async def tearDown(self):
+        await self.order_book.shutdown_task_manager()
+        await super(MatchingEngineTestSuite, self).tearDown()
 
     def test_empty_match_order_empty(self):
         # Test for match order with an empty order book

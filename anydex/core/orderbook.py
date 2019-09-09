@@ -4,11 +4,6 @@ import logging
 import time
 from binascii import unhexlify
 
-from twisted.internet import reactor
-from twisted.internet.defer import fail
-from twisted.internet.task import deferLater
-from twisted.python.failure import Failure
-
 from anydex.core.assetpair import AssetPair
 from anydex.core.message import TraderId
 from anydex.core.order import OrderId, OrderNumber
@@ -18,7 +13,7 @@ from anydex.core.tick import Ask, Bid
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
 from ipv8.taskmanager import TaskManager
-from ipv8.util import old_round
+from ipv8.util import old_round, fail
 
 
 class OrderBook(TaskManager):
@@ -45,10 +40,7 @@ class OrderBook(TaskManager):
         self.remove_tick(order_id)
         return bid
 
-    def on_timeout_error(self, _):
-        pass
-
-    def on_invalid_tick_insert(self, _):
+    def on_invalid_tick_insert(self):
         self._logger.warning("Invalid tick inserted in order book.")
 
     def insert_ask(self, ask):
@@ -57,11 +49,10 @@ class OrderBook(TaskManager):
         """
         if not self._asks.tick_exists(ask.order_id) and ask.order_id not in self.completed_orders and ask.is_valid():
             self._asks.insert_tick(ask)
-            timeout_delay = int(ask.timestamp) + int(ask.timeout) * 1000 - int(old_round(time.time() * 1000))
-            task = deferLater(reactor, timeout_delay, self.timeout_ask, ask.order_id)
-            self.register_task("ask_%s_timeout" % ask.order_id, task)
-            return task.addErrback(self.on_timeout_error)
-        return fail(Failure(RuntimeError("ask invalid"))).addErrback(self.on_invalid_tick_insert)
+            delay = int(ask.timestamp) + int(ask.timeout) * 1000 - int(old_round(time.time() * 1000))
+            return self.register_task("ask_%s_timeout" % ask.order_id, self.timeout_ask, ask.order_id, delay=delay)
+        self.on_invalid_tick_insert()
+        return fail(RuntimeError("ask invalid"))
 
     def remove_ask(self, order_id):
         """
@@ -77,11 +68,10 @@ class OrderBook(TaskManager):
         """
         if not self._bids.tick_exists(bid.order_id) and bid.order_id not in self.completed_orders and bid.is_valid():
             self._bids.insert_tick(bid)
-            timeout_delay = int(bid.timestamp) + int(bid.timeout) * 1000 - int(old_round(time.time() * 1000))
-            task = deferLater(reactor, timeout_delay, self.timeout_bid, bid.order_id)
-            self.register_task("bid_%s_timeout" % bid.order_id, task)
-            return task.addErrback(self.on_timeout_error)
-        return fail(Failure(RuntimeError("bid invalid"))).addErrback(self.on_invalid_tick_insert)
+            delay = int(bid.timestamp) + int(bid.timeout) * 1000 - int(old_round(time.time() * 1000))
+            return self.register_task("bid_%s_timeout" % bid.order_id, self.timeout_bid, bid.order_id, delay=delay)
+        self.on_invalid_tick_insert()
+        return fail(RuntimeError("bid invalid"))
 
     def remove_bid(self, order_id):
         """

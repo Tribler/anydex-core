@@ -1,10 +1,11 @@
 from __future__ import absolute_import
 
-from twisted.internet.defer import DeferredList
-from twisted.web import http, resource
-from twisted.web.server import NOT_DONE_YET
+from asyncio import gather
 
-import anydex.util.json_util as json
+from aiohttp import web
+
+from ipv8.REST.base_endpoint import Response, HTTP_BAD_REQUEST, HTTP_INTERNAL_SERVER_ERROR
+
 from anydex.restapi.base_market_endpoint import BaseMarketEndpoint
 
 
@@ -13,11 +14,14 @@ class WalletsEndpoint(BaseMarketEndpoint):
     This class represents the root endpoint of the wallets resource.
     """
 
-    def __init__(self, session):
-        BaseMarketEndpoint.__init__(self, session)
-        self.session = session
+    def setup_routes(self):
+        self.app.add_routes([web.get('', self.get_wallets),
+                             web.put('/{wallet_id}', self.create_wallet),
+                             web.get('/{wallet_id}/balance', self.get_wallet_balance),
+                             web.get('/{wallet_id}/transactions', self.get_wallet_transactions),
+                             web.post('/{wallet_id}/transfer', self.transfer_funds)])
 
-    def render_GET(self, request):
+    async def get_wallets(self, request):
         """
         .. http:get:: /wallets
 
@@ -51,53 +55,23 @@ class WalletsEndpoint(BaseMarketEndpoint):
                 }
         """
         wallets = {}
-        balance_deferreds = []
-        for wallet_id, wallet in self.get_market_community().wallets.items():
+
+        async def add_wallet(wallet_id, wallet):
+            balance = await wallet.get_balance()
             wallets[wallet_id] = {
                 'created': wallet.created,
                 'unlocked': wallet.unlocked,
                 'address': wallet.get_address(),
                 'name': wallet.get_name(),
                 'precision': wallet.precision(),
-                'min_unit': wallet.min_unit()
+                'min_unit': wallet.min_unit(),
+                'balance': balance
             }
-            balance_deferreds.append(wallet.get_balance().addCallback(
-                lambda balance, wid=wallet_id: (wid, balance)))
 
-        def on_received_balances(balances):
-            for _, balance_info in balances:
-                wallets[balance_info[0]]['balance'] = balance_info[1]
+        await gather(*[add_wallet(wid, w) for wid, w in self.get_market_community().wallets.items()])
+        return Response({"wallets": wallets})
 
-            request.write(json.twisted_dumps({"wallets": wallets}))
-            request.finish()
-
-        balance_deferred_list = DeferredList(balance_deferreds)
-        balance_deferred_list.addCallback(on_received_balances)
-
-        return NOT_DONE_YET
-
-    def getChild(self, path, request):
-        return WalletEndpoint(self.session, path)
-
-
-class WalletEndpoint(BaseMarketEndpoint):
-    """
-    This class represents the endpoint for a single wallet.
-    """
-    def __init__(self, session, identifier):
-        BaseMarketEndpoint.__init__(self, session)
-        self.session = session
-        self.identifier = identifier.upper().decode('utf-8')
-
-        child_handler_dict = {
-            b"balance": WalletBalanceEndpoint,
-            b"transactions": WalletTransactionsEndpoint,
-            b"transfer": WalletTransferEndpoint
-        }
-        for path, child_cls in child_handler_dict.items():
-            self.putChild(path, child_cls(self.session, self.identifier))
-
-    def render_PUT(self, request):
+    async def create_wallet(self, request):
         """
         .. http:put:: /wallets/(string:wallet identifier)
 
@@ -117,36 +91,17 @@ class WalletEndpoint(BaseMarketEndpoint):
                     "created": True
                 }
         """
-        if self.get_market_community().wallets[self.identifier].created:
-            request.setResponseCode(http.BAD_REQUEST)
-            return json.twisted_dumps({"error": "this wallet already exists"})
+        identifier = request.match_info['wallet_id']
+        if self.get_market_community().wallets[identifier].created:
+            return Response({"error": "this wallet already exists"}, status=HTTP_BAD_REQUEST)
 
-        def on_wallet_created(_):
-            request.write(json.twisted_dumps({"created": True}))
-            request.finish()
+        try:
+            await self.get_market_community().wallets[identifier].create_wallet()
+        except Exception as e:
+            return Response({"error": str(e)}, status=HTTP_INTERNAL_SERVER_ERROR)
+        return Response({"created": True})
 
-        def on_create_error(error):
-            request.setResponseCode(http.INTERNAL_SERVER_ERROR)
-            request.write(json.twisted_dumps({"error": error.getErrorMessage()}))
-            request.finish()
-
-        self.get_market_community().wallets[self.identifier].create_wallet()\
-            .addCallbacks(on_wallet_created, on_create_error)
-
-        return NOT_DONE_YET
-
-
-class WalletBalanceEndpoint(BaseMarketEndpoint):
-    """
-    This class handles requests regarding the balance in a wallet.
-    """
-
-    def __init__(self, session, identifier):
-        BaseMarketEndpoint.__init__(self, session)
-        self.session = session
-        self.identifier = identifier
-
-    def render_GET(self, request):
+    async def get_wallet_balance(self, request):
         """
         .. http:get:: /wallets/(string:wallet identifier)/balance
 
@@ -170,26 +125,11 @@ class WalletBalanceEndpoint(BaseMarketEndpoint):
                     }
                 }
         """
-        def on_balance(balance):
-            request.write(json.twisted_dumps({"balance": balance}))
-            request.finish()
+        identifier = request.match_info['wallet_id']
+        balance = await self.get_market_community().wallets[identifier].get_balance()
+        return Response({"balance": balance})
 
-        self.get_market_community().wallets[self.identifier].get_balance().addCallback(on_balance)
-
-        return NOT_DONE_YET
-
-
-class WalletTransactionsEndpoint(BaseMarketEndpoint):
-    """
-    This class handles requests regarding the transactions of a wallet.
-    """
-
-    def __init__(self, session, identifier):
-        BaseMarketEndpoint.__init__(self, session)
-        self.session = session
-        self.identifier = identifier
-
-    def render_GET(self, request):
+    async def get_wallet_transactions(self, request):
         """
         .. http:get:: /wallets/(string:wallet identifier)/transactions
 
@@ -219,26 +159,11 @@ class WalletTransactionsEndpoint(BaseMarketEndpoint):
                     }, ...]
                 }
         """
-        def on_transactions(transactions):
-            request.write(json.twisted_dumps({"transactions": transactions}))
-            request.finish()
+        identifier = request.match_info['wallet_id']
+        transactions = await self.get_market_community().wallets[identifier].get_transactions()
+        return Response({"transactions": transactions})
 
-        self.get_market_community().wallets[self.identifier].get_transactions().addCallback(on_transactions)
-
-        return NOT_DONE_YET
-
-
-class WalletTransferEndpoint(BaseMarketEndpoint):
-    """
-    This class handles requests regarding transferring money by a wallet.
-    """
-
-    def __init__(self, session, identifier):
-        BaseMarketEndpoint.__init__(self, session)
-        self.session = session
-        self.identifier = identifier
-
-    def render_POST(self, request):
+    async def transfer_funds(self, request):
         """
         .. http:post:: /wallets/(string:wallet identifier)/transfer
 
@@ -259,33 +184,23 @@ class WalletTransferEndpoint(BaseMarketEndpoint):
                     "txid": "abcd"
                 }
         """
-        parameters = http.parse_qs(request.content.read(), 1)
+        parameters = await request.post()
 
-        if self.identifier != "BTC" and self.identifier != "TBTC":
-            request.setResponseCode(http.BAD_REQUEST)
-            return json.twisted_dumps({"error": "currently, currency transfers using the API "
-                                                "is only supported for Bitcoin"})
+        identifier = request.match_info['wallet_id']
+        if identifier != "BTC" and identifier != "TBTC":
+            return Response({"error": "currently, currency transfers using the API "
+                                      "is only supported for Bitcoin"}, status=HTTP_BAD_REQUEST)
 
-        wallet = self.get_market_community().wallets[self.identifier]
+        wallet = self.get_market_community().wallets[identifier]
 
         if not wallet.created:
-            request.setResponseCode(http.BAD_REQUEST)
-            return json.twisted_dumps({"error": "this wallet is not created"})
+            return Response({"error": "this wallet is not created"}, status=HTTP_BAD_REQUEST)
 
-        if b'amount' not in parameters or b'destination' not in parameters:
-            request.setResponseCode(http.BAD_REQUEST)
-            return json.twisted_dumps({"error": "an amount and a destination address are required"})
+        if 'amount' not in parameters or 'destination' not in parameters:
+            return Response({"error": "an amount and a destination address are required"}, status=HTTP_BAD_REQUEST)
 
-        def on_transferred(txid):
-            request.write(json.twisted_dumps({"txid": txid}))
-            request.finish()
-
-        def on_transfer_error(error):
-            request.setResponseCode(http.INTERNAL_SERVER_ERROR)
-            request.write(json.twisted_dumps({"txid": "", "error": error.getErrorMessage()}))
-            request.finish()
-
-        wallet.transfer(parameters[b'amount'][0], parameters[b'destination'][0]).addCallback(on_transferred)\
-            .addErrback(on_transfer_error)
-
-        return NOT_DONE_YET
+        try:
+            txid = await wallet.transfer(parameters['amount'], parameters['destination'])
+        except Exception as e:
+            return Response({"txid": "", "error": str(e)}, status=HTTP_INTERNAL_SERVER_ERROR)
+        return Response({"txid": txid})

@@ -7,10 +7,6 @@ class BaseMarketEndpoint(BaseEndpoint):
     This class can be used as a base class for all Market community endpoints.
     """
 
-    def __init__(self, session):
-        BaseEndpoint.__init__(self)
-        self.session = session
-
     def get_market_community(self):
         for overlay in self.session.overlays:
             if isinstance(overlay, MarketCommunity):

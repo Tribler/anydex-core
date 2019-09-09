@@ -5,25 +5,19 @@ import os
 import random
 import shutil
 import string
+from asyncio import get_event_loop, current_task
+
+import asynctest
 
 import six
 
-import twisted
-from twisted.internet import interfaces, reactor
-from twisted.internet.base import BasePort
-from twisted.internet.defer import inlineCallbacks, Deferred
-from twisted.internet.task import deferLater
-from twisted.internet.tcp import Client
-from twisted.trial import unittest
-from twisted.web.http import HTTPChannel
-
 from anydex.test.instrumentation import WatchDog
-from anydex.test.util import process_unhandled_exceptions, process_unhandled_twisted_exceptions
+from anydex.test.util import process_unhandled_exceptions, process_unhandled_asyncio_exceptions
 
 TESTS_DIR = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 
 
-class BaseTestCase(unittest.TestCase):
+class BaseTestCase(asynctest.TestCase):
 
     def __init__(self, *args, **kwargs):
         super(BaseTestCase, self).__init__(*args, **kwargs)
@@ -48,76 +42,33 @@ class AbstractServer(BaseTestCase):
 
     def __init__(self, *args, **kwargs):
         super(AbstractServer, self).__init__(*args, **kwargs)
-        twisted.internet.base.DelayedCall.debug = True
+        get_event_loop().set_debug(True)
 
         self.watchdog = WatchDog()
 
-        # Enable Deferred debugging
-        from twisted.internet.defer import setDebugging
-        setDebugging(True)
-
-    @inlineCallbacks
     def setUp(self):
         self._logger = logging.getLogger(self.__class__.__name__)
 
         self.session_base_dir = self.temporary_directory(suffix="_tribler_test_session_")
         self.state_dir = os.path.join(self.session_base_dir, u"dot.Tribler")
-
-        # Wait until the reactor has started
-        reactor_deferred = Deferred()
-
-        reactor.callWhenRunning(reactor_deferred.callback, None)
-
         self.watchdog.start()
-        yield reactor_deferred
-        pass
 
-    @inlineCallbacks
-    def checkReactor(self, phase, *_):
-        delayed_calls = reactor.getDelayedCalls()
-        if delayed_calls:
-            self._logger.error("The reactor was dirty during %s:", phase)
-            for dc in delayed_calls:
-                self._logger.error(">     %s", dc)
-                dc.cancel()
+    async def checkLoop(self, phase, *_):
+        # Only in Python 3.7+..
+        try:
+            from asyncio import all_tasks
+        except ImportError:
+            return
 
-        has_network_selectables = False
-        for item in reactor.getReaders() + reactor.getWriters():
-            if isinstance(item, HTTPChannel) or isinstance(item, Client):
-                has_network_selectables = True
-                break
+        tasks = [t for t in all_tasks(get_event_loop()) if t is not current_task()]
+        if tasks:
+            self._logger.error("The event loop was dirty during %s:", phase)
+        for task in tasks:
+            self._logger.error(">     %s", task)
 
-        if has_network_selectables:
-            # TODO(Martijn): we wait a while before we continue the check since network selectables
-            # might take some time to cleanup. I'm not sure what's causing this.
-            yield deferLater(reactor, 0.2, lambda: None)
-
-        # This is the same check as in the _cleanReactor method of Twisted's Trial
-        selectable_strings = []
-        for sel in reactor.removeAll():
-            if interfaces.IProcessTransport.providedBy(sel):
-                self._logger.error("Sending kill signal to %s", repr(sel))
-                sel.signalProcess('KILL')
-            selectable_strings.append(repr(sel))
-
-        self.assertFalse(selectable_strings,
-                         "The reactor has leftover readers/writers during %s: %r" % (phase, selectable_strings))
-
-        # Check whether we have closed all the sockets
-        open_readers = reactor.getReaders()
-        for reader in open_readers:
-            self.assertNotIsInstance(reader, BasePort)
-
-        # Check whether the threadpool is clean
-        tp_items = len(reactor.getThreadPool().working)
-        if tp_items > 0:  # Print all stacks to debug this issue
-            self.watchdog.print_all_stacks()
-        self.assertEqual(tp_items, 0, "Still items left in the threadpool")
-
-    @inlineCallbacks
-    def tearDown(self):
+    async def tearDown(self):
         process_unhandled_exceptions()
-        process_unhandled_twisted_exceptions()
+        process_unhandled_asyncio_exceptions()
 
         self.watchdog.join(2)
         if self.watchdog.is_alive():
@@ -125,7 +76,7 @@ class AbstractServer(BaseTestCase):
             self.watchdog.print_all_stacks()
             raise RuntimeError("Couldn't stop the WatchDog")
 
-        yield self.checkReactor("tearDown")
+        await self.checkLoop("tearDown")
 
         super(AbstractServer, self).tearDown()
 

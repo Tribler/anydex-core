@@ -4,8 +4,6 @@ import os
 
 import six
 
-from twisted.internet.defer import inlineCallbacks
-
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
 from anydex.core.database import LATEST_DB_VERSION, MarketDB
@@ -23,9 +21,8 @@ from anydex.test.base import AbstractServer
 
 class TestDatabase(AbstractServer):
 
-    @inlineCallbacks
-    def setUp(self):
-        yield super(TestDatabase, self).setUp()
+    async def setUp(self):
+        super(TestDatabase, self).setUp()
 
         path = os.path.join(self.getStateDir(), 'sqlite')
         if not os.path.exists(path):
@@ -51,9 +48,9 @@ class TestDatabase(AbstractServer):
 
         self.transaction1.add_payment(self.payment1)
 
-    def tearDown(self):
+    async def tearDown(self):
         self.database.close()
-        super(TestDatabase, self).tearDown()
+        await super(TestDatabase, self).tearDown()
 
     def test_add_get_order(self):
         """

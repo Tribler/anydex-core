@@ -2,9 +2,10 @@ from __future__ import absolute_import
 
 from binascii import unhexlify
 
-from twisted.web import http
+from aiohttp import web
 
-import anydex.util.json_util as json
+from ipv8.REST.base_endpoint import Response, HTTP_NOT_FOUND
+
 from anydex.core.transaction import TransactionId
 from anydex.restapi.base_market_endpoint import BaseMarketEndpoint
 
@@ -14,10 +15,11 @@ class TransactionsEndpoint(BaseMarketEndpoint):
     This class handles requests regarding (past) transactions in the market community.
     """
 
-    def getChild(self, path, request):
-        return SpecificTransactionEndpoint(self.session, path)
+    def setup_routes(self):
+        self.app.add_routes([web.get('', self.get_transactions),
+                             web.get('/{transaction_id}/payments', self.get_payments)])
 
-    def render_GET(self, request):
+    async def get_transactions(self, request):
         """
         .. http:get:: /market/transactions
 
@@ -65,33 +67,9 @@ class TransactionsEndpoint(BaseMarketEndpoint):
                 }
         """
         transactions = self.get_market_community().transaction_manager.find_all()
-        return json.twisted_dumps({"transactions": [transaction.to_block_dictionary() for transaction in transactions]})
+        return Response({"transactions": [transaction.to_block_dictionary() for transaction in transactions]})
 
-
-class SpecificTransactionEndpoint(BaseMarketEndpoint):
-    """
-    This class handles requests for a specific transaction.
-    """
-
-    def __init__(self, session, path):
-        BaseMarketEndpoint.__init__(self, session)
-        self.transaction_id = path
-
-        child_handler_dict = {b"payments": TransactionPaymentsEndpoint}
-        for path, child_cls in child_handler_dict.items():
-            self.putChild(path, child_cls(self.session, self.transaction_id))
-
-
-class TransactionPaymentsEndpoint(BaseMarketEndpoint):
-    """
-    This class handles requests for the payments of a specific transaction.
-    """
-
-    def __init__(self, session, transaction_id):
-        BaseMarketEndpoint.__init__(self, session)
-        self.transaction_id = TransactionId(unhexlify(transaction_id))
-
-    def render_GET(self, request):
+    async def get_payments(self, request):
         """
         .. http:get:: /market/transactions/(string:transaction_id)/payments
 
@@ -124,10 +102,10 @@ class TransactionPaymentsEndpoint(BaseMarketEndpoint):
                     ]
                 }
         """
-        transaction = self.get_market_community().transaction_manager.find_by_id(self.transaction_id)
+        transaction_id = TransactionId(unhexlify(request.match_info['transaction_id']))
+        transaction = self.get_market_community().transaction_manager.find_by_id(transaction_id)
 
         if not transaction:
-            request.setResponseCode(http.NOT_FOUND)
-            return json.twisted_dumps({"error": "transaction not found"})
+            return Response({"error": "transaction not found"}, status=HTTP_NOT_FOUND)
 
-        return json.twisted_dumps({"payments": [payment.to_dictionary() for payment in transaction.payments]})
+        return Response({"payments": [payment.to_dictionary() for payment in transaction.payments]})

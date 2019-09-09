@@ -1,15 +1,13 @@
 from __future__ import absolute_import, division
 
+from asyncio import ensure_future, Future
 from base64 import b64encode
 from binascii import hexlify, unhexlify
 
 from ipv8.attestation.trustchain.listener import BlockListener
 from ipv8.keyvault.crypto import ECCrypto
 from ipv8.peer import Peer
-from ipv8.util import addCallback
-
-from twisted.internet.defer import Deferred, fail, succeed
-from twisted.internet.task import LoopingCall
+from ipv8.util import succeed
 
 from anydex.wallet.bandwidth_block import TriblerBandwidthBlock
 from anydex.wallet.wallet import InsufficientFunds, Wallet
@@ -83,37 +81,54 @@ class TrustchainWallet(Wallet, BlockListener):
         })
 
     def transfer(self, quantity, peer):
-        def on_balance(balance):
+        result_future = Future()
+
+        def on_balance(future):
+            balance = future.result()
             if self.check_negative_balance and balance['available'] < quantity:
-                return fail(InsufficientFunds())
+                result_future.set_exception(InsufficientFunds())
+                return
 
-            return self.create_transfer_block(peer, quantity)
+            def on_block(future):
+                block = future.result()
+                result_future.set_result(block)
+            self.create_transfer_block(peer, quantity).add_done_callback(on_block)
 
-        return self.get_balance().addCallback(on_balance)
+        ensure_future(self.get_balance()).add_done_callback(on_balance)
+        return result_future
 
     def create_transfer_block(self, peer, quantity):
-        transaction = {b"up": 0, b"down": int(quantity * MEGA_DIV)}
-        deferred = self.trustchain.sign_block(peer, peer.public_key.key_to_bin(),
-                                              block_type=b'tribler_bandwidth', transaction=transaction)
-        addCallback(deferred, lambda _: None)
-        latest_block = self.trustchain.persistence.get_latest(self.trustchain.my_peer.public_key.key_to_bin(),
-                                                              block_type=b'tribler_bandwidth')
-        txid = "%s.%s.%d.%d" % (hexlify(latest_block.public_key).decode('utf-8'),
-                                latest_block.sequence_number, 0, int(quantity * MEGA_DIV))
+        result_future = Future()
 
-        self.transaction_history.append({
-            'id': txid,
-            'outgoing': True,
-            'from': self.get_address(),
-            'to': b64encode(peer.public_key.key_to_bin()),
-            'amount': quantity,
-            'fee_amount': 0.0,
-            'currency': self.get_identifier(),
-            'timestamp': '',
-            'description': ''
-        })
+        async def sign_block():
+            transaction = {b"up": 0, b"down": int(quantity * MEGA_DIV)}
+            try:
+                await self.trustchain.sign_block(peer, peer.public_key.key_to_bin(),
+                                           block_type=b'tribler_bandwidth', transaction=transaction)
+            except Exception as e:
+                self.logger.error("Future errback fired: %s", e)
 
-        return succeed(txid)
+            latest_block = self.trustchain.persistence.get_latest(self.trustchain.my_peer.public_key.key_to_bin(),
+                                                                  block_type=b'tribler_bandwidth')
+            txid = "%s.%s.%d.%d" % (hexlify(latest_block.public_key).decode('utf-8'),
+                                    latest_block.sequence_number, 0, int(quantity * MEGA_DIV))
+
+            self.transaction_history.append({
+                'id': txid,
+                'outgoing': True,
+                'from': self.get_address(),
+                'to': b64encode(peer.public_key.key_to_bin()),
+                'amount': quantity,
+                'fee_amount': 0.0,
+                'currency': self.get_identifier(),
+                'timestamp': '',
+                'description': ''
+            })
+
+            result_future.set_result(txid)
+
+        ensure_future(sign_block())
+        return result_future
 
     def monitor_transaction(self, payment_id):
         """
@@ -125,21 +140,20 @@ class TrustchainWallet(Wallet, BlockListener):
 
         block = self.trustchain.persistence.get(pub_key, sequence_number)
 
-        monitor_deferred = Deferred()
+        monitor_future = Future()
 
         def check_has_block():
             self._logger.info("Checking for block with id %s and num %d", hexlify(pub_key), sequence_number)
             db_block = self.trustchain.persistence.get(pub_key, sequence_number)
             if db_block:
-                monitor_lc.stop()
-                monitor_deferred.callback(db_block)
+                monitor_future.set_result(db_block)
+                monitor_task.stop()
 
         if block:
             return succeed(block)
 
-        monitor_lc = self.register_task("poll_%s" % payment_id, LoopingCall(check_has_block))
-        monitor_lc.start(self.MONITOR_DELAY)
-        return monitor_deferred
+        monitor_task = self.register_task("poll_%s" % payment_id, check_has_block, interval=self.MONITOR_DELAY)
+        return monitor_future
 
     def get_address(self):
         return b64encode(self.trustchain.my_peer.public_key.key_to_bin()).decode('utf-8')

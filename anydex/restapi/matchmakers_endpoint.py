@@ -1,6 +1,9 @@
 from __future__ import absolute_import
 
-import anydex.util.json_util as json
+from aiohttp import web
+
+from ipv8.REST.base_endpoint import Response
+
 from anydex.restapi.base_market_endpoint import BaseMarketEndpoint
 
 
@@ -9,7 +12,10 @@ class MatchmakersEndpoint(BaseMarketEndpoint):
     This class handles requests regarding your known matchmakers in the market community.
     """
 
-    def render_GET(self, request):
+    def setup_routes(self):
+        self.app.add_routes([web.get('', self.get_matchmakers)])
+
+    async def get_matchmakers(self, request):
         """
         .. http:get:: /market/matchmakers
 
@@ -34,4 +40,4 @@ class MatchmakersEndpoint(BaseMarketEndpoint):
         """
         matchmakers = self.get_market_community().matchmakers
         matchmakers_json = [{"ip": mm.address[0], "port": mm.address[1]} for mm in matchmakers]
-        return json.twisted_dumps({"matchmakers": matchmakers_json})
+        return Response({"matchmakers": matchmakers_json})

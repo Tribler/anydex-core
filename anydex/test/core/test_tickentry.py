@@ -1,7 +1,5 @@
 from __future__ import absolute_import
 
-from twisted.internet.defer import inlineCallbacks
-
 from anydex.test.base import AbstractServer
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
@@ -18,9 +16,8 @@ from anydex.core.timestamp import Timestamp
 class TickEntryTestSuite(AbstractServer):
     """TickEntry test cases."""
 
-    @inlineCallbacks
-    def setUp(self):
-        yield super(TickEntryTestSuite, self).setUp()
+    async def setUp(self):
+        super(TickEntryTestSuite, self).setUp()
 
         # Object creation
         tick = Tick(OrderId(TraderId(b'0' * 20), OrderNumber(1)), AssetPair(AssetAmount(60, 'BTC'),
@@ -33,11 +30,10 @@ class TickEntryTestSuite(AbstractServer):
         self.tick_entry = TickEntry(tick, self.price_level)
         self.tick_entry2 = TickEntry(tick2, self.price_level)
 
-    @inlineCallbacks
-    def tearDown(self):
-        self.tick_entry.shutdown_task_manager()
-        self.tick_entry2.shutdown_task_manager()
-        yield super(TickEntryTestSuite, self).tearDown()
+    async def tearDown(self):
+        await self.tick_entry.shutdown_task_manager()
+        await self.tick_entry2.shutdown_task_manager()
+        await super(TickEntryTestSuite, self).tearDown()
 
     def test_price_level(self):
         self.assertEquals(self.price_level, self.tick_entry.price_level())

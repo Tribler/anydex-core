@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-from twisted.internet.defer import Deferred, inlineCallbacks
+from asyncio import Future
 
 from anydex.test.base import AbstractServer
 from anydex.test.util import trial_timeout
@@ -10,9 +10,8 @@ from anydex.wallet.wallet import InsufficientFunds
 
 class TestDummyWallet(AbstractServer):
 
-    @inlineCallbacks
-    def setUp(self):
-        yield super(TestDummyWallet, self).setUp()
+    async def setUp(self):
+        super(TestDummyWallet, self).setUp()
         self.dummy_wallet = BaseDummyWallet()
 
     def test_wallet_id(self):
@@ -39,41 +38,29 @@ class TestDummyWallet(AbstractServer):
         return self.dummy_wallet.create_wallet()
 
     @trial_timeout(10)
-    def test_get_balance(self):
+    async def test_get_balance(self):
         """
         Test fetching the balance of a dummy wallet
         """
-        def on_balance(balance):
-            self.assertIsInstance(balance, dict)
-
-        return self.dummy_wallet.get_balance().addCallback(on_balance)
+        balance = await self.dummy_wallet.get_balance()
+        self.assertIsInstance(balance, dict)
 
     @trial_timeout(10)
-    def test_transfer(self):
+    async def test_transfer(self):
         """
         Test the transfer of money from a dummy wallet
         """
-        def check_transactions(transactions):
-            self.assertEqual(len(transactions), 1)
-
-        def get_transactions(_):
-            return self.dummy_wallet.get_transactions().addCallback(check_transactions)
-
-        return self.dummy_wallet.transfer(self.dummy_wallet.balance - 1, None).addCallback(get_transactions)
+        await self.dummy_wallet.transfer(self.dummy_wallet.balance - 1, None)
+        transactions = await self.dummy_wallet.get_transactions()
+        self.assertEqual(len(transactions), 1)
 
     @trial_timeout(10)
-    def test_transfer_invalid(self):
+    async def test_transfer_invalid(self):
         """
         Test whether transferring a too large amount of money from a dummy wallet raises an error
         """
-        test_deferred = Deferred()
-
-        def on_error(failure):
-            self.assertIsInstance(failure.value, InsufficientFunds)
-            test_deferred.callback(None)
-
-        self.dummy_wallet.transfer(self.dummy_wallet.balance + 1, None).addErrback(on_error)
-        return test_deferred
+        with self.assertRaises(InsufficientFunds):
+            await self.dummy_wallet.transfer(self.dummy_wallet.balance + 1, None)
 
     @trial_timeout(10)
     def test_monitor(self):
@@ -98,14 +85,12 @@ class TestDummyWallet(AbstractServer):
         self.assertIsInstance(self.dummy_wallet.get_address(), str)
 
     @trial_timeout(10)
-    def test_get_transaction(self):
+    async def test_get_transaction(self):
         """
         Test the retrieval of transactions of a dummy wallet
         """
-        def on_transactions(transactions):
-            self.assertIsInstance(transactions, list)
-
-        return self.dummy_wallet.get_transactions().addCallback(on_transactions)
+        transactions = await self.dummy_wallet.get_transactions()
+        self.assertIsInstance(transactions, list)
 
     def test_min_unit(self):
         """

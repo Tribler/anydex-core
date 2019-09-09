@@ -1,22 +1,26 @@
-from autobahn.twisted.websocket import WebSocketServerProtocol
+from aiohttp import web, WSMsgType
 
+from anydex.restapi.base_market_endpoint import BaseMarketEndpoint
 
-class AnyDexWebsocketProtocol(WebSocketServerProtocol):
+class AnyDexWebsocketProtocol(BaseMarketEndpoint):
 
-    def onConnect(self, request):
-        print("Client connecting: {0}".format(request.peer))
+    def setup_routes(self):
+        self.app.add_routes([web.get('/ws', self.handle_websockets)])
 
-    def onOpen(self):
-        print("WebSocket connection open.")
+    async def handle_websockets(self, request):
+        print("WebSocket connection open")
 
-    def onMessage(self, payload, isBinary):
-        if isBinary:
-            print("Binary message received: {0} bytes".format(len(payload)))
-        else:
-            print("Text message received: {0}".format(payload.decode('utf8')))
+        ws = web.WebSocketResponse()
+        await ws.prepare(request)
 
-        # echo back message verbatim
-        self.sendMessage(payload, isBinary)
+        async for msg in ws:
+            if msg.type == WSMsgType.TEXT:
+                if msg.data == 'close':
+                    await ws.close()
+                else:
+                    await ws.send_str(msg.data + '/answer')
+            elif msg.type == WSMsgType.ERROR:
+                print('WebSocket connection closed with exception %s' % ws.exception())
 
-    def onClose(self, wasClean, code, reason):
-        print("WebSocket connection closed: {0}".format(reason))
+        print('WebSocket connection closed')
+        return ws

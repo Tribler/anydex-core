@@ -1,7 +1,5 @@
 from __future__ import absolute_import
 
-from twisted.internet.defer import inlineCallbacks
-
 from anydex.test.base import AbstractServer
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
@@ -21,9 +19,8 @@ class AbstractTestOrderBook(AbstractServer):
     Base class for the order book tests.
     """
 
-    @inlineCallbacks
-    def setUp(self):
-        yield super(AbstractTestOrderBook, self).setUp()
+    async def setUp(self):
+        super(AbstractTestOrderBook, self).setUp()
         # Object creation
         self.ask = Ask(OrderId(TraderId(b'0' * 20), OrderNumber(1)),
                        AssetPair(AssetAmount(100, 'BTC'), AssetAmount(30, 'MB')), Timeout(100), Timestamp.now())
@@ -44,9 +41,9 @@ class AbstractTestOrderBook(AbstractServer):
                                    Timestamp(1462224447117))
         self.order_book = OrderBook()
 
-    def tearDown(self):
-        self.order_book.shutdown_task_manager()
-        super(AbstractTestOrderBook, self).tearDown()
+    async def tearDown(self):
+        await self.order_book.shutdown_task_manager()
+        await super(AbstractTestOrderBook, self).tearDown()
 
 
 class TestOrderBook(AbstractTestOrderBook):
@@ -62,7 +59,7 @@ class TestOrderBook(AbstractTestOrderBook):
         self.order_book.insert_bid(self.bid)
         self.assertEqual(self.order_book.timeout_bid(self.bid.order_id), self.bid)
 
-        self.order_book.on_invalid_tick_insert(None)
+        self.order_book.on_invalid_tick_insert()
 
     def test_ask_insertion(self):
         # Test for ask insertion
@@ -82,18 +79,20 @@ class TestOrderBook(AbstractTestOrderBook):
         self.assertTrue(self.order_book.get_tick(self.bid.order_id))
 
     @trial_timeout(10)
-    def test_ask_insertion_invalid(self):
+    async def test_ask_insertion_invalid(self):
         """
         Test whether we get an error when we add an invalid ask to the order book
         """
-        return self.order_book.insert_ask(self.invalid_ask)
+        with self.assertRaises(RuntimeError):
+            await self.order_book.insert_ask(self.invalid_ask)
 
     @trial_timeout(10)
-    def test_bid_insertion_invalid(self):
+    async def test_bid_insertion_invalid(self):
         """
         Test whether we get an error when we add an invalid bid to the order book
         """
-        return self.order_book.insert_bid(self.invalid_bid)
+        with self.assertRaises(RuntimeError):
+            await self.order_book.insert_bid(self.invalid_bid)
 
     def test_ask_removal(self):
         # Test for ask removal

@@ -3,14 +3,13 @@ from __future__ import absolute_import
 import os
 import time
 # Important import, do not remove
+from asyncio import Future, ensure_future
 from binascii import hexlify
-
-from twisted.internet.defer import Deferred, fail, inlineCallbacks, succeed
-from twisted.internet.task import LoopingCall
-from twisted.python.failure import Failure
 
 from anydex.wallet import bitcoinlib_main as bitcoinlib_main
 from anydex.wallet.wallet import InsufficientFunds, Wallet
+
+from ipv8.util import fail, succeed
 
 
 class BitcoinWallet(Wallet):
@@ -64,7 +63,7 @@ class BitcoinWallet(Wallet):
             self.created = True
         except WalletError as exc:
             self._logger.error("Cannot create BTC wallet!")
-            return fail(Failure(exc))
+            return fail(exc)
         return succeed(None)
 
     def get_balance(self):
@@ -83,36 +82,38 @@ class BitcoinWallet(Wallet):
         return succeed({"available": 0, "pending": 0, "currency": 'BTC', "precision": self.precision()})
 
     def transfer(self, amount, address):
-        def on_balance(balance):
+        result_future = Future()
+
+        def on_balance(future):
+            balance = future.result()
             if balance['available'] >= int(amount):
                 self._logger.info("Creating Bitcoin payment with amount %f to address %s", amount, address)
                 tx = self.wallet.send_to(address, int(amount))
-                return str(tx.hash)
+                result_future.set_result(str(tx.hash))
             else:
-                return fail(InsufficientFunds("Insufficient funds"))
+                result_future.set_exception(InsufficientFunds("Insufficient funds"))
 
-        return self.get_balance().addCallback(on_balance)
+        ensure_future(self.get_balance()).add_done_callback(on_balance)
+        return result_future
 
     def monitor_transaction(self, txid):
         """
         Monitor a given transaction ID. Returns a Deferred that fires when the transaction is present.
         """
-        monitor_deferred = Deferred()
+        monitor_future = Future()
 
-        @inlineCallbacks
-        def monitor_loop():
-            transactions = yield self.get_transactions()
+        async def monitor():
+            transactions = await self.get_transactions()
             for transaction in transactions:
                 if transaction['id'] == txid:
                     self._logger.debug("Found transaction with id %s", txid)
-                    monitor_deferred.callback(None)
-                    monitor_lc.stop()
+                    monitor_future.set_result(None)
+                    monitor_task.stop()
 
         self._logger.debug("Start polling for transaction %s", txid)
-        monitor_lc = self.register_task("btc_poll_%s" % txid, LoopingCall(monitor_loop))
-        monitor_lc.start(5)
+        monitor_task = self.register_task("btc_poll_%s" % txid, monitor, interval=5)
 
-        return monitor_deferred
+        return monitor_future
 
     def get_address(self):
         if not self.created:
