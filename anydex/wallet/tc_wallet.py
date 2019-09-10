@@ -173,23 +173,23 @@ class TrustchainWallet(Wallet, BlockListener):
         """
         if public_key is None:
             public_key = self.trustchain.my_peer.public_key.key_to_bin()
-        latest_block = self.trustchain.persistence.get_latest(public_key, block_type=b'tribler_bandwidth')
+
+        latest_block = self.trustchain.persistence.get_latest(public_key)
+        latest_bw_block = self.trustchain.persistence.get_latest(public_key, block_type=b'tribler_bandwidth')
         statistics = dict()
-        statistics["id"] = hexlify(public_key)
+        statistics["id"] = hexlify(public_key).decode('utf-8')
         interacts = self.get_num_unique_interactors(public_key)
         statistics["peers_that_pk_helped"] = interacts[0] if interacts[0] is not None else 0
         statistics["peers_that_helped_pk"] = interacts[1] if interacts[1] is not None else 0
         if latest_block:
             statistics["total_blocks"] = latest_block.sequence_number
-            statistics["total_up"] = latest_block.transaction[b"total_up"]
-            statistics["total_down"] = latest_block.transaction[b"total_down"]
-            statistics["latest_block"] = dict(latest_block)
-
-            # Set up/down
-            statistics["latest_block"]["up"] = latest_block.transaction[b"up"]
-            statistics["latest_block"]["down"] = latest_block.transaction[b"down"]
         else:
             statistics["total_blocks"] = 0
+
+        if latest_bw_block:
+            statistics["total_up"] = latest_block.transaction[b"total_up"]
+            statistics["total_down"] = latest_block.transaction[b"total_down"]
+        else:
             statistics["total_up"] = 0
             statistics["total_down"] = 0
         return statistics
