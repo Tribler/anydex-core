@@ -153,4 +153,5 @@ class TestTrustchainWallet(TestBase):
         self.assertEqual(res["total_blocks"], 0)
         yield self.tc_wallet.transfer(5, self.nodes[1].overlay.my_peer)
         res = self.tc_wallet.get_statistics()
-        self.assertTrue(res["latest_block"])
+        self.assertEqual(0, res["total_up"])
+        self.assertEqual(5 * 1024 * 1024, res["total_down"])
