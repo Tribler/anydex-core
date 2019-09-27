@@ -23,6 +23,10 @@ class TestTrustchainWallet(TestBase):
         self.tc_wallet.MONITOR_DELAY = 0.01
         self.tc_wallet.check_negative_balance = True
 
+    async def tearDown(self):
+        await self.tc_wallet.shutdown_task_manager()
+        await super(TestTrustchainWallet, self).tearDown()
+
     def create_node(self):
         return MockIPv8(u"curve25519", TrustChainCommunity, working_directory=u":memory:")
 
@@ -138,8 +142,7 @@ class TestTrustchainWallet(TestBase):
         self.tc_wallet.check_negative_balance = False
         res = self.tc_wallet.get_statistics()
         self.assertEqual(res["total_blocks"], 0)
-        self.tc_wallet.transfer(5, self.nodes[1].overlay.my_peer)
-        await sleep(.1)
+        await self.tc_wallet.transfer(5, self.nodes[1].overlay.my_peer)
         res = self.tc_wallet.get_statistics()
         self.assertEqual(0, res["total_up"])
         self.assertEqual(5 * 1024 * 1024, res["total_down"])

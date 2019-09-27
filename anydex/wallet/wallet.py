@@ -51,7 +51,7 @@ class Wallet(six.with_metaclass(abc.ABCMeta, TaskManager)):
         return
 
     @abc.abstractmethod
-    def transfer(self, *args, **kwargs):
+    async def transfer(self, *args, **kwargs):
         return
 
     @abc.abstractmethod

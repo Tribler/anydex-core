@@ -14,6 +14,10 @@ class TestDummyWallet(AbstractServer):
         super(TestDummyWallet, self).setUp()
         self.dummy_wallet = BaseDummyWallet()
 
+    async def tearDown(self):
+        await self.dummy_wallet.shutdown_task_manager()
+        await super(TestDummyWallet, self).tearDown()
+
     def test_wallet_id(self):
         """
         Test the identifier of a dummy wallet

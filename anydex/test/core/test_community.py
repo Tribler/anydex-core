@@ -334,10 +334,13 @@ class TestMarketCommunity(TestMarketCommunityBase):
         """
         await self.introduce_nodes()
 
+        def mock_connect_peer(_):
+            raise DHTError()
+
         # Clean the mid register of node 1 and make sure DHT peer connection fails
         self.nodes[1].overlay.mid_register = {}
         self.nodes[1].overlay.dht = MockObject()
-        self.nodes[1].overlay.dht.connect_peer = lambda *_: fail(DHTError())
+        self.nodes[1].overlay.dht.connect_peer = mock_connect_peer
 
         ask_order = await self.nodes[0].overlay.create_ask(
             AssetPair(AssetAmount(1, 'DUM1'), AssetAmount(1, 'DUM2')), 3600)

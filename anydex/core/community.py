@@ -15,7 +15,6 @@ from ipv8.messaging.payload_headers import BinMemberAuthenticationPayload
 from ipv8.messaging.payload_headers import GlobalTimeDistributionPayload
 from ipv8.peer import Peer
 from ipv8.requestcache import NumberCache, RandomNumberCache, RequestCache
-from ipv8.util import succeed, fail, call_later
 
 from anydex.core import DeclineMatchReason, DeclinedTradeReason, MAX_ORDER_TIMEOUT
 from anydex.core.block import MarketBlock
@@ -44,7 +43,9 @@ from anydex.core.transaction_manager import TransactionManager
 from anydex.core.transaction_repository import DatabaseTransactionRepository,\
     MemoryTransactionRepository
 from anydex.core.wallet_address import WalletAddress
+from anydex.util.asyncio import call_later
 from anydex.wallet.tc_wallet import TrustchainWallet
+from ipv8.util import succeed, fail
 
 
 # Message definitions
@@ -125,7 +126,8 @@ class MatchCache(NumberCache):
         if not self.schedule_task:
             # Schedule a timer
             self._logger.info("Scheduling batch match of order %s" % str(self.order.order_id))
-            self.schedule_task = call_later(self.community.settings.match_window, self.start_process_matches)
+            self.schedule_task = call_later(self.community.settings.match_window,
+                                            self.start_process_matches, ignore_errors=True)
         elif self.schedule_task_done and not self.outstanding_request:
             # If we are currently not processing anything and the schedule task is done, process the matches
             self.process_match()
@@ -173,7 +175,7 @@ class MatchCache(NumberCache):
                 delay = random.uniform(1, 2)
             self.schedule_propose = call_later(delay,
                                                self.community.accept_match_and_propose,
-                                               self.order, other_order_id)
+                                               self.order, other_order_id, ignore_errors=True)
 
     def received_decline_trade(self, other_order_id, decline_reason):
         """
@@ -406,7 +408,7 @@ class MarketCommunity(Community, BlockListener):
 
         self.logger.info("Market community initialized with mid %s", hexlify(self.mid))
 
-    def get_address_for_trader(self, trader_id):
+    async def get_address_for_trader(self, trader_id):
         """
         Fetch the address for a trader.
         If not available in the local storage, perform a DHT request to fetch the address of the peer with a
@@ -414,30 +416,27 @@ class MarketCommunity(Community, BlockListener):
         Return a Deferred that fires either with the address or None if the peer could not be found in the DHT.
         """
         if bytes(trader_id) == self.mid:
-            return succeed(self.get_ipv8_address())
+            return self.get_ipv8_address()
         address = self.lookup_ip(trader_id)
         if address:
-            return succeed(address)
+            return address
 
         self.logger.info("Address for trader %s not found locally, doing DHT request", trader_id.as_hex())
-        result_future = Future()
 
         if not self.dht:
-            return fail(RuntimeError("DHT not available"))
+            raise RuntimeError("DHT not available")
 
-        def on_peers(future):
-            try:
-                peers = future.result()
-            except DHTError as e:
-                self._logger.warning("Unable to get address for trader %s", trader_id.as_hex())
-                result_future.set_exception(e)
+        try:
+            peers = await self.dht.connect_peer(bytes(trader_id))
+        except DHTError:
+            self._logger.warning("Unable to get address for trader %s", trader_id.as_hex())
+            return
+
+        if peers:
             self.update_ip(trader_id, peers[0].address)
-            result_future.set_result(peers[0].address)
+            return peers[0].address
 
-        ensure_future(self.dht.connect_peer(bytes(trader_id))).add_done_callback(on_peers)
-        return result_future
-
-    def should_sign(self, block):
+    async def should_sign(self, block):
         """
         Check whether we should sign the incoming block.
         """
@@ -454,29 +453,20 @@ class MarketCommunity(Community, BlockListener):
                 self.logger.warning("Wallet for asset %s not found - not signing payment message", asset_id)
                 return False
 
-            payment_received_future = Future()
-
-            def on_payment_received(future):
-                future.result()
-                transaction.add_payment(payment)
-                self.transaction_manager.transaction_repository.update(transaction)
-
-                order = self.order_manager.order_repository.find_by_id(transaction.order_id)
-                order.add_trade(transaction.partner_order_id, payment.transferred_assets)
-                self.order_manager.order_repository.update(order)
-
-                if not transaction.is_payment_complete():
-                    self.send_payment(transaction)
-
-                # TODO MULTIPLE INVOCATIONS!!
-
-                payment_received_future.set_result(True)
-
             wallet = self.wallets[asset_id]
             payment = Payment.from_block(block)
-            transaction_future = wallet.monitor_transaction(payment.payment_id.payment_id)
-            transaction_future.add_done_callback(on_payment_received)
-            return payment_received_future
+            await wallet.monitor_transaction(payment.payment_id.payment_id)
+            transaction.add_payment(payment)
+            self.transaction_manager.transaction_repository.update(transaction)
+
+            order = self.order_manager.order_repository.find_by_id(transaction.order_id)
+            order.add_trade(transaction.partner_order_id, payment.transferred_assets)
+            self.order_manager.order_repository.update(order)
+
+            if not transaction.is_payment_complete():
+                self.register_anonymous_task('send_payment', self.send_payment, transaction)
+            return True
+
         elif block.type == b"tx_init":
             if not block.is_valid_tx_init_done_block():
                 return False
@@ -1158,7 +1148,12 @@ class MarketCommunity(Community, BlockListener):
         my_id = TraderId(self.mid)
         payload_tup += (recipient_order_id.order_number, tick.order_id.trader_id, my_id)
 
-        def on_peer_address(address):
+        async def get_address():
+            try:
+                address = await self.get_address_for_trader(recipient_order_id.trader_id)
+            except:
+                address = None
+
             if not address:
                 return
 
@@ -1171,17 +1166,8 @@ class MarketCommunity(Community, BlockListener):
             packet = self._ez_pack(self._prefix, MSG_MATCH, [auth, payload])
             self.endpoint.send(address, packet)
 
-        async def get_address():
-            try:
-                peer_address = await self.get_address_for_trader(recipient_order_id.trader_id)
-            except:
-                peer_address = None
-            on_peer_address(peer_address)
-
-        if self.settings.match_send_interval == 0:
-            ensure_future(get_address())
-        else:
-            call_later(random.uniform(0, self.settings.match_send_interval), get_address)
+        self.register_task('get_address_for_trader_%s-%s' % (recipient_order_id, tick.order_id), get_address,
+                           delay=random.uniform(0, self.settings.match_send_interval))
 
     @lazy_wrapper(MatchPayload)
     def received_match(self, peer, payload):
@@ -1270,9 +1256,9 @@ class MarketCommunity(Community, BlockListener):
             return
 
         # Otherwise, propose!
-        self.propose_trade(order, other_order_id, propose_quantity)
+        await self.propose_trade(order, other_order_id, propose_quantity)
 
-    def propose_trade(self, order, other_order_id, propose_quantity):
+    async def propose_trade(self, order, other_order_id, propose_quantity):
         propose_quantity_scaled = order.assets.proportional_downscale(first=propose_quantity)
 
         propose_trade = Trade.propose(
@@ -1283,25 +1269,22 @@ class MarketCommunity(Community, BlockListener):
             Timestamp.now()
         )
 
-        def on_peer_address(future):
-            try:
-                address = future.result()
-            except:
-                address = None
-
-            if address:
-                self.send_proposed_trade(propose_trade, address)
-            else:
-                order.release_quantity_for_tick(other_order_id, propose_quantity)
-
-                # Notify the match cache
-                cache = self.request_cache.get(u"match", int(order.order_id.order_number))
-                if cache:
-                    cache.received_decline_trade(other_order_id, DeclinedTradeReason.ADDRESS_LOOKUP_FAIL)
-
         # Fetch the address of the target peer (we are not guaranteed to know it at this point since we might have
         # received the order indirectly)
-        self.get_address_for_trader(propose_trade.recipient_order_id.trader_id).add_done_callback(on_peer_address)
+        try:
+            address = await self.get_address_for_trader(propose_trade.recipient_order_id.trader_id)
+        except:
+            address = None
+
+        if address:
+            self.send_proposed_trade(propose_trade, address)
+        else:
+            order.release_quantity_for_tick(other_order_id, propose_quantity)
+
+            # Notify the match cache
+            cache = self.request_cache.get(u"match", int(order.order_id.order_number))
+            if cache:
+                cache.received_decline_trade(other_order_id, DeclinedTradeReason.ADDRESS_LOOKUP_FAIL)
 
     def send_decline_match_message(self, order, other_order_id, matchmaker_trader_id, decline_reason):
         address = self.lookup_ip(matchmaker_trader_id)
@@ -1701,7 +1684,7 @@ class MarketCommunity(Community, BlockListener):
         self.transaction_manager.transaction_repository.update(transaction)
 
     @lazy_wrapper(WalletInfoPayload)
-    def received_wallet_info(self, _, payload):
+    async def received_wallet_info(self, _, payload):
         self.logger.info("Received wallet info from trader %s", payload.trader_id.as_hex())
 
         transaction = self.transaction_manager.find_by_id(payload.transaction_id)
@@ -1717,11 +1700,11 @@ class MarketCommunity(Community, BlockListener):
         else:
             self.logger.info("Wallet info exchanged for transaction %s - starting payments",
                              transaction.transaction_id.as_hex())
-            self.send_payment(transaction)
+            self.register_anonymous_task('send_payment', self.send_payment, transaction)
 
         self.transaction_manager.transaction_repository.update(transaction)
 
-    def send_payment(self, transaction):
+    async def send_payment(self, transaction):
         order = self.order_manager.order_repository.find_by_id(transaction.order_id)
 
         transfer_amount = transaction.next_payment(order.is_ask())
@@ -1736,37 +1719,34 @@ class MarketCommunity(Community, BlockListener):
         if isinstance(wallet, TrustchainWallet):
             peer = Peer(b64decode(str(transaction.partner_incoming_address)),
                         address=self.lookup_ip(transaction.partner_order_id.trader_id))
-            transfer_future = wallet.transfer(transfer_amount.amount, peer)
+            transfer_coro = wallet.transfer(transfer_amount.amount, peer)
         else:
-            transfer_future = wallet.transfer(transfer_amount.amount, str(transaction.partner_incoming_address))
+            transfer_coro = wallet.transfer(transfer_amount.amount, str(transaction.partner_incoming_address))
 
-        def on_payment_acknowledged(payment):
-            self.logger.info("Payment with id %s acknowledged by counterparty!", payment.payment_id)
+        try:
+            txid = await transfer_coro
+        except Exception as e:
+            # When a payment fails, log the error.
+            self.logger.error("Payment of %s to %s failed: (%s) %s", transfer_amount,
+                              str(transaction.partner_incoming_address), type(e), e)
+            return
 
-        def on_payment_done(future):
-            try:
-                txid = future.result()
-            except Exception as e:
-                # When a payment fails, log the error.
-                self.logger.error("Payment of %s to %s failed: (%s) %s", transfer_amount,
-                                  str(transaction.partner_incoming_address), type(e), e)
-                return
+        payment = Payment(TraderId(self.mid), transaction.transaction_id, transfer_amount,
+                          wallet.get_address(), str(transaction.partner_incoming_address), PaymentId(txid),
+                          Timestamp.now())
 
-            payment = Payment(TraderId(self.mid), transaction.transaction_id, transfer_amount,
-                              wallet.get_address(), str(transaction.partner_incoming_address), PaymentId(txid),
-                              Timestamp.now())
+        # Add it to the transaction
+        transaction.add_payment(payment)
+        self.transaction_manager.transaction_repository.update(transaction)
 
-            # Add it to the transaction
-            transaction.add_payment(payment)
-            self.transaction_manager.transaction_repository.update(transaction)
+        order.add_trade(transaction.partner_order_id, payment.transferred_assets)
+        self.order_manager.order_repository.update(order)
 
-            order.add_trade(transaction.partner_order_id, payment.transferred_assets)
-            self.order_manager.order_repository.update(order)
-
-            ensure_future(self.create_new_tx_payment_block(transaction.trading_peer, payment)) \
-                .add_done_callback(lambda _: on_payment_acknowledged(payment))
-
-        transfer_future.add_done_callback(on_payment_done)
+        try:
+            await self.create_new_tx_payment_block(transaction.trading_peer, payment)
+        except:
+            return
+        self.logger.info("Payment with id %s acknowledged by counterparty!", payment.payment_id)
 
     def send_matched_transaction_completed(self, transaction, block):
         """

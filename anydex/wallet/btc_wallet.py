@@ -2,8 +2,8 @@ from __future__ import absolute_import
 
 import os
 import time
+from asyncio import Future
 # Important import, do not remove
-from asyncio import Future, ensure_future
 from binascii import hexlify
 
 from anydex.wallet import bitcoinlib_main as bitcoinlib_main
@@ -81,20 +81,17 @@ class BitcoinWallet(Wallet):
 
         return succeed({"available": 0, "pending": 0, "currency": 'BTC', "precision": self.precision()})
 
-    def transfer(self, amount, address):
-        result_future = Future()
+    async def transfer(self, amount, address):
+        try:
+            balance = await self.get_balance()
+        except:
+            return
 
-        def on_balance(future):
-            balance = future.result()
-            if balance['available'] >= int(amount):
-                self._logger.info("Creating Bitcoin payment with amount %f to address %s", amount, address)
-                tx = self.wallet.send_to(address, int(amount))
-                result_future.set_result(str(tx.hash))
-            else:
-                result_future.set_exception(InsufficientFunds("Insufficient funds"))
-
-        ensure_future(self.get_balance()).add_done_callback(on_balance)
-        return result_future
+        if balance['available'] >= int(amount):
+            self._logger.info("Creating Bitcoin payment with amount %f to address %s", amount, address)
+            tx = self.wallet.send_to(address, int(amount))
+            return str(tx.hash)
+        raise InsufficientFunds("Insufficient funds")
 
     def monitor_transaction(self, txid):
         """
@@ -108,7 +105,7 @@ class BitcoinWallet(Wallet):
                 if transaction['id'] == txid:
                     self._logger.debug("Found transaction with id %s", txid)
                     monitor_future.set_result(None)
-                    monitor_task.stop()
+                    monitor_task.cancel()
 
         self._logger.debug("Start polling for transaction %s", txid)
         monitor_task = self.register_task("btc_poll_%s" % txid, monitor, interval=5)
