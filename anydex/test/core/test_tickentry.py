@@ -36,25 +36,25 @@ class TickEntryTestSuite(AbstractServer):
         await super(TickEntryTestSuite, self).tearDown()
 
     def test_price_level(self):
-        self.assertEquals(self.price_level, self.tick_entry.price_level())
+        self.assertEqual(self.price_level, self.tick_entry.price_level())
 
     def test_next_tick(self):
         # Test for next tick
-        self.assertEquals(None, self.tick_entry.next_tick)
+        self.assertEqual(None, self.tick_entry.next_tick)
         self.price_level.append_tick(self.tick_entry)
         self.price_level.append_tick(self.tick_entry2)
-        self.assertEquals(self.tick_entry2, self.tick_entry.next_tick)
+        self.assertEqual(self.tick_entry2, self.tick_entry.next_tick)
 
     def test_prev_tick(self):
         # Test for previous tick
-        self.assertEquals(None, self.tick_entry.prev_tick)
+        self.assertEqual(None, self.tick_entry.prev_tick)
         self.price_level.append_tick(self.tick_entry)
         self.price_level.append_tick(self.tick_entry2)
-        self.assertEquals(self.tick_entry, self.tick_entry2.prev_tick)
+        self.assertEqual(self.tick_entry, self.tick_entry2.prev_tick)
 
     def test_str(self):
         # Test for tick string representation
-        self.assertEquals('60 BTC\t@\t0.5 MB', str(self.tick_entry))
+        self.assertEqual('60 BTC\t@\t0.5 MB', str(self.tick_entry))
 
     def test_is_valid(self):
         # Test for is valid

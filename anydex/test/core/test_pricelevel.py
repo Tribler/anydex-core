@@ -33,16 +33,16 @@ class PriceLevelTestSuite(unittest.TestCase):
 
     def test_appending_length(self):
         # Test for tick appending and length
-        self.assertEquals(0, self.price_level.length)
-        self.assertEquals(0, len(self.price_level))
+        self.assertEqual(0, self.price_level.length)
+        self.assertEqual(0, len(self.price_level))
 
         self.price_level.append_tick(self.tick_entry1)
         self.price_level.append_tick(self.tick_entry2)
         self.price_level.append_tick(self.tick_entry3)
         self.price_level.append_tick(self.tick_entry4)
 
-        self.assertEquals(4, self.price_level.length)
-        self.assertEquals(4, len(self.price_level))
+        self.assertEqual(4, self.price_level.length)
+        self.assertEqual(4, len(self.price_level))
 
     def test_tick_removal(self):
         # Test for tick removal
@@ -55,11 +55,11 @@ class PriceLevelTestSuite(unittest.TestCase):
         self.price_level.remove_tick(self.tick_entry1)
         self.price_level.remove_tick(self.tick_entry4)
         self.price_level.remove_tick(self.tick_entry3)
-        self.assertEquals(0, self.price_level.length)
+        self.assertEqual(0, self.price_level.length)
 
     def test_str(self):
         # Test for price level string representation
         self.price_level.append_tick(self.tick_entry1)
         self.price_level.append_tick(self.tick_entry2)
-        self.assertEquals('60 BTC\t@\t0.5 MC\n'
+        self.assertEqual('60 BTC\t@\t0.5 MC\n'
                           '60 BTC\t@\t0.5 MC\n', str(self.price_level))

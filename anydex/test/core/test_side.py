@@ -27,33 +27,33 @@ class SideTestSuite(unittest.TestCase):
 
     def test_max_price(self):
         # Test max price (list)
-        self.assertEquals(None, self.side.get_max_price('MB', 'BTC'))
-        self.assertEquals(None, self.side.get_max_price_list('MB', 'BTC'))
+        self.assertEqual(None, self.side.get_max_price('MB', 'BTC'))
+        self.assertEqual(None, self.side.get_max_price_list('MB', 'BTC'))
 
         self.side.insert_tick(self.tick)
         self.side.insert_tick(self.tick2)
 
-        self.assertEquals(Price(1, 2, 'MB', 'BTC'), self.side.get_max_price('MB', 'BTC'))
+        self.assertEqual(Price(1, 2, 'MB', 'BTC'), self.side.get_max_price('MB', 'BTC'))
 
     def test_min_price(self):
         # Test min price (list)
-        self.assertEquals(None, self.side.get_min_price_list('MB', 'BTC'))
-        self.assertEquals(None, self.side.get_min_price('MB', 'BTC'))
+        self.assertEqual(None, self.side.get_min_price_list('MB', 'BTC'))
+        self.assertEqual(None, self.side.get_min_price('MB', 'BTC'))
 
         self.side.insert_tick(self.tick)
         self.side.insert_tick(self.tick2)
 
-        self.assertEquals(Price(1, 4, 'MB', 'BTC'), self.side.get_min_price('MB', 'BTC'))
+        self.assertEqual(Price(1, 4, 'MB', 'BTC'), self.side.get_min_price('MB', 'BTC'))
 
     def test_insert_tick(self):
         # Test insert tick
-        self.assertEquals(0, len(self.side))
+        self.assertEqual(0, len(self.side))
         self.assertFalse(self.side.tick_exists(OrderId(TraderId(b'0' * 20), OrderNumber(1))))
 
         self.side.insert_tick(self.tick)
         self.side.insert_tick(self.tick2)
 
-        self.assertEquals(2, len(self.side))
+        self.assertEqual(2, len(self.side))
         self.assertTrue(self.side.tick_exists(OrderId(TraderId(b'0' * 20), OrderNumber(1))))
 
     def test_remove_tick(self):
@@ -62,9 +62,9 @@ class SideTestSuite(unittest.TestCase):
         self.side.insert_tick(self.tick2)
 
         self.side.remove_tick(OrderId(TraderId(b'0' * 20), OrderNumber(1)))
-        self.assertEquals(1, len(self.side))
+        self.assertEqual(1, len(self.side))
         self.side.remove_tick(OrderId(TraderId(b'1' * 20), OrderNumber(2)))
-        self.assertEquals(0, len(self.side))
+        self.assertEqual(0, len(self.side))
 
     def test_get_price_level_list_wallets(self):
         """
