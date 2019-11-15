@@ -336,9 +336,10 @@ class OrderBook(TaskManager):
         return res_str
 
     def cancel_all_pending_tasks(self):
-        super(OrderBook, self).cancel_all_pending_tasks()
+        tasks = super(OrderBook, self).cancel_all_pending_tasks()
         for order_id in self.get_order_ids():
-            self.get_tick(order_id).cancel_all_pending_tasks()
+            tasks.extend(self.get_tick(order_id).cancel_all_pending_tasks())
+        return tasks
 
 
 class DatabaseOrderBook(OrderBook):
