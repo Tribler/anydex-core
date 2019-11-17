@@ -10,9 +10,8 @@ import random
 import socket
 import struct
 import sys
-from asyncio import get_event_loop
-
-from twisted.python.log import addObserver
+from asyncio import coroutine, get_event_loop, iscoroutinefunction, wait_for
+from functools import wraps
 
 
 logger = logging.getLogger(__name__)
@@ -112,11 +111,14 @@ class MockObject(object):
     pass
 
 
-def trial_timeout(timeout):
-    def trial_timeout_decorator(func):
-        func.timeout = timeout
-        return func
-    return trial_timeout_decorator
+def timeout(timeout):
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            coro = func if iscoroutinefunction(func) else coroutine(func)
+            await wait_for(coro(*args, **kwargs), timeout)
+        return wrapper
+    return decorator
 
 
 CLAIMED_PORTS = []

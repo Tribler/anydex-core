@@ -15,7 +15,7 @@ from anydex.core.tick import Ask, Bid
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
 from anydex.core.transaction import Transaction, TransactionId
-from anydex.test.util import MockObject, trial_timeout
+from anydex.test.util import MockObject, timeout
 from anydex.wallet.dummy_wallet import DummyWallet1, DummyWallet2
 from anydex.wallet.tc_wallet import TrustchainWallet
 
@@ -61,7 +61,7 @@ class TestMarketCommunity(TestMarketCommunityBase):
         self.nodes[0].overlay.disable_matchmaker()
         self.nodes[1].overlay.disable_matchmaker()
 
-    @trial_timeout(2)
+    @timeout(2)
     async def test_create_ask(self):
         """
         Test creating an ask and sending it to others
@@ -78,7 +78,7 @@ class TestMarketCommunity(TestMarketCommunityBase):
         self.assertTrue(orders[0].is_ask())
         self.assertEqual(len(self.nodes[2].overlay.order_book.asks), 1)
 
-    @trial_timeout(2)
+    @timeout(2)
     async def test_create_bid(self):
         """
         Test creating a bid and sending it to others
@@ -105,7 +105,7 @@ class TestMarketCommunity(TestMarketCommunityBase):
         with self.assertRaises(RuntimeError):
             await self.nodes[0].overlay.create_bid(invalid_pair, 3600)
 
-    @trial_timeout(2)
+    @timeout(2)
     async def test_decline_trade(self):
         """
         Test declining a trade
@@ -126,7 +126,7 @@ class TestMarketCommunity(TestMarketCommunityBase):
         # The ask should be removed since this node thinks the order is already completed
         self.assertEqual(len(self.nodes[2].overlay.order_book.asks), 0)
 
-    @trial_timeout(3)
+    @timeout(3)
     async def test_decline_trade_cancel(self):
         """
         Test whether a cancelled order is correctly declined when negotiating
@@ -147,7 +147,7 @@ class TestMarketCommunity(TestMarketCommunityBase):
         self.assertFalse(list(self.nodes[0].overlay.transaction_manager.find_all()))
         self.assertEqual(len(self.nodes[2].overlay.order_book.asks), 0)
 
-    @trial_timeout(2)
+    @timeout(2)
     async def test_decline_match_cancel(self):
         """
         Test whether an order is removed when the matched order is cancelled
@@ -167,7 +167,7 @@ class TestMarketCommunity(TestMarketCommunityBase):
         self.assertFalse(list(self.nodes[0].overlay.transaction_manager.find_all()))
         self.assertEqual(len(self.nodes[2].overlay.order_book.bids), 0)
 
-    @trial_timeout(2)
+    @timeout(2)
     async def test_counter_trade(self):
         """
         Test making a counter trade
@@ -187,7 +187,7 @@ class TestMarketCommunity(TestMarketCommunityBase):
         self.assertTrue(list(self.nodes[0].overlay.transaction_manager.find_all()))
         self.assertTrue(list(self.nodes[1].overlay.transaction_manager.find_all()))
 
-    @trial_timeout(3)
+    @timeout(3)
     async def test_completed_trade(self):
         """
         Test whether a completed trade is removed from the orderbook of a matchmaker
@@ -208,7 +208,7 @@ class TestMarketCommunity(TestMarketCommunityBase):
         # The matchmaker should have removed this order from the orderbook
         self.assertFalse(self.nodes[2].overlay.order_book.tick_exists(order.order_id))
 
-    @trial_timeout(3)
+    @timeout(3)
     async def test_other_completed_trade(self):
         """
         Test whether a completed trade of a counterparty is removed from the orderbook of a matchmaker
@@ -229,7 +229,7 @@ class TestMarketCommunity(TestMarketCommunityBase):
         # Matchmaker should have removed this order from the orderbook
         self.assertFalse(self.nodes[2].overlay.order_book.tick_exists(order.order_id))
 
-    @trial_timeout(3)
+    @timeout(3)
     async def test_e2e_trade(self):
         """
         Test trading dummy tokens against bandwidth tokens between two persons, with a matchmaker
@@ -255,7 +255,7 @@ class TestMarketCommunity(TestMarketCommunityBase):
         self.assertEqual(balance1['available'], 1050)
         self.assertEqual(balance2['available'], -50)
 
-    @trial_timeout(2)
+    @timeout(2)
     async def test_e2e_trade_dht(self):
         """
         Test a full trade with (dummy assets), where both traders are not connected to each other
@@ -300,7 +300,7 @@ class TestMarketCommunity(TestMarketCommunityBase):
 
         self.assertTrue(self.nodes[0].overlay.order_manager.order_repository.find_by_id(ask_order.order_id).cancelled)
 
-    @trial_timeout(3)
+    @timeout(3)
     async def test_proposed_trade_timeout(self):
         """
         Test whether we unreserve the quantity if a proposed trade timeouts
@@ -325,7 +325,7 @@ class TestMarketCommunity(TestMarketCommunityBase):
         self.assertEqual(ask_order.reserved_quantity, 0)
         self.assertEqual(bid_order.reserved_quantity, 0)
 
-    @trial_timeout(3)
+    @timeout(3)
     async def test_address_resolv_fail(self):
         """
         Test whether an order is unreserved when address resolution fails
@@ -350,7 +350,7 @@ class TestMarketCommunity(TestMarketCommunityBase):
         self.assertEqual(ask_order.reserved_quantity, 0)
         self.assertEqual(bid_order.reserved_quantity, 0)
 
-    @trial_timeout(4)
+    @timeout(4)
     async def test_orderbook_sync(self):
         """
         Test whether orderbooks are synchronized with a new node
@@ -382,7 +382,7 @@ class TestMarketCommunity(TestMarketCommunityBase):
         self.assertTrue(self.nodes[4].overlay.order_book.get_tick(ask_order.order_id))
         self.assertTrue(self.nodes[4].overlay.order_book.get_tick(bid_order.order_id))
 
-    @trial_timeout(4)
+    @timeout(4)
     async def test_partial_trade(self):
         """
         Test a partial trade between two nodes with a matchmaker
@@ -412,7 +412,7 @@ class TestMarketCommunity(TestMarketCommunityBase):
 class TestMarketCommunityTwoNodes(TestMarketCommunityBase):
     __testing__ = True
 
-    @trial_timeout(2)
+    @timeout(2)
     async def test_e2e_trade(self):
         """
         Test a direct trade between two nodes
@@ -443,7 +443,7 @@ class TestMarketCommunityTwoNodes(TestMarketCommunityBase):
         self.assertEqual(balance1['available'], 1010)
         self.assertEqual(balance2['available'], 9987)
 
-    @trial_timeout(2)
+    @timeout(2)
     async def test_partial_trade(self):
         """
         Test a partial trade between two nodes
@@ -493,7 +493,7 @@ class TestMarketCommunityFiveNodes(TestMarketCommunityBase):
         self.nodes[1].overlay.disable_matchmaker()
         self.nodes[2].overlay.disable_matchmaker()
 
-    @trial_timeout(2)
+    @timeout(2)
     async def test_partial_match(self):
         """
         Test matchmaking with partial orders
@@ -549,21 +549,21 @@ class TestMarketCommunityFiveNodes(TestMarketCommunityBase):
         self.assertTrue(list(self.nodes[0].overlay.transaction_manager.find_all()))
         self.assertTrue(list(self.nodes[2].overlay.transaction_manager.find_all()))
 
-    @trial_timeout(4)
+    @timeout(4)
     async def test_match_window_bid(self):
         """
         Test the match window when one is matching a new bid
         """
         await self.match_window_impl(False)
 
-    @trial_timeout(4)
+    @timeout(4)
     async def test_match_window_ask(self):
         """
         Test the match window when one is matching a new ask
         """
         await self.match_window_impl(True)
 
-    @trial_timeout(4)
+    @timeout(4)
     async def test_match_window_multiple(self):
         """
         Test whether multiple ask orders in the matching window will get matched
@@ -594,7 +594,7 @@ class TestMarketCommunityFiveNodes(TestMarketCommunityBase):
         self.assertEqual(len(list(self.nodes[1].overlay.transaction_manager.find_all())), 1)
         self.assertEqual(len(list(self.nodes[2].overlay.transaction_manager.find_all())), 2)
 
-    @trial_timeout(4)
+    @timeout(4)
     async def test_clearing_policy_pending_trade_decline(self):
         """
         Test whether we are refusing to trade with a counterparty who is currently involved in another trade
@@ -624,7 +624,7 @@ class TestMarketCommunityFiveNodes(TestMarketCommunityBase):
         await sleep(0.5)
         self.assertFalse(list(self.nodes[2].overlay.transaction_manager.find_all()))
 
-    @trial_timeout(4)
+    @timeout(4)
     async def test_clearing_policy_pending_trade_accept(self):
         """
         Test whether we accept trade with a counterparty who is currently involved in another trade

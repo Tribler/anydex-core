@@ -5,7 +5,7 @@ from ipv8.attestation.trustchain.community import TrustChainCommunity
 from ipv8.test.base import TestBase
 from ipv8.test.mocking.ipv8 import MockIPv8
 
-from anydex.test.util import trial_timeout
+from anydex.test.util import timeout
 from anydex.wallet.tc_wallet import TrustchainWallet
 from anydex.wallet.wallet import InsufficientFunds
 
@@ -40,7 +40,7 @@ class TestTrustchainWallet(TestBase):
         """
         self.assertEqual(self.tc_wallet.get_identifier(), 'MB')
 
-    @trial_timeout(2)
+    @timeout(2)
     async def test_get_balance(self):
         """
         Test the balance retrieval of a Trustchain wallet
@@ -98,7 +98,7 @@ class TestTrustchainWallet(TestBase):
 
         await tx_future
 
-    @trial_timeout(2)
+    @timeout(2)
     async def test_monitor_tx_existing(self):
         """
         Test monitoring a transaction that already exists

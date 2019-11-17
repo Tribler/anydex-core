@@ -1,7 +1,7 @@
 from asyncio import Future
 
 from anydex.test.base import AbstractServer
-from anydex.test.util import trial_timeout
+from anydex.test.util import timeout
 from anydex.wallet.dummy_wallet import BaseDummyWallet, DummyWallet1, DummyWallet2
 from anydex.wallet.wallet import InsufficientFunds
 
@@ -32,14 +32,14 @@ class TestDummyWallet(AbstractServer):
         self.assertEqual(DummyWallet1().get_name(), 'Dummy 1')
         self.assertEqual(DummyWallet2().get_name(), 'Dummy 2')
 
-    @trial_timeout(10)
+    @timeout(10)
     def test_create_wallet(self):
         """
         Test the creation of a dummy wallet
         """
         return self.dummy_wallet.create_wallet()
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_get_balance(self):
         """
         Test fetching the balance of a dummy wallet
@@ -47,7 +47,7 @@ class TestDummyWallet(AbstractServer):
         balance = await self.dummy_wallet.get_balance()
         self.assertIsInstance(balance, dict)
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_transfer(self):
         """
         Test the transfer of money from a dummy wallet
@@ -56,7 +56,7 @@ class TestDummyWallet(AbstractServer):
         transactions = await self.dummy_wallet.get_transactions()
         self.assertEqual(len(transactions), 1)
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_transfer_invalid(self):
         """
         Test whether transferring a too large amount of money from a dummy wallet raises an error
@@ -64,7 +64,7 @@ class TestDummyWallet(AbstractServer):
         with self.assertRaises(InsufficientFunds):
             await self.dummy_wallet.transfer(self.dummy_wallet.balance + 1, None)
 
-    @trial_timeout(10)
+    @timeout(10)
     def test_monitor(self):
         """
         Test the monitor loop of a transaction wallet
@@ -72,7 +72,7 @@ class TestDummyWallet(AbstractServer):
         self.dummy_wallet.MONITOR_DELAY = 1
         return self.dummy_wallet.monitor_transaction("3.0")
 
-    @trial_timeout(10)
+    @timeout(10)
     def test_monitor_instant(self):
         """
         Test an instant the monitor loop of a transaction wallet
@@ -86,7 +86,7 @@ class TestDummyWallet(AbstractServer):
         """
         self.assertIsInstance(self.dummy_wallet.get_address(), str)
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_get_transaction(self):
         """
         Test the retrieval of transactions of a dummy wallet

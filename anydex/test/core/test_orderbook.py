@@ -9,7 +9,7 @@ from anydex.core.tick import Ask, Bid
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
 from anydex.core.trade import Trade
-from anydex.test.util import trial_timeout
+from anydex.test.util import timeout
 
 
 class AbstractTestOrderBook(AbstractServer):
@@ -76,7 +76,7 @@ class TestOrderBook(AbstractTestOrderBook):
         self.assertTrue(self.order_book.get_tick(self.ask.order_id))
         self.assertTrue(self.order_book.get_tick(self.bid.order_id))
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_ask_insertion_invalid(self):
         """
         Test whether we get an error when we add an invalid ask to the order book
@@ -84,7 +84,7 @@ class TestOrderBook(AbstractTestOrderBook):
         with self.assertRaises(RuntimeError):
             await self.order_book.insert_ask(self.invalid_ask)
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_bid_insertion_invalid(self):
         """
         Test whether we get an error when we add an invalid bid to the order book

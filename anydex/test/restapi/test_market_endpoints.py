@@ -11,7 +11,7 @@ from anydex.core.trade import AcceptedTrade
 from anydex.core.transaction import Transaction, TransactionId
 from anydex.core.wallet_address import WalletAddress
 from anydex.test.restapi.base import TestRestApiBase
-from anydex.test.util import MockObject, trial_timeout
+from anydex.test.util import MockObject, timeout
 
 
 class TestMarketEndpoint(TestRestApiBase):
@@ -41,7 +41,7 @@ class TestMarketEndpoint(TestRestApiBase):
         block.hash = b'a'
         return block
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_get_asks(self):
         """
         Test whether the API returns the right asks in the order book when performing a request
@@ -54,7 +54,7 @@ class TestMarketEndpoint(TestRestApiBase):
         self.assertIn('ticks', json_response['asks'][0])
         self.assertEqual(len(json_response['asks'][0]['ticks']), 1)
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_create_ask(self):
         """
         Test whether we can create an ask using the API
@@ -70,7 +70,7 @@ class TestMarketEndpoint(TestRestApiBase):
         await self.do_request('asks', expected_code=200, request_type='PUT', post_data=post_data)
         self.assertEqual(len(self.nodes[0].overlay.order_book.asks), 1)
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_create_ask_no_amount(self):
         """
         Test for an error when we don't add an asset amount when creating an ask
@@ -79,7 +79,7 @@ class TestMarketEndpoint(TestRestApiBase):
         post_data = {'first_asset_amount': 10, 'first_asset_type': 'DUM1', 'second_asset_type': 'DUM2', 'timeout': 3400}
         await self.do_request('asks', expected_code=400, request_type='PUT', post_data=post_data)
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_create_ask_no_type(self):
         """
         Test for an error when we don't add an asset type when creating an ask
@@ -88,7 +88,7 @@ class TestMarketEndpoint(TestRestApiBase):
         post_data = {'first_asset_amount': 10, 'second_asset_amount': 10, 'second_asset_type': 'DUM2', 'timeout': 3400}
         await self.do_request('asks', expected_code=400, request_type='PUT', post_data=post_data)
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_get_bids(self):
         """
         Test whether the API returns the right bids in the order book when performing a request
@@ -101,7 +101,7 @@ class TestMarketEndpoint(TestRestApiBase):
         self.assertIn('ticks', json_response['bids'][0])
         self.assertEqual(len(json_response['bids'][0]['ticks']), 1)
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_create_bid(self):
         """
         Test whether we can create a bid using the API
@@ -117,7 +117,7 @@ class TestMarketEndpoint(TestRestApiBase):
         await self.do_request('bids', expected_code=200, request_type='PUT', post_data=post_data)
         self.assertEqual(len(self.nodes[0].overlay.order_book.bids), 1)
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_create_bid_no_amount(self):
         """
         Test for an error when we don't add an asset amount when creating a bid
@@ -126,7 +126,7 @@ class TestMarketEndpoint(TestRestApiBase):
         post_data = {'first_asset_amount': 10, 'first_asset_type': 'DUM1', 'second_asset_type': 'DUM2', 'timeout': 3400}
         await self.do_request('bids', expected_code=400, request_type='PUT', post_data=post_data)
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_create_bid_no_type(self):
         """
         Test for an error when we don't add an asset type when creating a bid
@@ -135,7 +135,7 @@ class TestMarketEndpoint(TestRestApiBase):
         post_data = {'first_asset_amount': 10, 'second_asset_amount': 10, 'second_asset_type': 'DUM2', 'timeout': 3400}
         await self.do_request('bids', expected_code=400, request_type='PUT', post_data=post_data)
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_get_transactions(self):
         """
         Test whether the API returns the right transactions in the order book when performing a request
@@ -146,7 +146,7 @@ class TestMarketEndpoint(TestRestApiBase):
         self.assertIn('transactions', json_response)
         self.assertEqual(len(json_response['transactions']), 1)
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_get_payment_not_found(self):
         """
         Test whether the API returns a 404 when a payment cannot be found
@@ -154,7 +154,7 @@ class TestMarketEndpoint(TestRestApiBase):
         self.should_check_equality = False
         await self.do_request('market/transactions/%s/3/payments' % ('30' * 20), expected_code=404)
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_get_orders(self):
         """
         Test whether the API returns the right orders when we perform a request
@@ -168,7 +168,7 @@ class TestMarketEndpoint(TestRestApiBase):
         self.assertIn('orders', json_response)
         self.assertEqual(len(json_response['orders']), 1)
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_get_payments(self):
         """
         Test whether the API returns the right payments when we perform a request
@@ -180,7 +180,7 @@ class TestMarketEndpoint(TestRestApiBase):
         self.assertIn('payments', json_response)
         self.assertEqual(len(json_response['payments']), 1)
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_cancel_order_not_found(self):
         """
         Test whether a 404 is returned when we try to cancel an order that does not exist
@@ -190,7 +190,7 @@ class TestMarketEndpoint(TestRestApiBase):
         self.should_check_equality = False
         await self.do_request('orders/1234/cancel', request_type='POST', expected_code=404)
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_cancel_order_invalid(self):
         """
         Test whether an error is returned when we try to cancel an order that has expired
@@ -202,7 +202,7 @@ class TestMarketEndpoint(TestRestApiBase):
         self.should_check_equality = False
         await self.do_request('orders/1/cancel', request_type='POST', expected_code=400)
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_cancel_order(self):
         """
         Test whether an error is returned when we try to cancel an order that has expired
@@ -216,7 +216,7 @@ class TestMarketEndpoint(TestRestApiBase):
         cancelled_order = self.nodes[0].overlay.order_manager.order_repository.find_by_id(order.order_id)
         self.assertTrue(cancelled_order.cancelled)
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_get_matchmakers(self):
         """
         Test the request to fetch known matchmakers

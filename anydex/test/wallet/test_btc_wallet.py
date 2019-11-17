@@ -4,7 +4,7 @@ from asyncio import Future
 from sqlalchemy.orm import session as db_session
 
 from anydex.test.base import AbstractServer
-from anydex.test.util import MockObject, trial_timeout
+from anydex.test.util import MockObject, timeout
 from anydex.wallet.btc_wallet import BitcoinTestnetWallet, BitcoinWallet
 
 from ipv8.util import succeed
@@ -17,7 +17,7 @@ class TestBtcWallet(AbstractServer):
         db_session.close_all_sessions()
         await super(TestBtcWallet, self).tearDown()
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_btc_wallet(self):
         """
         Test the creating, opening, transactions and balance query of a Bitcoin (testnet) wallet
@@ -79,7 +79,7 @@ class TestBtcWallet(AbstractServer):
         balance = await wallet.get_balance()
         self.assertDictEqual(balance, {'available': 0, 'pending': 0, 'currency': 'BTC', 'precision': 8})
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_btc_wallet_transfer(self):
         """
         Test that the transfer method of a BTC wallet works
@@ -92,7 +92,7 @@ class TestBtcWallet(AbstractServer):
         wallet.wallet.send_to = lambda *_: mock_tx
         await wallet.transfer(3000, '2N8hwP1WmJrFF5QWABn38y63uYLhnJYJYTF')
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_btc_wallet_create_error(self):
         """
         Test whether an error during wallet creation is handled
@@ -102,7 +102,7 @@ class TestBtcWallet(AbstractServer):
         with self.assertRaises(Exception):
             await wallet.create_wallet()
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_btc_wallet_transfer_no_funds(self):
         """
         Test that the transfer method of a BTC wallet raises an error when we don't have enough funds
@@ -113,7 +113,7 @@ class TestBtcWallet(AbstractServer):
         with self.assertRaises(Exception):
             await wallet.transfer(3000, '2N8hwP1WmJrFF5QWABn38y63uYLhnJYJYTF')
 
-    @trial_timeout(10)
+    @timeout(10)
     async def test_get_transactions(self):
         """
         Test whether transactions in bitcoinlib are correctly returned
