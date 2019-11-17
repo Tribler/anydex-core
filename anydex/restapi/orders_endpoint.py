@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from aiohttp import web
 
 from ipv8.REST.base_endpoint import Response, HTTP_BAD_REQUEST, HTTP_NOT_FOUND

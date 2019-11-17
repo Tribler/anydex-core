@@ -1,14 +1,10 @@
 """
 This file contains everything related to persistence for the market community.
 """
-from __future__ import absolute_import
-
 from os import path
 
 from ipv8.attestation.trustchain.database import TrustChainDB
 from ipv8.database import database_blob
-
-from six import text_type
 
 from anydex.core.message import TraderId
 from anydex.core.order import Order, OrderId, OrderNumber
@@ -138,7 +134,7 @@ class MarketDB(TrustChainDB):
         try:
             db_result = next(self.execute(u"SELECT * FROM orders WHERE trader_id = ? AND order_number = ?",
                                           (database_blob(bytes(order_id.trader_id)),
-                                           text_type(order_id.order_number))))
+                                           str(order_id.order_number))))
         except StopIteration:
             return None
         return Order.from_database(db_result, self.get_reserved_ticks(order_id))
@@ -163,7 +159,7 @@ class MarketDB(TrustChainDB):
         Delete a specific order from the database
         """
         self.execute(u"DELETE FROM orders WHERE trader_id = ? AND order_number = ?",
-                     (database_blob(bytes(order_id.trader_id)), text_type(order_id.order_number)))
+                     (database_blob(bytes(order_id.trader_id)), str(order_id.order_number)))
         self.delete_reserved_ticks(order_id)
 
     def get_next_order_number(self):
@@ -180,7 +176,7 @@ class MarketDB(TrustChainDB):
         Delete all reserved ticks from a specific order
         """
         self.execute(u"DELETE FROM orders_reserved_ticks WHERE trader_id = ? AND order_number = ?",
-                     (database_blob(bytes(order_id.trader_id)), text_type(order_id.order_number)))
+                     (database_blob(bytes(order_id.trader_id)), str(order_id.order_number)))
 
     def add_reserved_tick(self, order_id, reserved_order_id, amount):
         """
@@ -189,8 +185,8 @@ class MarketDB(TrustChainDB):
         self.execute(
             u"INSERT INTO orders_reserved_ticks (trader_id, order_number, reserved_trader_id, reserved_order_number,"
             u"quantity) VALUES(?,?,?,?,?)",
-            (database_blob(bytes(order_id.trader_id)), text_type(order_id.order_number),
-             database_blob(bytes(reserved_order_id.trader_id)), text_type(reserved_order_id.order_number), amount))
+            (database_blob(bytes(order_id.trader_id)), str(order_id.order_number),
+             database_blob(bytes(reserved_order_id.trader_id)), str(reserved_order_id.order_number), amount))
         self.commit()
 
     def get_reserved_ticks(self, order_id):
@@ -198,7 +194,7 @@ class MarketDB(TrustChainDB):
         Get all reserved ticks for a specific order.
         """
         db_results = self.execute(u"SELECT * FROM orders_reserved_ticks WHERE trader_id = ? AND order_number = ?",
-                                  (database_blob(bytes(order_id.trader_id)), text_type(order_id.order_number)))
+                                  (database_blob(bytes(order_id.trader_id)), str(order_id.order_number)))
         return [(OrderId(TraderId(bytes(data[2])), OrderNumber(data[3])), data[4]) for data in db_results]
 
     def get_all_transactions(self):
@@ -335,7 +331,7 @@ class MarketDB(TrustChainDB):
         :param database_version: Current version of the database.
         :return:
         """
-        assert isinstance(database_version, text_type)
+        assert isinstance(database_version, str)
         assert database_version.isdigit()
         assert int(database_version) >= 0
         database_version = int(database_version)

@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from sqlalchemy.orm import session as db_session
 
 import anydex.util.json_util as json

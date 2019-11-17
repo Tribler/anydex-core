@@ -1,9 +1,5 @@
-from __future__ import absolute_import, division
-
 import datetime
 import time
-
-from six import integer_types
 
 from ipv8.util import old_round
 
@@ -14,12 +10,12 @@ class Timestamp(object):
     def __init__(self, timestamp):
         """
         :param timestamp: Integer representation of a timestamp in milliseconds
-        :type timestamp: integer_types
+        :type timestamp: int
         :raises ValueError: Thrown when one of the arguments are invalid
         """
         super(Timestamp, self).__init__()
 
-        if not isinstance(timestamp, integer_types):
+        if not isinstance(timestamp, int):
             raise ValueError("Timestamp must be an integer")
 
         if timestamp < 0:
@@ -46,14 +42,14 @@ class Timestamp(object):
     def __lt__(self, other):
         if isinstance(other, Timestamp):
             return self._timestamp < other._timestamp
-        if isinstance(other, integer_types):
+        if isinstance(other, int):
             return self._timestamp < other
         return NotImplemented
 
     def __le__(self, other):
         if isinstance(other, Timestamp):
             return self._timestamp <= other._timestamp
-        if isinstance(other, integer_types):
+        if isinstance(other, int):
             return self._timestamp <= other
         return NotImplemented
 
@@ -70,14 +66,14 @@ class Timestamp(object):
     def __gt__(self, other):
         if isinstance(other, Timestamp):
             return self._timestamp > other._timestamp
-        if isinstance(other, integer_types):
+        if isinstance(other, int):
             return self._timestamp > other
         return NotImplemented
 
     def __ge__(self, other):
         if isinstance(other, Timestamp):
             return self._timestamp >= other._timestamp
-        if isinstance(other, integer_types):
+        if isinstance(other, int):
             return self._timestamp >= other
         return NotImplemented
 

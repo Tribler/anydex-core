@@ -1,14 +1,11 @@
-from __future__ import absolute_import
-
 import abc
 import logging
 from binascii import hexlify, unhexlify
 
 from ipv8.peer import Peer
 
-import six
 
-class ClearingPolicy(six.with_metaclass(abc.ABCMeta, object)):
+class ClearingPolicy(metaclass=abc.ABCMeta):
     """
     The clearing policy determines whether we should trade with a specific counterparty.
     """

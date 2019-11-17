@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import anydex.util.json_util as json
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair

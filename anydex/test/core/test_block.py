@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
 from anydex.core.block import MarketBlock

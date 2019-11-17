@@ -1,13 +1,9 @@
-from __future__ import absolute_import
-
 import time
 from binascii import hexlify, unhexlify
 
 from ipv8.attestation.trustchain.block import GENESIS_HASH
 from ipv8.database import database_blob
 from ipv8.util import old_round
-
-from six import text_type
 
 from anydex.core import MAX_ORDER_TIMEOUT
 from anydex.core.assetamount import AssetAmount
@@ -65,8 +61,8 @@ class Tick(object):
 
     def to_database(self):
         return (database_blob(bytes(self.order_id.trader_id)), int(self.order_id.order_number),
-                self.assets.first.amount, text_type(self.assets.first.asset_id), self.assets.second.amount,
-                text_type(self.assets.second.asset_id), int(self.timeout), int(self.timestamp), self.is_ask(),
+                self.assets.first.amount, str(self.assets.first.asset_id), self.assets.second.amount,
+                str(self.assets.second.asset_id), int(self.timeout), int(self.timestamp), self.is_ask(),
                 self.traded, database_blob(self.block_hash))
 
     @classmethod

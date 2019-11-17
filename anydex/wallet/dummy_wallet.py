@@ -1,9 +1,5 @@
-from __future__ import absolute_import
-
 import string
 from random import choice
-
-from six.moves import xrange
 
 from anydex.wallet.wallet import InsufficientFunds, Wallet
 
@@ -22,7 +18,7 @@ class BaseDummyWallet(Wallet):
         self.balance = 1000
         self.created = True
         self.unlocked = True
-        self.address = ''.join([choice(string.ascii_lowercase) for _ in xrange(10)])
+        self.address = ''.join([choice(string.ascii_lowercase) for _ in range(10)])
         self.transaction_history = []
 
     def get_name(self):

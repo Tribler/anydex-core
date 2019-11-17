@@ -1,10 +1,6 @@
-from __future__ import absolute_import
-
 from binascii import unhexlify
 
 from ipv8.database import database_blob
-
-from six import text_type
 
 from anydex.core.assetamount import AssetAmount
 from anydex.core.message import Message, TraderId
@@ -45,9 +41,9 @@ class Payment(Message):
         :rtype: tuple
         """
         return (database_blob(bytes(self.trader_id)), database_blob(bytes(self.transaction_id)),
-                text_type(self.payment_id), self.transferred_assets.amount,
-                text_type(self.transferred_assets.asset_id), text_type(self.address_from),
-                text_type(self.address_to), int(self.timestamp))
+                str(self.payment_id), self.transferred_assets.amount,
+                str(self.transferred_assets.asset_id), str(self.address_from),
+                str(self.address_to), int(self.timestamp))
 
     @classmethod
     def from_block(cls, block):

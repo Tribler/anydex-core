@@ -1,11 +1,7 @@
-from __future__ import absolute_import
-
 import abc
 import logging
 import random
 import string
-
-import six
 
 from ipv8.taskmanager import TaskManager
 
@@ -17,7 +13,7 @@ class InsufficientFunds(Exception):
     pass
 
 
-class Wallet(six.with_metaclass(abc.ABCMeta, TaskManager)):
+class Wallet(TaskManager, metaclass=abc.ABCMeta):
     """
     This is the base class of a wallet and contains various methods that every wallet should implement.
     To create your own wallet, subclass this class and implement the required methods.

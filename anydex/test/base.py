@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import logging
 import os
 import random
@@ -8,8 +6,6 @@ import string
 from asyncio import get_event_loop, current_task
 
 import asynctest
-
-import six
 
 from anydex.test.instrumentation import WatchDog
 from anydex.test.util import process_unhandled_exceptions, process_unhandled_asyncio_exceptions
@@ -28,7 +24,7 @@ class BaseTestCase(asynctest.TestCase):
         while self._tempdirs:
             temp_dir = self._tempdirs.pop()
             os.chmod(temp_dir, 0o700)
-            shutil.rmtree(six.text_type(temp_dir), ignore_errors=False)
+            shutil.rmtree(str(temp_dir), ignore_errors=False)
 
     def temporary_directory(self, suffix=''):
         random_string = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))

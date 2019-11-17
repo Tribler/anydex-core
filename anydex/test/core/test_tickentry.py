@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from anydex.test.base import AbstractServer
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair

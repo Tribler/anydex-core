@@ -4,8 +4,6 @@ The original main file has many side effects and creates all kinds of directorie
 This file makes sure that all these directories are created inside a designated (wallet) directory.
 It should be imported before any bitcoinlib imports.
 """
-from __future__ import absolute_import
-
 import ast
 import functools
 import imp

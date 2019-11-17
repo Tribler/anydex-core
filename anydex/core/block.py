@@ -1,8 +1,4 @@
-from __future__ import absolute_import
-
 from ipv8.attestation.trustchain.block import TrustChainBlock
-
-from six import integer_types, string_types
 
 from anydex.core import MAX_ORDER_TIMEOUT
 
@@ -36,10 +32,10 @@ class MarketBlock(TrustChainBlock):
         if 'amount' not in assets_dict['second'] or 'type' not in assets_dict['second']:
             return False
 
-        if not MarketBlock.has_required_types([('amount', integer_types), ('type', string_types)],
+        if not MarketBlock.has_required_types([('amount', int), ('type', str)],
                                               assets_dict['first']):
             return False
-        if not MarketBlock.has_required_types([('amount', integer_types), ('type', string_types)],
+        if not MarketBlock.has_required_types([('amount', int), ('type', str)],
                                               assets_dict['second']):
             return False
 
@@ -71,7 +67,7 @@ class MarketBlock(TrustChainBlock):
         if not MarketBlock.has_fields(required_fields, tick):
             return False
 
-        required_types = [('trader_id', string_types), ('order_number', int), ('assets', dict), ('timestamp', int),
+        required_types = [('trader_id', str), ('order_number', int), ('assets', dict), ('timestamp', int),
                           ('timeout', int)]
 
         if not MarketBlock.is_valid_trader_id(tick['trader_id']):
@@ -97,7 +93,7 @@ class MarketBlock(TrustChainBlock):
         if len(tx) != len(required_fields):
             return False
 
-        required_types = [('trader_id', string_types), ('order_number', int), ('partner_trader_id', string_types),
+        required_types = [('trader_id', str), ('order_number', int), ('partner_trader_id', str),
                           ('partner_order_number', int), ('assets', dict), ('timestamp', int)]
 
         if not MarketBlock.is_valid_trader_id(tx['trader_id']) or not \
@@ -122,8 +118,8 @@ class MarketBlock(TrustChainBlock):
         if len(tx) != len(required_fields):
             return False
 
-        required_types = [('trader_id', string_types), ('order_number', int), ('partner_trader_id', string_types),
-                          ('partner_order_number', int), ('transaction_id', string_types), ('assets', dict),
+        required_types = [('trader_id', str), ('order_number', int), ('partner_trader_id', str),
+                          ('partner_order_number', int), ('transaction_id', str), ('assets', dict),
                           ('transferred', dict), ('timestamp', int)]
 
         if not MarketBlock.is_valid_trader_id(tx['trader_id']) or not \
@@ -150,8 +146,8 @@ class MarketBlock(TrustChainBlock):
         if len(payment) != len(required_fields):
             return False
 
-        required_types = [('trader_id', string_types), ('transaction_id', string_types), ('transferred', dict),
-                          ('payment_id', string_types), ('address_from', string_types), ('address_to', string_types), ('timestamp', int)]
+        required_types = [('trader_id', str), ('transaction_id', str), ('transferred', dict),
+                          ('payment_id', str), ('address_from', str), ('address_to', str), ('timestamp', int)]
         if not MarketBlock.is_valid_trader_id(payment['trader_id']):
             return False
         if not MarketBlock.has_required_types(required_types, payment):
@@ -182,7 +178,7 @@ class MarketBlock(TrustChainBlock):
         if not MarketBlock.has_fields(['trader_id', 'order_number'], self.transaction):
             return False
 
-        required_types = [('trader_id', string_types), ('order_number', int)]
+        required_types = [('trader_id', str), ('order_number', int)]
         if not MarketBlock.has_required_types(required_types, self.transaction):
             return False
 

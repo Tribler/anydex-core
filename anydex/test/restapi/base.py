@@ -1,14 +1,10 @@
-from __future__ import absolute_import
-
 from asyncio import ensure_future
+from urllib.parse import quote_plus
 
 from aiohttp import ClientSession
 
 from ipv8.test.base import TestBase
 from ipv8.test.mocking.ipv8 import MockIPv8
-
-from six import text_type
-from six.moves.urllib_parse import quote_plus
 
 from anydex.core.community import MarketCommunity
 from anydex.restapi.rest_manager import RESTManager
@@ -30,11 +26,11 @@ def urlencode(data):
 
 
 def urlencode_single(key, value):
-    utf8_key = quote_plus(text_type(key).encode('utf-8'))
+    utf8_key = quote_plus(str(key).encode('utf-8'))
     # Convert bool values to ints
     if isinstance(value, bool):
         value = int(value)
-    utf8_value = quote_plus(text_type(value).encode('utf-8'))
+    utf8_value = quote_plus(str(value).encode('utf-8'))
     return "%s=%s" % (utf8_key, utf8_value)
 
 

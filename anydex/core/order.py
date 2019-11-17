@@ -1,10 +1,6 @@
-from __future__ import absolute_import
-
 import logging
 
 from ipv8.database import database_blob
-
-from six import integer_types, text_type
 
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
@@ -29,7 +25,7 @@ class OrderNumber(object):
         """
         super(OrderNumber, self).__init__()
 
-        if not isinstance(order_number, integer_types):
+        if not isinstance(order_number, int):
             raise ValueError("Order number must be an integer")
 
         self.order_number = order_number
@@ -149,9 +145,9 @@ class Order(object):
         :rtype: tuple
         """
         completed_timestamp = int(self.completed_timestamp) if self.completed_timestamp else None
-        return (database_blob(bytes(self.order_id.trader_id)), text_type(self.order_id.order_number),
-                self.assets.first.amount, text_type(self.assets.first.asset_id), self.assets.second.amount,
-                text_type(self.assets.second.asset_id), self.traded_quantity, self._received_quantity,
+        return (database_blob(bytes(self.order_id.trader_id)), str(self.order_id.order_number),
+                self.assets.first.amount, str(self.assets.first.asset_id), self.assets.second.amount,
+                str(self.assets.second.asset_id), self.traded_quantity, self._received_quantity,
                 int(self.timeout), int(self.timestamp), completed_timestamp, self.is_ask(), self._cancelled,
                 self._verified)
 

@@ -1,7 +1,5 @@
 # pylint: disable=long-builtin,redefined-builtin
 
-from __future__ import absolute_import
-
 from anydex.core.assetamount import AssetAmount
 from anydex.core.price import Price
 

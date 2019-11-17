@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import random
 from asyncio import Future, get_event_loop, gather, ensure_future
 from base64 import b64decode
