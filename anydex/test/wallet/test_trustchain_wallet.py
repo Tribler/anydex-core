@@ -1,4 +1,3 @@
-from asyncio import Future, sleep
 from binascii import hexlify
 
 from ipv8.attestation.trustchain.community import TrustChainCommunity
@@ -8,8 +7,6 @@ from ipv8.test.mocking.ipv8 import MockIPv8
 from anydex.test.util import timeout
 from anydex.wallet.tc_wallet import TrustchainWallet
 from anydex.wallet.wallet import InsufficientFunds
-
-from ipv8.util import succeed
 
 
 class TestTrustchainWallet(TestBase):

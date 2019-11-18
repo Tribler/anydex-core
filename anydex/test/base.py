@@ -3,12 +3,12 @@ import os
 import random
 import shutil
 import string
-from asyncio import get_event_loop, current_task
+from asyncio import current_task, get_event_loop
 
 import asynctest
 
 from anydex.test.instrumentation import WatchDog
-from anydex.test.util import process_unhandled_exceptions, process_unhandled_asyncio_exceptions
+from anydex.test.util import process_unhandled_asyncio_exceptions, process_unhandled_exceptions
 
 TESTS_DIR = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 

@@ -1,6 +1,7 @@
-from aiohttp import web, WSMsgType
+from aiohttp import WSMsgType, web
 
 from anydex.restapi.base_market_endpoint import BaseMarketEndpoint
+
 
 class AnyDexWebsocketProtocol(BaseMarketEndpoint):
 

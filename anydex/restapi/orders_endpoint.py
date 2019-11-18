@@ -1,10 +1,10 @@
 from aiohttp import web
 
-from ipv8.REST.base_endpoint import Response, HTTP_BAD_REQUEST, HTTP_NOT_FOUND
+from ipv8.REST.base_endpoint import HTTP_BAD_REQUEST, HTTP_NOT_FOUND, Response
 
-from anydex.restapi.base_market_endpoint import BaseMarketEndpoint
 from anydex.core.message import TraderId
 from anydex.core.order import OrderId, OrderNumber
+from anydex.restapi.base_market_endpoint import BaseMarketEndpoint
 
 
 class OrdersEndpoint(BaseMarketEndpoint):

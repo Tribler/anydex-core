@@ -1,13 +1,12 @@
 import datetime
-from asyncio import Future
+
+from ipv8.util import succeed
 
 from sqlalchemy.orm import session as db_session
 
 from anydex.test.base import AbstractServer
 from anydex.test.util import MockObject, timeout
 from anydex.wallet.btc_wallet import BitcoinTestnetWallet, BitcoinWallet
-
-from ipv8.util import succeed
 
 
 class TestBtcWallet(AbstractServer):

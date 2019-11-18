@@ -1,5 +1,5 @@
 import random
-from asyncio import Future, get_event_loop, gather, ensure_future
+from asyncio import Future, ensure_future, gather, get_event_loop
 from base64 import b64decode
 from binascii import hexlify, unhexlify
 from functools import wraps
@@ -13,6 +13,7 @@ from ipv8.messaging.payload_headers import BinMemberAuthenticationPayload
 from ipv8.messaging.payload_headers import GlobalTimeDistributionPayload
 from ipv8.peer import Peer
 from ipv8.requestcache import NumberCache, RandomNumberCache, RequestCache
+from ipv8.util import fail, succeed
 
 from anydex.core import DeclineMatchReason, DeclinedTradeReason, MAX_ORDER_TIMEOUT
 from anydex.core.block import MarketBlock
@@ -43,7 +44,6 @@ from anydex.core.transaction_repository import DatabaseTransactionRepository,\
 from anydex.core.wallet_address import WalletAddress
 from anydex.util.asyncio import call_later
 from anydex.wallet.tc_wallet import TrustchainWallet
-from ipv8.util import succeed, fail
 
 
 # Message definitions
@@ -462,7 +462,10 @@ class MarketCommunity(Community, BlockListener):
             self.order_manager.order_repository.update(order)
 
             if not transaction.is_payment_complete():
-                self.register_anonymous_task('send_payment', self.send_payment, transaction)
+                self.register_anonymous_task('send_payment_%s' % id(transaction), self.send_payment, transaction)
+
+            # TODO MULTIPLE INVOCATIONS!!
+
             return True
 
         elif block.type == b"tx_init":
@@ -1040,7 +1043,7 @@ class MarketCommunity(Community, BlockListener):
             try:
                 blocks = future.result()
             except Exception as e:
-                self.logger.error("Future errback fired: %s", e)
+                self.logger.error("Future resulted in error: %s", e)
                 return
 
             transaction_id = TransactionId(blocks[1].hash)
@@ -1698,7 +1701,7 @@ class MarketCommunity(Community, BlockListener):
         else:
             self.logger.info("Wallet info exchanged for transaction %s - starting payments",
                              transaction.transaction_id.as_hex())
-            self.register_anonymous_task('send_payment', self.send_payment, transaction)
+            self.register_anonymous_task('send_payment_%s' % id(transaction), self.send_payment, transaction)
 
         self.transaction_manager.transaction_repository.update(transaction)
 
@@ -1740,10 +1743,7 @@ class MarketCommunity(Community, BlockListener):
         order.add_trade(transaction.partner_order_id, payment.transferred_assets)
         self.order_manager.order_repository.update(order)
 
-        try:
-            await self.create_new_tx_payment_block(transaction.trading_peer, payment)
-        except:
-            return
+        await self.create_new_tx_payment_block(transaction.trading_peer, payment)
         self.logger.info("Payment with id %s acknowledged by counterparty!", payment.payment_id)
 
     def send_matched_transaction_completed(self, transaction, block):

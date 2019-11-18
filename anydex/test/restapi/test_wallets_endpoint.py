@@ -1,10 +1,9 @@
+from ipv8.util import fail, succeed
+
 from sqlalchemy.orm import session as db_session
 
-import anydex.util.json_util as json
 from anydex.test.restapi.base import TestRestApiBase
 from anydex.test.util import timeout
-
-from ipv8.util import succeed, fail
 
 
 class TestWalletsEndpoint(TestRestApiBase):

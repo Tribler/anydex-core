@@ -1,5 +1,5 @@
 import logging
-from asyncio import coroutine, iscoroutine, ensure_future
+from asyncio import CancelledError, coroutine, ensure_future, iscoroutine
 
 from ipv8.taskmanager import delay_runner
 
@@ -20,6 +20,8 @@ def add_default_callback(task):
     def done_cb(future):
         try:
             future.result()
+        except CancelledError:
+            pass
         except Exception as e:
             logging.error('Task raised exception: %s', e)
 

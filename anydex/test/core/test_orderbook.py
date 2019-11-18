@@ -1,4 +1,3 @@
-from anydex.test.base import AbstractServer
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
 from anydex.core.message import TraderId
@@ -9,6 +8,7 @@ from anydex.core.tick import Ask, Bid
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
 from anydex.core.trade import Trade
+from anydex.test.base import AbstractServer
 from anydex.test.util import timeout
 
 

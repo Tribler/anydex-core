@@ -1,9 +1,9 @@
 import string
 from random import choice
 
-from anydex.wallet.wallet import InsufficientFunds, Wallet
-
 from ipv8.util import succeed
+
+from anydex.wallet.wallet import InsufficientFunds, Wallet
 
 
 class BaseDummyWallet(Wallet):

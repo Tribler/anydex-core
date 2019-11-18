@@ -2,7 +2,7 @@ from asyncio import gather
 
 from aiohttp import web
 
-from ipv8.REST.base_endpoint import Response, HTTP_BAD_REQUEST, HTTP_INTERNAL_SERVER_ERROR
+from ipv8.REST.base_endpoint import HTTP_BAD_REQUEST, HTTP_INTERNAL_SERVER_ERROR, Response
 
 from anydex.restapi.base_market_endpoint import BaseMarketEndpoint
 

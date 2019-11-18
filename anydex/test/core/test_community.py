@@ -1,4 +1,4 @@
-from asyncio import sleep, Future
+from asyncio import Future, sleep
 
 from ipv8.dht import DHTError
 from ipv8.test.base import TestBase
@@ -18,8 +18,6 @@ from anydex.core.transaction import Transaction, TransactionId
 from anydex.test.util import MockObject, timeout
 from anydex.wallet.dummy_wallet import DummyWallet1, DummyWallet2
 from anydex.wallet.tc_wallet import TrustchainWallet
-
-from ipv8.util import fail
 
 
 class TestMarketCommunityBase(TestBase):

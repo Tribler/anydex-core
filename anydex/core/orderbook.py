@@ -2,6 +2,9 @@ import logging
 import time
 from binascii import unhexlify
 
+from ipv8.taskmanager import TaskManager
+from ipv8.util import fail, old_round
+
 from anydex.core.assetpair import AssetPair
 from anydex.core.message import TraderId
 from anydex.core.order import OrderId, OrderNumber
@@ -10,8 +13,6 @@ from anydex.core.side import Side
 from anydex.core.tick import Ask, Bid
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
-from ipv8.taskmanager import TaskManager
-from ipv8.util import old_round, fail
 
 
 class OrderBook(TaskManager):

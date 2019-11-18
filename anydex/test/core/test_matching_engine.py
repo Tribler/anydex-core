@@ -1,4 +1,3 @@
-from anydex.test.base import AbstractServer
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
 from anydex.core.matching_engine import MatchingEngine, PriceTimeStrategy
@@ -8,6 +7,7 @@ from anydex.core.orderbook import OrderBook
 from anydex.core.tick import Ask, Bid
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
+from anydex.test.base import AbstractServer
 
 
 class PriceTimeStrategyTestSuite(AbstractServer):

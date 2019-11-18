@@ -1,11 +1,10 @@
 from aiohttp import web
 
+from ipv8.REST.base_endpoint import HTTP_BAD_REQUEST, Response
+
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
-from anydex.restapi import get_param, has_param
 from anydex.restapi.base_market_endpoint import BaseMarketEndpoint
-
-from ipv8.REST.base_endpoint import Response, HTTP_BAD_REQUEST
 
 
 class BaseAsksBidsEndpoint(BaseMarketEndpoint):

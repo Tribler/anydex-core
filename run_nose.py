@@ -1,6 +1,8 @@
 import re
 import sys
+
 from nose import run_exit
+
 
 if __name__ == '__main__':
     # We try to use the reactor that does not use 'select' or '*poll' to

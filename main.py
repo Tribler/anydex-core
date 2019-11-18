@@ -1,13 +1,10 @@
-from __future__ import absolute_import
 import os
 import signal
 import sys
 
 import anydex  # To set the IPv8 path
 
-from autobahn.twisted import WebSocketServerFactory
-
-from ipv8.attestation.trustchain.community import TrustChainTestnetCommunity
+from ipv8.attestation.trustchain.community import TrustChainTestnetCommunity  # noqa
 from ipv8.dht.discovery import DHTDiscoveryCommunity
 from ipv8.peerdiscovery.discovery import RandomWalk
 
@@ -24,7 +21,6 @@ from zope.interface import implementer
 from anydex.config import get_anydex_configuration
 from anydex.core.community import MarketTestnetCommunity
 from anydex.restapi.rest_manager import RESTManager
-from anydex.restapi.websocket import AnyDexWebsocketProtocol
 from anydex.wallet.dummy_wallet import DummyWallet1, DummyWallet2
 
 
@@ -97,10 +93,6 @@ class AnyDexServiceMaker(object):
         if not options['no-rest-api']:
             self.restapi = RESTManager(self.ipv8)
             reactor.callLater(0.0, self.restapi.start, options['apiport'])
-
-            factory = WebSocketServerFactory(u"ws://127.0.0.1:9000")
-            factory.protocol = AnyDexWebsocketProtocol
-            reactor.listenTCP(9000, factory)
 
         # Get Trustchain + DHT overlays
         for overlay in self.ipv8.overlays:

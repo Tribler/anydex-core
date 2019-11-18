@@ -4,10 +4,10 @@ from asyncio import Future
 # Important import, do not remove
 from binascii import hexlify
 
+from ipv8.util import fail, succeed
+
 from anydex.wallet import bitcoinlib_main as bitcoinlib_main
 from anydex.wallet.wallet import InsufficientFunds, Wallet
-
-from ipv8.util import fail, succeed
 
 
 class BitcoinWallet(Wallet):

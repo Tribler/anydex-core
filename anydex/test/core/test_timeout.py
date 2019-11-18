@@ -1,9 +1,10 @@
 import time
 import unittest
 
+from ipv8.util import old_round
+
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
-from ipv8.util import old_round
 
 
 class TimeoutTestSuite(unittest.TestCase):

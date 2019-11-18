@@ -2,7 +2,7 @@ import logging
 
 from aiohttp import web
 
-from ipv8.REST.base_endpoint import BaseEndpoint, Response, HTTP_INTERNAL_SERVER_ERROR
+from ipv8.REST.base_endpoint import BaseEndpoint, HTTP_INTERNAL_SERVER_ERROR, Response
 from ipv8.REST.root_endpoint import RootEndpoint as IPv8RootEndpoint
 
 from anydex.restapi.asks_bids_endpoint import AsksEndpoint, BidsEndpoint
