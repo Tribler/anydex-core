@@ -54,8 +54,3 @@ class RootEndpoint(BaseEndpoint):
                      '/wallets': WalletsEndpoint}
         for path, ep_cls in endpoints.items():
             self.add_endpoint(path, ep_cls())
-
-    def initialize(self, session):
-        super(RootEndpoint, self).initialize(session)
-        if self.ipv8_endpoint:
-            self.ipv8_endpoint.initialize(session)
