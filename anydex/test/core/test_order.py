@@ -1,8 +1,6 @@
 import time
 import unittest
 
-from ipv8.util import old_round
-
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
 from anydex.core.message import TraderId
@@ -42,7 +40,7 @@ class OrderTestSuite(unittest.TestCase):
         self.order.set_verified()
         self.order2 = Order(OrderId(TraderId(b'0' * 20), OrderNumber(4)),
                             AssetPair(AssetAmount(50, 'BTC'), AssetAmount(10, 'MC')),
-                            Timeout(5), Timestamp(int(old_round(time.time() * 1000)) - 1000 * 1000), True)
+                            Timeout(5), Timestamp(int(time.time() * 1000) - 1000 * 1000), True)
         self.order2.set_verified()
 
     def test_add_trade(self):

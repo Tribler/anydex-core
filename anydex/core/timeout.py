@@ -1,7 +1,5 @@
 import time
 
-from ipv8.util import old_round
-
 
 class Timeout(object):
     """Used for having a validated instance of a timeout that we can easily check if it still valid."""
@@ -31,7 +29,7 @@ class Timeout(object):
         :return: True if timeout has occurred, False otherwise
         :rtype: bool
         """
-        return int(old_round(time.time() * 1000)) - int(timestamp) >= self._timeout * 1000
+        return int(time.time() * 1000) - int(timestamp) >= self._timeout * 1000
 
     def __int__(self):
         return self._timeout

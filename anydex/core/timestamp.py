@@ -1,8 +1,6 @@
 import datetime
 import time
 
-from ipv8.util import old_round
-
 
 class Timestamp(object):
     """Used for having a validated instance of a timestamp that we can easily compare."""
@@ -31,7 +29,7 @@ class Timestamp(object):
         :return: A timestamp
         :rtype: Timestamp
         """
-        return cls(int(old_round(time.time() * 1000)))
+        return cls(int(time.time() * 1000))
 
     def __int__(self):
         return self._timestamp
