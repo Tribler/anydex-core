@@ -1,8 +1,6 @@
 import time
 import unittest
 
-from ipv8.util import old_round
-
 from anydex.core.timestamp import Timestamp
 
 
@@ -24,7 +22,7 @@ class TimestampTestSuite(unittest.TestCase):
 
     def test_now(self):
         # Test for Timestamp.now
-        self.assertAlmostEqual(int(old_round(time.time() * 1000)), int(Timestamp.now()), delta=1000)
+        self.assertAlmostEqual(int(time.time() * 1000), int(Timestamp.now()), delta=1000)
 
     def test_conversion(self):
         # Test for conversions

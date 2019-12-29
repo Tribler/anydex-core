@@ -3,7 +3,6 @@ from binascii import hexlify, unhexlify
 
 from ipv8.attestation.trustchain.block import GENESIS_HASH
 from ipv8.database import database_blob
-from ipv8.util import old_round
 
 from anydex.core import MAX_ORDER_TIMEOUT
 from anydex.core.assetamount import AssetAmount
@@ -160,9 +159,11 @@ class Tick(object):
         :return: True if valid, False otherwise
         :rtype: bool
         """
-        return not self._timeout.is_timed_out(self._timestamp) and \
-               int(old_round(time.time() * 1000)) >= int(self.timestamp) - self.TIME_TOLERANCE and \
-               int(self._timeout) <= MAX_ORDER_TIMEOUT
+        return (
+            not self._timeout.is_timed_out(self._timestamp)
+            and int(time.time() * 1000) >= int(self.timestamp) - self.TIME_TOLERANCE
+            and int(self._timeout) <= MAX_ORDER_TIMEOUT
+        )
 
     def to_network(self):
         """
