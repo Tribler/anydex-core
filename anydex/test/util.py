@@ -17,7 +17,7 @@ from functools import wraps
 logger = logging.getLogger(__name__)
 
 
-class UnhandledExceptionCatcher(object):
+class UnhandledExceptionCatcher:
     """
     Logs the usual tb information, followed by a listing of all the
     local variables in each frame and mark the test run as failed.
@@ -42,12 +42,7 @@ class UnhandledExceptionCatcher(object):
         """
         self.exc_counter += 1
 
-        def repr_(value):
-            try:
-                return repr(value)
-            except:
-                return "<Error while REPRing value>"
-        self.last_exc = repr_(value)
+        self.last_exc = repr(value)
         self._register_exception_line("Unhandled exception raised while running the test: %s %s", type, self.last_exc)
 
         stack = []
@@ -60,7 +55,7 @@ class UnhandledExceptionCatcher(object):
             self._register_exception_line("%s:%s %s:", frame.f_code.co_filename,
                                           frame.f_lineno, frame.f_code.co_name)
             for key, value in frame.f_locals.items():
-                value = repr_(value)
+                value = repr(value)
                 if len(value) > 500:
                     value = value[:500] + "..."
                 self._register_exception_line("| %12s = %s", key, value)
@@ -81,10 +76,10 @@ class UnhandledExceptionCatcher(object):
             for line in lines:
                 self._logger.critical(line)
 
-            raise Exception("Test raised %d unhandled exceptions, last one was: %s" % (exc_counter, last_exc))
+            raise Exception(f"Test raised {exc_counter} unhandled exceptions, last one was: {last_exc}")
 
 
-class UnhandledAsyncioExceptionCatcher(object):
+class UnhandledAsyncioExceptionCatcher:
 
     def __init__(self):
         self._asyncio_exceptions = []
@@ -100,11 +95,11 @@ class UnhandledAsyncioExceptionCatcher(object):
         self._asyncio_exceptions = []
         num_exceptions = len(exceptions)
         if num_exceptions > 0:
-            raise Exception("Test raised %d unhandled asyncio exceptions:\n%s"
-                            % (num_exceptions, '\n-------------------\n'.join(exceptions)))
+            exceptions = '\n-------------------\n'.join(exceptions)
+            raise Exception(f"Test raised {num_exceptions} unhandled asyncio exceptions:\n{exceptions}")
 
 
-class MockObject(object):
+class MockObject:
     """
     This class is used to create as base class for fake (mocked) objects.
     """
@@ -131,10 +126,10 @@ def get_random_port(socket_type="all", min_port=5000, max_port=60000):
     @param max_port: The maximal port number to try with.
     @return: A working port number if exists, otherwise None.
     """
-    assert socket_type in ("all", "tcp", "udp"), "Invalid socket type %s" % type(socket_type)
-    assert isinstance(min_port, int), "Invalid min_port type %s" % type(min_port)
-    assert isinstance(max_port, int), "Invalid max_port type %s" % type(max_port)
-    assert 0 < min_port <= max_port <= 65535, "Invalid min_port and mac_port values %s, %s" % (min_port, max_port)
+    assert socket_type in ("all", "tcp", "udp"), f"Invalid socket type {type(socket_type)}"
+    assert isinstance(min_port, int), f"Invalid min_port type {type(min_port)}"
+    assert isinstance(max_port, int), f"Invalid max_port type {type(max_port)}"
+    assert 0 < min_port <= max_port <= 65535, f"Invalid min_port and mac_port values {min_port}, {max_port}"
 
     working_port = None
     try_port = random.randint(min_port, max_port)
@@ -190,9 +185,9 @@ def _test_port(family, sock_type, port):
     @param port: The port number to test with.
     @return: True if the port is available or there is no problem with the socket, otherwise False.
     """
-    assert family in (socket.AF_INET,), "Invalid family value %s" % family
-    assert sock_type in (socket.SOCK_DGRAM, socket.SOCK_STREAM), "Invalid sock_type value %s" % sock_type
-    assert 0 < port <= 65535, "Invalid port value %s" % port
+    assert family in (socket.AF_INET,), f"Invalid family value {family}"
+    assert sock_type in (socket.SOCK_DGRAM, socket.SOCK_STREAM), f"Invalid sock_type value {sock_type}"
+    assert 0 < port <= 65535, f"Invalid port value {port}"
 
     s = None
     try:

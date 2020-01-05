@@ -112,17 +112,17 @@ class WatchDog(Thread):
                         event.clear()
                         self.event_timestamps[name] = time()
                         if self.debug:
-                            self.printe("watchog %s is OK" % name)
+                            self.printe(f"watchog {name} is OK")
                     elif (self.event_timestamps[name] + self.event_timeouts[name]) < time():
-                        self.printe("watchog %s *******TRIPPED!******, hasn't been set for %.4f secs." % (
-                            name, time() - self.event_timestamps[name]))
+                        secs = time() - self.event_timestamps[name]
+                        self.printe(f"watchog {name} *******TRIPPED!******, hasn't been set for {secs:.4} secs.")
                         self.printe("disabling it and printing traces for all threads.:")
                         events_to_unregister.append(name)
                         self.print_all_stacks()
                 while events_to_unregister:
                     name = events_to_unregister.pop()
                     if self.debug:
-                        self.printe(">>>>>>>>> UNREGISTERING %r" % name)
+                        self.printe(f">>>>>>>>> UNREGISTERING {name!r}")
                     self.tripped_canaries.append(name)
                     self.unregister_event(name)
         if self.debug:
@@ -134,28 +134,20 @@ class WatchDog(Thread):
                 return thread.name
         return "Unknown"
 
-    @staticmethod
-    def repr_(value):
-        try:
-            return repr(value)
-        except:
-            return "<Error while REPRing value>"
-
     def print_all_stacks(self):
         self.printe("\n*** STACKTRACE - START ***\n")
 
         for thread_id, frame in sys._current_frames().items():
-            self.printe("\n### ThreadID: %s Thread name: %s" % (thread_id, self.get_thread_name(thread_id)))
+            self.printe(f"\n### ThreadID: {thread_id} Thread name: {self.get_thread_name(thread_id)}")
 
             self.printe("Locals by frame, innermost last:")
             while frame:
-                self.printe("%s:%s %s:" % (frame.f_code.co_filename,
-                                           frame.f_lineno, frame.f_code.co_name))
+                self.printe(f"{frame.f_code.co_filename}:{frame.f_lineno} {frame.f_code.co_name}:")
                 for key, value in frame.f_locals.items():
-                    value = WatchDog.repr_(value)
+                    value = repr(value)
                     if len(value) > 500:
                         value = value[:500] + "..."
-                        self.printe("| %12s = %s" % (key, value))
+                        self.printe(f"| {key: >12} = {value}")
                 frame = frame.f_back
 
         self.printe("\n*** STACKTRACE - END ***\n")
@@ -169,12 +161,12 @@ class WatchDog(Thread):
 
             frame_list = []
             while frame:
-                frame_str = "%s:%s %s:\n" % (frame.f_code.co_filename, frame.f_lineno, frame.f_code.co_name)
+                frame_str = f"{frame.f_code.co_filename}:{frame.f_lineno} {frame.f_code.co_name}:\n"
                 for key, value in frame.f_locals.items():
-                    value = WatchDog.repr_(value)
+                    value = repr(value)
                     if len(value) > 500:
                         value = value[:500] + "..."
-                        frame_str += "| %12s = %s" % (key, value)
+                        frame_str += f"| {key: >12} = {value}"
                 frame = frame.f_back
                 frame_list.append(frame_str.rstrip())
 
@@ -191,7 +183,7 @@ class WatchDog(Thread):
                 self.stacks[thread_id] = stack
                 self.times[thread_id] = time()
             elif time() - self.times[thread_id] >= self.max_same_stack_time:
-                self.printe("\n*** POSSIBLE DEADLOCK IN THREAD %d DETECTED: - ***\n" % thread_id)
+                self.printe(f"\n*** POSSIBLE DEADLOCK IN THREAD {thread_id} DETECTED: - ***\n")
                 self.deadlock_found = True
                 self.stacks.pop(thread_id)
                 self.times.pop(thread_id)
