@@ -51,7 +51,7 @@ class BitcoinWallet(Wallet):
         from bitcoinlib.wallets import wallet_exists, HDWallet, WalletError
 
         if wallet_exists(self.wallet_name, databasefile=self.db_path):
-            return fail(RuntimeError("Bitcoin wallet with name %s already exists." % self.wallet_name))
+            return fail(RuntimeError(f"Bitcoin wallet with name {self.wallet_name} already exists."))
 
         self._logger.info("Creating wallet in %s", self.wallet_dir)
         try:
@@ -80,10 +80,7 @@ class BitcoinWallet(Wallet):
         return succeed({"available": 0, "pending": 0, "currency": 'BTC', "precision": self.precision()})
 
     async def transfer(self, amount, address):
-        try:
-            balance = await self.get_balance()
-        except:
-            return
+        balance = await self.get_balance()
 
         if balance['available'] >= int(amount):
             self._logger.info("Creating Bitcoin payment with amount %f to address %s", amount, address)
@@ -106,7 +103,7 @@ class BitcoinWallet(Wallet):
                     monitor_task.cancel()
 
         self._logger.debug("Start polling for transaction %s", txid)
-        monitor_task = self.register_task("btc_poll_%s" % txid, monitor, interval=5)
+        monitor_task = self.register_task(f"btc_poll_{txid}", monitor, interval=5)
 
         return monitor_future
 
@@ -172,7 +169,7 @@ class BitcoinWallet(Wallet):
                 'fee_amount': transaction.fee,
                 'currency': 'BTC',
                 'timestamp': time.mktime(transaction.date.timetuple()),
-                'description': 'Confirmations: %d' % transaction.confirmations
+                'description': f'Confirmations: {transaction.confirmations}' 
             })
 
         return succeed(transactions_list)

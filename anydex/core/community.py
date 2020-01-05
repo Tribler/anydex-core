@@ -78,7 +78,7 @@ class MatchCache(NumberCache):
     """
 
     def __init__(self, community, order):
-        super(MatchCache, self).__init__(community.request_cache, u"match", int(order.order_id.order_number))
+        super(MatchCache, self).__init__(community.request_cache, "match", int(order.order_id.order_number))
         self.community = community
         self.order = order
         self.matches = {}
@@ -258,7 +258,7 @@ class ProposedTradeRequestCache(NumberCache):
     This cache keeps track of outstanding proposed trade messages.
     """
     def __init__(self, community, proposed_trade):
-        super(ProposedTradeRequestCache, self).__init__(community.request_cache, u"proposed-trade",
+        super(ProposedTradeRequestCache, self).__init__(community.request_cache, "proposed-trade",
                                                         proposed_trade.proposal_id)
         self.community = community
         self.proposed_trade = proposed_trade
@@ -272,7 +272,7 @@ class ProposedTradeRequestCache(NumberCache):
         self.community.order_manager.order_repository.update(order)
 
         # Let the match cache know about the timeout
-        cache = self.community.request_cache.get(u"match", int(order.order_id.order_number))
+        cache = self.community.request_cache.get("match", int(order.order_id.order_number))
         if cache:
             cache.received_decline_trade(self.proposed_trade.recipient_order_id, DeclinedTradeReason.OTHER)
 
@@ -280,7 +280,7 @@ class ProposedTradeRequestCache(NumberCache):
 class OrderStatusRequestCache(RandomNumberCache):
 
     def __init__(self, community, request_future):
-        super(OrderStatusRequestCache, self).__init__(community.request_cache, u"order-status-request")
+        super(OrderStatusRequestCache, self).__init__(community.request_cache, "order-status-request")
         self.request_future = request_future
 
     @property
@@ -294,7 +294,7 @@ class OrderStatusRequestCache(RandomNumberCache):
 class PublicKeyRequestCache(RandomNumberCache):
 
     def __init__(self, community, trader_id, request_future):
-        super(PublicKeyRequestCache, self).__init__(community.request_cache, u"pk-request")
+        super(PublicKeyRequestCache, self).__init__(community.request_cache, "pk-request")
         self.trader_id = trader_id
         self.request_future = request_future
 
@@ -313,7 +313,7 @@ class PingRequestCache(RandomNumberCache):
     TIMEOUT_DELAY = 5.0
 
     def __init__(self, community, request_future):
-        super(PingRequestCache, self).__init__(community.request_cache, u"ping")
+        super(PingRequestCache, self).__init__(community.request_cache, "ping")
         self.request_future = request_future
 
     @property
@@ -812,11 +812,11 @@ class MarketCommunity(Community, BlockListener):
 
     @lazy_wrapper(PingPongPayload)
     def received_pong(self, _, payload):
-        if not self.request_cache.has(u"ping", payload.identifier):
+        if not self.request_cache.has("ping", payload.identifier):
             self.logger.warning("ping cache with id %s not found", payload.identifier)
             return
 
-        cache = self.request_cache.pop(u"ping", payload.identifier)
+        cache = self.request_cache.pop("ping", payload.identifier)
         get_event_loop().call_soon_threadsafe(cache.request_future.set_result, True)
 
     def verify_offer_creation(self, assets, timeout):
@@ -1152,7 +1152,7 @@ class MarketCommunity(Community, BlockListener):
         async def get_address():
             try:
                 address = await self.get_address_for_trader(recipient_order_id.trader_id)
-            except:
+            except RuntimeError:
                 address = None
 
             if not address:
@@ -1204,7 +1204,7 @@ class MarketCommunity(Community, BlockListener):
             self.send_decline_match_message(order, other_order_id, payload.matchmaker_trader_id, decline_reason)
             return
 
-        cache = self.request_cache.get(u"match", int(payload.recipient_order_number))
+        cache = self.request_cache.get("match", int(payload.recipient_order_number))
         if not cache:
             cache = MatchCache(self, order)
             self.request_cache.add(cache)
@@ -1220,7 +1220,7 @@ class MarketCommunity(Community, BlockListener):
             self.logger.info("No available quantity for order %s - not sending outgoing proposal", order.order_id)
 
             # Notify the match cache
-            cache = self.request_cache.get(u"match", int(order.order_id.order_number))
+            cache = self.request_cache.get("match", int(order.order_id.order_number))
             if cache:
                 cache.received_decline_trade(other_order_id, DeclinedTradeReason.NO_AVAILABLE_QUANTITY)
             return
@@ -1251,7 +1251,7 @@ class MarketCommunity(Community, BlockListener):
             self.order_manager.order_repository.update(order)
 
             # Notify the match cache
-            cache = self.request_cache.get(u"match", int(order.order_id.order_number))
+            cache = self.request_cache.get("match", int(order.order_id.order_number))
             if cache:
                 cache.received_decline_trade(other_order_id, decline_reason)
             return
@@ -1274,7 +1274,7 @@ class MarketCommunity(Community, BlockListener):
         # received the order indirectly)
         try:
             address = await self.get_address_for_trader(propose_trade.recipient_order_id.trader_id)
-        except:
+        except RuntimeError:
             address = None
 
         if address:
@@ -1283,7 +1283,7 @@ class MarketCommunity(Community, BlockListener):
             order.release_quantity_for_tick(other_order_id, propose_quantity)
 
             # Notify the match cache
-            cache = self.request_cache.get(u"match", int(order.order_id.order_number))
+            cache = self.request_cache.get("match", int(order.order_id.order_number))
             if cache:
                 cache.received_decline_trade(other_order_id, DeclinedTradeReason.ADDRESS_LOOKUP_FAIL)
 
@@ -1411,12 +1411,12 @@ class MarketCommunity(Community, BlockListener):
         if outstanding_proposals:
             # Discard current outstanding proposed trade and continue
             for proposal_id, _ in outstanding_proposals:
-                request = self.request_cache.get(u"proposed-trade", int(proposal_id.split(':')[1]))
+                request = self.request_cache.get("proposed-trade", int(proposal_id.split(':')[1]))
                 eq_and_ask = order.assets.first.amount == request.proposed_trade.assets.first.amount and order.is_ask()
                 have_largest_order = order.assets.first.amount > request.proposed_trade.assets.first.amount
                 if eq_and_ask or have_largest_order:
                     self.logger.info("Discarding current outstanding proposals for order %s", proposed_trade.order_id)
-                    self.request_cache.pop(u"proposed-trade", int(proposal_id.split(':')[1]))
+                    self.request_cache.pop("proposed-trade", int(proposal_id.split(':')[1]))
                     request.on_timeout()
 
         if order.available_quantity == 0:
@@ -1499,11 +1499,11 @@ class MarketCommunity(Community, BlockListener):
 
         declined_trade = DeclinedTrade.from_network(payload)
 
-        if not self.request_cache.has(u"proposed-trade", declined_trade.proposal_id):
+        if not self.request_cache.has("proposed-trade", declined_trade.proposal_id):
             self.logger.warning("declined trade cache with id %s not found", declined_trade.proposal_id)
             return
 
-        request = self.request_cache.pop(u"proposed-trade", declined_trade.proposal_id)
+        request = self.request_cache.pop("proposed-trade", declined_trade.proposal_id)
 
         order = self.order_manager.order_repository.find_by_id(declined_trade.recipient_order_id)
         proposed_assets = request.proposed_trade.assets
@@ -1518,7 +1518,7 @@ class MarketCommunity(Community, BlockListener):
         other_order_id = OrderId(payload.trader_id, payload.order_number)
 
         # Update the cache which will inform the related matchmakers
-        cache = self.request_cache.get(u"match", int(order.order_id.order_number))
+        cache = self.request_cache.get("match", int(order.order_id.order_number))
         if cache:
             cache.received_decline_trade(other_order_id, payload.decline_reason)
 
@@ -1548,11 +1548,11 @@ class MarketCommunity(Community, BlockListener):
 
         counter_trade = CounterTrade.from_network(payload)
 
-        if not self.request_cache.has(u"proposed-trade", counter_trade.proposal_id):
+        if not self.request_cache.has("proposed-trade", counter_trade.proposal_id):
             self.logger.warning("proposed trade cache with id %s not found", counter_trade.proposal_id)
             return
 
-        request = self.request_cache.pop(u"proposed-trade", counter_trade.proposal_id)
+        request = self.request_cache.pop("proposed-trade", counter_trade.proposal_id)
 
         order = self.order_manager.order_repository.find_by_id(counter_trade.recipient_order_id)
         self.logger.info("Received counter trade for order %s (quantity: %d)", order.order_id,
@@ -1605,11 +1605,11 @@ class MarketCommunity(Community, BlockListener):
     async def received_accept_trade(self, peer, payload):
         accepted_trade = AcceptedTrade.from_network(payload)
 
-        if not self.request_cache.has(u"proposed-trade", accepted_trade.proposal_id):
+        if not self.request_cache.has("proposed-trade", accepted_trade.proposal_id):
             self.logger.warning("No proposed-trade cache found for proposal id %d", accepted_trade.proposal_id)
             return
 
-        self.request_cache.pop(u"proposed-trade", accepted_trade.proposal_id)
+        self.request_cache.pop("proposed-trade", accepted_trade.proposal_id)
 
         order = self.order_manager.order_repository.find_by_id(accepted_trade.recipient_order_id)
         if not order:
@@ -1651,7 +1651,7 @@ class MarketCommunity(Community, BlockListener):
 
     @lazy_wrapper(OrderStatusResponsePayload)
     def received_order_status(self, _, payload):
-        request = self.request_cache.pop(u"order-status-request", payload.identifier)
+        request = self.request_cache.pop("order-status-request", payload.identifier)
 
         # Convert the order status to a dictionary that is saved on TradeChain
         order_dict = {
@@ -1752,10 +1752,10 @@ class MarketCommunity(Community, BlockListener):
         :param transaction: The completed transaction.
         :param block: The block created by this peer defining the transaction.
         """
-        cache = self.request_cache.get(u"match", int(transaction.order_id.order_number))
+        cache = self.request_cache.get("match", int(transaction.order_id.order_number))
         if cache and cache.order.status != "open":
             # Remove the match request cache
-            self.request_cache.pop(u"match", int(transaction.order_id.order_number))
+            self.request_cache.pop("match", int(transaction.order_id.order_number))
         elif cache:
             cache.did_trade(transaction, block)
 
@@ -1814,7 +1814,7 @@ class MarketCommunity(Community, BlockListener):
 
     @lazy_wrapper(PublicKeyPayload)
     def received_trader_pk_response(self, peer, payload):
-        request = self.request_cache.pop(u"pk-request", payload.identifier)
+        request = self.request_cache.pop("pk-request", payload.identifier)
         self.pk_register[request.trader_id] = peer.public_key
         request.request_future.set_result(peer.public_key)
 
