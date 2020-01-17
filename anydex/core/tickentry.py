@@ -2,8 +2,6 @@ import logging
 
 from ipv8.taskmanager import TaskManager
 
-from twisted.internet import reactor
-
 
 class TickEntry(TaskManager):
     """Class for representing a tick in the order book"""
@@ -81,7 +79,7 @@ class TickEntry(TaskManager):
 
         self._logger.debug("Blocking %s for tick %s", order_id, self.order_id)
         self._blocked_for_matching.add(order_id)
-        self.register_task("unblock_%s" % order_id, reactor.callLater(10, unblock_order_id, order_id))
+        self.register_task("unblock_%s" % order_id, unblock_order_id, order_id, delay=10)
 
     def is_blocked_for_matching(self, order_id):
         """

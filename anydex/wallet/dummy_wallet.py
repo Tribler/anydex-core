@@ -1,13 +1,7 @@
-from __future__ import absolute_import
-
 import string
 from random import choice
 
-from six.moves import xrange
-
-from twisted.internet import reactor
-from twisted.internet.defer import succeed
-from twisted.internet.task import deferLater
+from ipv8.util import succeed
 
 from anydex.wallet.wallet import InsufficientFunds, Wallet
 
@@ -24,7 +18,7 @@ class BaseDummyWallet(Wallet):
         self.balance = 1000
         self.created = True
         self.unlocked = True
-        self.address = ''.join([choice(string.ascii_lowercase) for _ in xrange(10)])
+        self.address = ''.join([choice(string.ascii_lowercase) for _ in range(10)])
         self.transaction_history = []
 
     def get_name(self):
@@ -44,29 +38,25 @@ class BaseDummyWallet(Wallet):
             'precision': self.precision()
         })
 
-    def transfer(self, quantity, candidate):
+    async def transfer(self, quantity, candidate):
         self._logger.info("Transferring %s %s to %s from dummy wallet", quantity, self.get_identifier(), candidate)
-        def on_balance(balance):
-            if balance['available'] < quantity:
-                raise InsufficientFunds()
 
-            self.balance -= quantity
-
-            self.transaction_history.append({
-                'id': str(quantity),
-                'outgoing': True,
-                'from': self.address,
-                'to': '',
-                'amount': quantity,
-                'fee_amount': 0.0,
-                'currency': self.get_identifier(),
-                'timestamp': '',
-                'description': ''
-            })
-
-            return succeed(str(quantity))
-
-        return self.get_balance().addCallback(on_balance)
+        balance = await self.get_balance()
+        if balance['available'] < quantity:
+            raise InsufficientFunds()
+        self.balance -= quantity
+        self.transaction_history.append({
+            'id': str(quantity),
+            'outgoing': True,
+            'from': self.address,
+            'to': '',
+            'amount': quantity,
+            'fee_amount': 0.0,
+            'currency': self.get_identifier(),
+            'timestamp': '',
+            'description': ''
+        })
+        return str(quantity)
 
     def monitor_transaction(self, transaction_id):
         """
@@ -88,9 +78,9 @@ class BaseDummyWallet(Wallet):
             self.balance += float(str(transaction_id))  # txid = amount of money transferred
 
         if self.MONITOR_DELAY == 0:
-            return succeed(None).addCallback(lambda _: on_transaction_done())
+            return succeed(on_transaction_done())
         else:
-            return deferLater(reactor, self.MONITOR_DELAY, on_transaction_done)
+            return self.register_anonymous_task('monitor_transaction', on_transaction_done, delay=self.MONITOR_DELAY)
 
     def get_address(self):
         return self.address

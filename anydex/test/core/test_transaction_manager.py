@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import unittest
 
 from anydex.core.assetamount import AssetAmount
@@ -27,12 +25,12 @@ class TransactionManagerTestSuite(unittest.TestCase):
 
     def test_find_by_id(self):
         # Test for find by id
-        self.assertEquals(None, self.transaction_manager.find_by_id(self.transaction_id))
+        self.assertEqual(None, self.transaction_manager.find_by_id(self.transaction_id))
         self.memory_transaction_repository.add(self.transaction)
-        self.assertEquals(self.transaction, self.transaction_manager.find_by_id(self.transaction_id))
+        self.assertEqual(self.transaction, self.transaction_manager.find_by_id(self.transaction_id))
 
     def test_find_all(self):
         # Test for find all
-        self.assertEquals([], list(self.transaction_manager.find_all()))
+        self.assertEqual([], list(self.transaction_manager.find_all()))
         self.memory_transaction_repository.add(self.transaction)
-        self.assertEquals([self.transaction], list(self.transaction_manager.find_all()))
+        self.assertEqual([self.transaction], list(self.transaction_manager.find_all()))

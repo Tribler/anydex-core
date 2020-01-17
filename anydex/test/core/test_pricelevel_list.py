@@ -29,7 +29,7 @@ class PriceLevelListTestSuite(unittest.TestCase):
 
     def test_min_key(self):
         # Test for min key
-        self.assertEquals(self.price, self.price_level_list.min_key())
+        self.assertEqual(self.price, self.price_level_list.min_key())
 
     def test_min_key_empty(self):
         # Test for min key when empty
@@ -38,7 +38,7 @@ class PriceLevelListTestSuite(unittest.TestCase):
 
     def test_max_key(self):
         # Test for max key
-        self.assertEquals(self.price4, self.price_level_list.max_key())
+        self.assertEqual(self.price4, self.price_level_list.max_key())
 
     def test_max_key_empty(self):
         # Test for max key when empty
@@ -47,8 +47,8 @@ class PriceLevelListTestSuite(unittest.TestCase):
 
     def test_succ_item(self):
         # Test for succ item
-        self.assertEquals(self.price_level2, self.price_level_list.succ_item(self.price))
-        self.assertEquals(self.price_level4, self.price_level_list.succ_item(self.price3))
+        self.assertEqual(self.price_level2, self.price_level_list.succ_item(self.price))
+        self.assertEqual(self.price_level4, self.price_level_list.succ_item(self.price3))
 
     def test_succ_item_tail(self):
         # Test for succ item when at tail
@@ -57,8 +57,8 @@ class PriceLevelListTestSuite(unittest.TestCase):
 
     def test_prev_item(self):
         # Test for prev item
-        self.assertEquals(self.price_level3, self.price_level_list.prev_item(self.price4))
-        self.assertEquals(self.price_level2, self.price_level_list.prev_item(self.price3))
+        self.assertEqual(self.price_level3, self.price_level_list.prev_item(self.price4))
+        self.assertEqual(self.price_level2, self.price_level_list.prev_item(self.price3))
 
     def test_prev_item_head(self):
         # Test for prev item when at head
@@ -68,7 +68,7 @@ class PriceLevelListTestSuite(unittest.TestCase):
     def test_remove(self):
         # Test for remove
         self.price_level_list.remove(self.price4)
-        self.assertEquals(self.price3, self.price_level_list.max_key())
+        self.assertEqual(self.price3, self.price_level_list.max_key())
 
     def test_remove_empty(self):
         # Test for remove when element not exists
@@ -78,25 +78,25 @@ class PriceLevelListTestSuite(unittest.TestCase):
 
     def test_items(self):
         # Test for items
-        self.assertEquals(
+        self.assertEqual(
             [self.price_level, self.price_level2, self.price_level3, self.price_level4], self.price_level_list.items())
         self.price_level_list.remove(self.price2)
-        self.assertEquals(
+        self.assertEqual(
             [self.price_level, self.price_level3, self.price_level4], self.price_level_list.items())
 
     def test_items_empty(self):
         # Test for items when empty
-        self.assertEquals([], self.price_level_list2.items())
+        self.assertEqual([], self.price_level_list2.items())
 
     def test_items_reverse(self):
         # Test for items with reverse attribute
-        self.assertEquals(
+        self.assertEqual(
             [self.price_level4, self.price_level3, self.price_level2, self.price_level],
             self.price_level_list.items(reverse=True))
         self.price_level_list.remove(self.price2)
-        self.assertEquals(
+        self.assertEqual(
             [self.price_level4, self.price_level3, self.price_level], self.price_level_list.items(reverse=True))
 
     def test_items_reverse_empty(self):
         # Test for items when empty with reverse attribute
-        self.assertEquals([], self.price_level_list2.items(reverse=True))
+        self.assertEqual([], self.price_level_list2.items(reverse=True))

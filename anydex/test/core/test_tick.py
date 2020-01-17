@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import unittest
 from binascii import hexlify
 
@@ -38,7 +36,7 @@ class TickTestSuite(unittest.TestCase):
 
     def test_to_network(self):
         # Test for to network
-        self.assertEquals((TraderId(b'0' * 20), self.tick.timestamp, OrderNumber(1),
+        self.assertEqual((TraderId(b'0' * 20), self.tick.timestamp, OrderNumber(1),
                            AssetPair(AssetAmount(30, 'BTC'), AssetAmount(30, 'MB')), self.tick.timeout, 0),
                           self.tick.to_network())
 

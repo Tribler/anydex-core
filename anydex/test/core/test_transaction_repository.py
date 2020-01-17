@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import unittest
 
 from anydex.core.assetamount import AssetAmount
@@ -24,25 +22,25 @@ class MemoryTransactionRepositoryTestSuite(unittest.TestCase):
 
     def test_find_by_id(self):
         # Test for find by id
-        self.assertEquals(None, self.memory_transaction_repository.find_by_id(self.transaction_id))
+        self.assertEqual(None, self.memory_transaction_repository.find_by_id(self.transaction_id))
         self.memory_transaction_repository.add(self.transaction)
-        self.assertEquals(self.transaction, self.memory_transaction_repository.find_by_id(self.transaction_id))
+        self.assertEqual(self.transaction, self.memory_transaction_repository.find_by_id(self.transaction_id))
 
     def test_delete_by_id(self):
         # Test for delete by id
         self.memory_transaction_repository.add(self.transaction)
-        self.assertEquals(self.transaction, self.memory_transaction_repository.find_by_id(self.transaction_id))
+        self.assertEqual(self.transaction, self.memory_transaction_repository.find_by_id(self.transaction_id))
         self.memory_transaction_repository.delete_by_id(self.transaction_id)
-        self.assertEquals(None, self.memory_transaction_repository.find_by_id(self.transaction_id))
+        self.assertEqual(None, self.memory_transaction_repository.find_by_id(self.transaction_id))
 
     def test_find_all(self):
         # Test for find all
-        self.assertEquals([], list(self.memory_transaction_repository.find_all()))
+        self.assertEqual([], list(self.memory_transaction_repository.find_all()))
         self.memory_transaction_repository.add(self.transaction)
-        self.assertEquals([self.transaction], list(self.memory_transaction_repository.find_all()))
+        self.assertEqual([self.transaction], list(self.memory_transaction_repository.find_all()))
 
     def test_update(self):
         # Test for update
         self.memory_transaction_repository.add(self.transaction)
         self.memory_transaction_repository.update(self.transaction)
-        self.assertEquals(self.transaction, self.memory_transaction_repository.find_by_id(self.transaction_id))
+        self.assertEqual(self.transaction, self.memory_transaction_repository.find_by_id(self.transaction_id))

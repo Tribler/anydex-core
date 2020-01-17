@@ -1,54 +1,46 @@
-from __future__ import absolute_import
-
 import datetime
+
+from ipv8.util import succeed
 
 from sqlalchemy.orm import session as db_session
 
-from twisted.internet.defer import Deferred, inlineCallbacks, succeed
-
 from anydex.test.base import AbstractServer
-from anydex.test.util import MockObject, trial_timeout
+from anydex.test.util import MockObject, timeout
 from anydex.wallet.btc_wallet import BitcoinTestnetWallet, BitcoinWallet
 
 
 class TestBtcWallet(AbstractServer):
 
-    @inlineCallbacks
-    def tearDown(self):
+    async def tearDown(self):
         # Close all bitcoinlib Wallet DB sessions
         db_session.close_all_sessions()
-        yield super(TestBtcWallet, self).tearDown()
+        await super(TestBtcWallet, self).tearDown()
 
-    @trial_timeout(10)
-    def test_btc_wallet(self):
+    @timeout(10)
+    async def test_btc_wallet(self):
         """
         Test the creating, opening, transactions and balance query of a Bitcoin (testnet) wallet
         """
         wallet = BitcoinTestnetWallet(self.session_base_dir)
 
-        def on_wallet_transactions(transactions):
-            self.assertFalse(transactions)
+        await wallet.create_wallet()
+        self.assertIsNotNone(wallet.wallet)
+        self.assertTrue(wallet.get_address())
 
-            wallet.get_transactions = lambda: succeed([{"id": "abc"}])
-            return wallet.monitor_transaction("abc")
+        _ = BitcoinTestnetWallet(self.session_base_dir)
+        self.assertRaises(Exception, BitcoinTestnetWallet, self.session_base_dir, testnet=True)
 
-        def on_wallet_balance(balance):
-            self.assertDictEqual(balance, {'available': 3, 'pending': 0, 'currency': 'BTC', 'precision': 8})
-            wallet.wallet.transactions_update = lambda **_: None  # We don't want to do an actual HTTP request here
-            return wallet.get_transactions().addCallback(on_wallet_transactions)
+        wallet.wallet.utxos_update = lambda **_: None  # We don't want to do an actual HTTP request here
+        wallet.wallet.balance = lambda **_: 3
+        balance = await wallet.get_balance()
 
-        def on_wallet_created(_):
-            self.assertIsNotNone(wallet.wallet)
-            self.assertTrue(wallet.get_address())
+        self.assertDictEqual(balance, {'available': 3, 'pending': 0, 'currency': 'BTC', 'precision': 8})
+        wallet.wallet.transactions_update = lambda **_: None  # We don't want to do an actual HTTP request here
+        transactions = await wallet.get_transactions()
+        self.assertFalse(transactions)
 
-            _ = BitcoinTestnetWallet(self.session_base_dir)
-            self.assertRaises(Exception, BitcoinTestnetWallet, self.session_base_dir, testnet=True)
-
-            wallet.wallet.utxos_update = lambda **_: None  # We don't want to do an actual HTTP request here
-            wallet.wallet.balance = lambda **_: 3
-            return wallet.get_balance().addCallback(on_wallet_balance)
-
-        return wallet.create_wallet().addCallback(on_wallet_created)
+        wallet.get_transactions = lambda: succeed([{"id": "abc"}])
+        await wallet.monitor_transaction("abc")
 
     def test_btc_wallet_name(self):
         """
@@ -78,71 +70,50 @@ class TestBtcWallet(AbstractServer):
         wallet = BitcoinTestnetWallet(self.session_base_dir)
         self.assertEqual(wallet.min_unit(), 100000)
 
-    def test_btc_balance_no_wallet(self):
+    async def test_btc_balance_no_wallet(self):
         """
         Test the retrieval of the balance of a BTC wallet that is not created yet
         """
-        def on_wallet_balance(balance):
-            self.assertDictEqual(balance, {'available': 0, 'pending': 0, 'currency': 'BTC', 'precision': 8})
-
         wallet = BitcoinTestnetWallet(self.session_base_dir)
-        return wallet.get_balance().addCallback(on_wallet_balance)
+        balance = await wallet.get_balance()
+        self.assertDictEqual(balance, {'available': 0, 'pending': 0, 'currency': 'BTC', 'precision': 8})
 
-    @trial_timeout(10)
-    def test_btc_wallet_transfer(self):
+    @timeout(10)
+    async def test_btc_wallet_transfer(self):
         """
         Test that the transfer method of a BTC wallet works
         """
-        test_deferred = Deferred()
         wallet = BitcoinTestnetWallet(self.session_base_dir)
+        await wallet.create_wallet()
+        wallet.get_balance = lambda: succeed({'available': 100000, 'pending': 0, 'currency': 'BTC', 'precision': 8})
+        mock_tx = MockObject()
+        mock_tx.hash = 'a' * 20
+        wallet.wallet.send_to = lambda *_: mock_tx
+        await wallet.transfer(3000, '2N8hwP1WmJrFF5QWABn38y63uYLhnJYJYTF')
 
-        def on_wallet_created(_):
-            wallet.get_balance = lambda: succeed({'available': 100000, 'pending': 0, 'currency': 'BTC', 'precision': 8})
-            mock_tx = MockObject()
-            mock_tx.hash = 'a' * 20
-            wallet.wallet.send_to = lambda *_: mock_tx
-            wallet.transfer(3000, '2N8hwP1WmJrFF5QWABn38y63uYLhnJYJYTF').addCallback(
-                lambda _: test_deferred.callback(None))
-
-        wallet.create_wallet().addCallback(on_wallet_created)
-
-        return test_deferred
-
-    @trial_timeout(10)
-    def test_btc_wallet_create_error(self):
+    @timeout(10)
+    async def test_btc_wallet_create_error(self):
         """
         Test whether an error during wallet creation is handled
         """
-        test_deferred = Deferred()
         wallet = BitcoinTestnetWallet(self.session_base_dir)
+        await wallet.create_wallet()  # This should work
+        with self.assertRaises(Exception):
+            await wallet.create_wallet()
 
-        def on_wallet_created(_):
-            wallet.create_wallet().addErrback(lambda _: test_deferred.callback(None))
-
-        wallet.create_wallet().addCallback(on_wallet_created)  # This should work
-
-        return test_deferred
-
-    @trial_timeout(10)
-    def test_btc_wallet_transfer_no_funds(self):
+    @timeout(10)
+    async def test_btc_wallet_transfer_no_funds(self):
         """
         Test that the transfer method of a BTC wallet raises an error when we don't have enough funds
         """
-        test_deferred = Deferred()
-
         wallet = BitcoinTestnetWallet(self.session_base_dir)
+        await wallet.create_wallet()
+        wallet.wallet.utxos_update = lambda **_: None  # We don't want to do an actual HTTP request here
+        with self.assertRaises(Exception):
+            await wallet.transfer(3000, '2N8hwP1WmJrFF5QWABn38y63uYLhnJYJYTF')
 
-        def on_wallet_created(_):
-            wallet.wallet.utxos_update = lambda **_: None  # We don't want to do an actual HTTP request here
-            wallet.transfer(3000, '2N8hwP1WmJrFF5QWABn38y63uYLhnJYJYTF').addErrback(
-                lambda _: test_deferred.callback(None))
-
-        wallet.create_wallet().addCallback(on_wallet_created)
-
-        return test_deferred
-
-    @trial_timeout(10)
-    def test_get_transactions(self):
+    @timeout(10)
+    async def test_get_transactions(self):
         """
         Test whether transactions in bitcoinlib are correctly returned
         """
@@ -170,12 +141,10 @@ class TestBtcWallet(AbstractServer):
         wallet.wallet.keys = lambda **_: [mock_key]
         wallet.created = True
 
-        def on_transactions(transactions):
-            self.assertTrue(transactions)
-            self.assertEqual(transactions[0]["fee_amount"], 12345)
-            self.assertEqual(transactions[0]["amount"], 16250000)
-
-        return wallet.get_transactions().addCallback(on_transactions)
+        transactions = await wallet.get_transactions()
+        self.assertTrue(transactions)
+        self.assertEqual(transactions[0]["fee_amount"], 12345)
+        self.assertEqual(transactions[0]["amount"], 16250000)
 
 
 class TestBtcTestnetWallet(AbstractServer):

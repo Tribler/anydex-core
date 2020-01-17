@@ -23,37 +23,37 @@ class MemoryOrderRepositoryTestSuite(unittest.TestCase):
 
     def test_add(self):
         # Test for add
-        self.assertEquals([], list(self.memory_order_repository.find_all()))
+        self.assertEqual([], list(self.memory_order_repository.find_all()))
         self.memory_order_repository.add(self.order)
-        self.assertEquals([self.order], list(self.memory_order_repository.find_all()))
+        self.assertEqual([self.order], list(self.memory_order_repository.find_all()))
 
     def test_delete_by_id(self):
         # Test for delete by id
         self.memory_order_repository.add(self.order)
-        self.assertEquals([self.order], list(self.memory_order_repository.find_all()))
+        self.assertEqual([self.order], list(self.memory_order_repository.find_all()))
         self.memory_order_repository.delete_by_id(self.order_id)
-        self.assertEquals([], list(self.memory_order_repository.find_all()))
+        self.assertEqual([], list(self.memory_order_repository.find_all()))
 
     def test_find_by_id(self):
         # Test for find by id
-        self.assertEquals(None, self.memory_order_repository.find_by_id(self.order_id))
+        self.assertEqual(None, self.memory_order_repository.find_by_id(self.order_id))
         self.memory_order_repository.add(self.order)
-        self.assertEquals(self.order, self.memory_order_repository.find_by_id(self.order_id))
+        self.assertEqual(self.order, self.memory_order_repository.find_by_id(self.order_id))
 
     def test_find_all(self):
         # Test for find all
-        self.assertEquals([], list(self.memory_order_repository.find_all()))
+        self.assertEqual([], list(self.memory_order_repository.find_all()))
         self.memory_order_repository.add(self.order)
-        self.assertEquals([self.order], list(self.memory_order_repository.find_all()))
+        self.assertEqual([self.order], list(self.memory_order_repository.find_all()))
 
     def test_next_identity(self):
         # Test for next identity
-        self.assertEquals(OrderId(TraderId(b'0' * 20), OrderNumber(1)),
+        self.assertEqual(OrderId(TraderId(b'0' * 20), OrderNumber(1)),
                           self.memory_order_repository.next_identity())
 
     def test_update(self):
         # Test for update
         self.memory_order_repository.add(self.order)
         self.memory_order_repository.update(self.order2)
-        self.assertNotEquals(self.order, self.memory_order_repository.find_by_id(self.order_id))
-        self.assertEquals(self.order2, self.memory_order_repository.find_by_id(self.order_id))
+        self.assertNotEqual(self.order, self.memory_order_repository.find_by_id(self.order_id))
+        self.assertEqual(self.order2, self.memory_order_repository.find_by_id(self.order_id))

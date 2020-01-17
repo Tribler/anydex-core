@@ -1,11 +1,10 @@
-from __future__ import absolute_import
+from aiohttp import web
 
-from twisted.web import http
+from ipv8.REST.base_endpoint import HTTP_BAD_REQUEST, HTTP_NOT_FOUND, Response
 
-import anydex.util.json_util as json
-from anydex.restapi.base_market_endpoint import BaseMarketEndpoint
 from anydex.core.message import TraderId
 from anydex.core.order import OrderId, OrderNumber
+from anydex.restapi.base_market_endpoint import BaseMarketEndpoint
 
 
 class OrdersEndpoint(BaseMarketEndpoint):
@@ -13,10 +12,11 @@ class OrdersEndpoint(BaseMarketEndpoint):
     This class handles requests regarding your orders in the market community.
     """
 
-    def getChild(self, path, request):
-        return OrderSpecificEndpoint(self.session, path)
+    def setup_routes(self):
+        self.app.add_routes([web.get('', self.get_orders),
+                             web.post('/{order_number}/cancel', self.cancel_order)])
 
-    def render_GET(self, request):
+    async def get_orders(self, request):
         """
         .. http:get:: /market/orders
 
@@ -58,30 +58,9 @@ class OrdersEndpoint(BaseMarketEndpoint):
                 }
         """
         orders = self.get_market_community().order_manager.order_repository.find_all()
-        return json.twisted_dumps({"orders": [order.to_dictionary() for order in orders]})
+        return Response({"orders": [order.to_dictionary() for order in orders]})
 
-
-class OrderSpecificEndpoint(BaseMarketEndpoint):
-
-    def __init__(self, session, order_number):
-        BaseMarketEndpoint.__init__(self, session)
-        self.order_number = order_number
-
-        child_handler_dict = {b"cancel": OrderCancelEndpoint}
-        for path, child_cls in child_handler_dict.items():
-            self.putChild(path, child_cls(self.session, self.order_number))
-
-
-class OrderCancelEndpoint(BaseMarketEndpoint):
-    """
-    This class handles requests for cancelling a specific order.
-    """
-
-    def __init__(self, session, order_number):
-        BaseMarketEndpoint.__init__(self, session)
-        self.order_number = order_number
-
-    def render_POST(self, request):
+    async def cancel_order(self, request):
         """
         .. http:get:: /market/orders/(string:order_number)/cancel
 
@@ -102,17 +81,15 @@ class OrderCancelEndpoint(BaseMarketEndpoint):
                 }
         """
         market_community = self.get_market_community()
-        order_id = OrderId(TraderId(market_community.mid), OrderNumber(int(self.order_number)))
+        order_number = request.match_info['order_number']
+        order_id = OrderId(TraderId(market_community.mid), OrderNumber(int(order_number)))
         order = market_community.order_manager.order_repository.find_by_id(order_id)
 
         if not order:
-            request.setResponseCode(http.NOT_FOUND)
-            return json.twisted_dumps({"error": "order not found"})
+            return Response({"error": "order not found"}, status=HTTP_NOT_FOUND)
 
         if order.status != "open" and order.status != "unverified":
-            request.setResponseCode(http.BAD_REQUEST)
-            return json.twisted_dumps({"error": "only open and unverified orders can be cancelled"})
+            return Response({"error": "only open and unverified orders can be cancelled"}, status=HTTP_BAD_REQUEST)
 
-        market_community.cancel_order(order_id)
-
-        return json.twisted_dumps({"cancelled": True})
+        await market_community.cancel_order(order_id)
+        return Response({"cancelled": True})

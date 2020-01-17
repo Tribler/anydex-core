@@ -1,8 +1,3 @@
-from __future__ import absolute_import
-
-from twisted.internet.defer import inlineCallbacks
-
-from anydex.test.base import AbstractServer
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
 from anydex.core.message import TraderId
@@ -13,7 +8,8 @@ from anydex.core.tick import Ask, Bid
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
 from anydex.core.trade import Trade
-from anydex.test.util import trial_timeout
+from anydex.test.base import AbstractServer
+from anydex.test.util import timeout
 
 
 class AbstractTestOrderBook(AbstractServer):
@@ -21,9 +17,8 @@ class AbstractTestOrderBook(AbstractServer):
     Base class for the order book tests.
     """
 
-    @inlineCallbacks
-    def setUp(self):
-        yield super(AbstractTestOrderBook, self).setUp()
+    async def setUp(self):
+        super(AbstractTestOrderBook, self).setUp()
         # Object creation
         self.ask = Ask(OrderId(TraderId(b'0' * 20), OrderNumber(1)),
                        AssetPair(AssetAmount(100, 'BTC'), AssetAmount(30, 'MB')), Timeout(100), Timestamp.now())
@@ -44,9 +39,9 @@ class AbstractTestOrderBook(AbstractServer):
                                    Timestamp(1462224447117))
         self.order_book = OrderBook()
 
-    def tearDown(self):
-        self.order_book.shutdown_task_manager()
-        super(AbstractTestOrderBook, self).tearDown()
+    async def tearDown(self):
+        await self.order_book.shutdown_task_manager()
+        await super(AbstractTestOrderBook, self).tearDown()
 
 
 class TestOrderBook(AbstractTestOrderBook):
@@ -62,15 +57,15 @@ class TestOrderBook(AbstractTestOrderBook):
         self.order_book.insert_bid(self.bid)
         self.assertEqual(self.order_book.timeout_bid(self.bid.order_id), self.bid)
 
-        self.order_book.on_invalid_tick_insert(None)
+        self.order_book.on_invalid_tick_insert()
 
-    def test_ask_insertion(self):
+    async def test_ask_insertion(self):
         # Test for ask insertion
         self.order_book.insert_ask(self.ask2)
         self.assertTrue(self.order_book.tick_exists(self.ask2.order_id))
         self.assertTrue(self.order_book.ask_exists(self.ask2.order_id))
         self.assertFalse(self.order_book.bid_exists(self.ask2.order_id))
-        self.assertEquals(self.ask2, self.order_book.get_ask(self.ask2.order_id).tick)
+        self.assertEqual(self.ask2, self.order_book.get_ask(self.ask2.order_id).tick)
 
     def test_get_tick(self):
         """
@@ -81,19 +76,21 @@ class TestOrderBook(AbstractTestOrderBook):
         self.assertTrue(self.order_book.get_tick(self.ask.order_id))
         self.assertTrue(self.order_book.get_tick(self.bid.order_id))
 
-    @trial_timeout(10)
-    def test_ask_insertion_invalid(self):
+    @timeout(10)
+    async def test_ask_insertion_invalid(self):
         """
         Test whether we get an error when we add an invalid ask to the order book
         """
-        return self.order_book.insert_ask(self.invalid_ask)
+        with self.assertRaises(RuntimeError):
+            await self.order_book.insert_ask(self.invalid_ask)
 
-    @trial_timeout(10)
-    def test_bid_insertion_invalid(self):
+    @timeout(10)
+    async def test_bid_insertion_invalid(self):
         """
         Test whether we get an error when we add an invalid bid to the order book
         """
-        return self.order_book.insert_bid(self.invalid_bid)
+        with self.assertRaises(RuntimeError):
+            await self.order_book.insert_bid(self.invalid_bid)
 
     def test_ask_removal(self):
         # Test for ask removal
@@ -108,7 +105,7 @@ class TestOrderBook(AbstractTestOrderBook):
         self.assertTrue(self.order_book.tick_exists(self.bid2.order_id))
         self.assertTrue(self.order_book.bid_exists(self.bid2.order_id))
         self.assertFalse(self.order_book.ask_exists(self.bid2.order_id))
-        self.assertEquals(self.bid2, self.order_book.get_bid(self.bid2.order_id).tick)
+        self.assertEqual(self.bid2, self.order_book.get_bid(self.bid2.order_id).tick)
 
     def test_bid_removal(self):
         # Test for bid removal
@@ -121,7 +118,7 @@ class TestOrderBook(AbstractTestOrderBook):
         # Test for properties
         self.order_book.insert_ask(self.ask2)
         self.order_book.insert_bid(self.bid2)
-        self.assertEquals(Price(-25, 1000, 'MB', 'BTC'), self.order_book.get_bid_ask_spread('MB', 'BTC'))
+        self.assertEqual(Price(-25, 1000, 'MB', 'BTC'), self.order_book.get_bid_ask_spread('MB', 'BTC'))
 
     def test_ask_price_level(self):
         self.order_book.insert_ask(self.ask)
@@ -138,16 +135,16 @@ class TestOrderBook(AbstractTestOrderBook):
         # Test for ask side depth
         self.order_book.insert_ask(self.ask)
         self.order_book.insert_ask(self.ask2)
-        self.assertEquals(100, self.order_book.ask_side_depth(Price(3, 10, 'MB', 'BTC')))
-        self.assertEquals([(Price(75, 1000, 'MB', 'BTC'), 400), (Price(3, 10, 'MB', 'BTC'), 100)],
+        self.assertEqual(100, self.order_book.ask_side_depth(Price(3, 10, 'MB', 'BTC')))
+        self.assertEqual([(Price(75, 1000, 'MB', 'BTC'), 400), (Price(3, 10, 'MB', 'BTC'), 100)],
                           self.order_book.get_ask_side_depth_profile('MB', 'BTC'))
 
     def test_bid_side_depth(self):
         # Test for bid side depth
         self.order_book.insert_bid(self.bid)
         self.order_book.insert_bid(self.bid2)
-        self.assertEquals(300, self.order_book.bid_side_depth(Price(1, 10, 'MB', 'BTC')))
-        self.assertEquals([(Price(1, 10, 'MB', 'BTC'), 300), (Price(15, 100, 'MB', 'BTC'), 200)],
+        self.assertEqual(300, self.order_book.bid_side_depth(Price(1, 10, 'MB', 'BTC')))
+        self.assertEqual([(Price(1, 10, 'MB', 'BTC'), 300), (Price(15, 100, 'MB', 'BTC'), 200)],
                           self.order_book.get_bid_side_depth_profile('MB', 'BTC'))
 
     def test_remove_tick(self):
@@ -204,7 +201,7 @@ class TestOrderBook(AbstractTestOrderBook):
         self.order_book.insert_ask(self.ask)
         self.order_book.insert_bid(self.bid)
 
-        self.assertEquals('------ Bids -------\n'
+        self.assertEqual('------ Bids -------\n'
                           '200 BTC\t@\t0.15 MB\n\n'
                           '------ Asks -------\n'
                           '100 BTC\t@\t0.3 MB\n\n', str(self.order_book))

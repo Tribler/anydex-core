@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from setuptools import find_packages, setup
 
 with open("README.md", "r") as fh:
@@ -22,19 +20,15 @@ setup(
         "cryptography",
         "libnacl",
         "netifaces",
-        "Twisted",
-        "pyOpenSSL",
-        "six"
+        "aiohttp",
+        "pyOpenSSL"
     ],
     classifiers=[
         "Development Status :: 5 - Production/Stable",
-        "Framework :: Twisted",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
         "Natural Language :: English",
         "Operating System :: OS Independent",
-        "Programming Language :: Python :: 2.7",
-        "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Topic :: Scientific/Engineering",

@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from ipv8.messaging.payload import Payload
 
 from anydex.core.assetamount import AssetAmount

@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-
-from six import string_types
-
 
 class WalletAddress(object):
     """Used for having a validated instance of a wallet address that we can easily check if it still valid."""
@@ -14,7 +10,7 @@ class WalletAddress(object):
         """
         super(WalletAddress, self).__init__()
 
-        if not isinstance(wallet_address, string_types):
+        if not isinstance(wallet_address, str):
             raise ValueError("Wallet address must be a string, found %s instead" % type(wallet_address))
 
         self._wallet_address = wallet_address

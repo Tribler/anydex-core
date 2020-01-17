@@ -1,8 +1,4 @@
-from __future__ import absolute_import
-
 from binascii import hexlify
-
-from six import binary_type
 
 
 class TraderId(object):
@@ -11,12 +7,12 @@ class TraderId(object):
     def __init__(self, trader_id):
         """
         :param trader_id: String representing the trader id
-        :type trader_id: binary_type
+        :type trader_id: bytes
         :raises ValueError: Thrown when one of the arguments are invalid
         """
         super(TraderId, self).__init__()
 
-        trader_id = trader_id if isinstance(trader_id, bytes) else binary_type(trader_id)
+        trader_id = trader_id if isinstance(trader_id, bytes) else bytes(trader_id)
 
         if len(trader_id) != 20:
             raise ValueError("Trader ID must be 20 bytes")

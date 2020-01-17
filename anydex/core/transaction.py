@@ -1,11 +1,7 @@
-from __future__ import absolute_import
-
 import logging
 from binascii import hexlify, unhexlify
 
 from ipv8.database import database_blob
-
-from six import binary_type, text_type
 
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
@@ -21,12 +17,12 @@ class TransactionId(object):
     def __init__(self, transaction_id):
         """
         :param transaction_id: String representing the transaction id
-        :type transaction_id: binary_type
+        :type transaction_id: bytes
         :raises ValueError: Thrown when one of the arguments are invalid
         """
         super(TransactionId, self).__init__()
 
-        transaction_id = transaction_id if isinstance(transaction_id, bytes) else binary_type(transaction_id)
+        transaction_id = transaction_id if isinstance(transaction_id, bytes) else bytes(transaction_id)
 
         if len(transaction_id) != 32:
             raise ValueError("Transaction ID must be 32 bytes")
@@ -128,11 +124,11 @@ class Transaction(object):
         return (database_blob(bytes(self.order_id.trader_id)), database_blob(bytes(self.transaction_id)),
                 int(self.order_id.order_number),
                 database_blob(bytes(self.partner_order_id.trader_id)), int(self.partner_order_id.order_number),
-                self.assets.first.amount, text_type(self.assets.first.asset_id), self.transferred_assets.first.amount,
-                self.assets.second.amount, text_type(self.assets.second.asset_id),
+                self.assets.first.amount, str(self.assets.first.asset_id), self.transferred_assets.first.amount,
+                self.assets.second.amount, str(self.assets.second.asset_id),
                 self.transferred_assets.second.amount, int(self.timestamp), self.sent_wallet_info,
-                self.received_wallet_info, text_type(self.incoming_address), text_type(self.outgoing_address),
-                text_type(self.partner_incoming_address), text_type(self.partner_outgoing_address))
+                self.received_wallet_info, str(self.incoming_address), str(self.outgoing_address),
+                str(self.partner_incoming_address), str(self.partner_outgoing_address))
 
     @classmethod
     def from_accepted_trade(cls, accepted_trade, transaction_id):

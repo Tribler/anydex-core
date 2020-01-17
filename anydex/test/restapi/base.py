@@ -1,21 +1,11 @@
-from __future__ import absolute_import
+from asyncio import ensure_future
+from urllib.parse import quote_plus
 
+from aiohttp import ClientSession
 
 from ipv8.test.base import TestBase
 from ipv8.test.mocking.ipv8 import MockIPv8
 
-from six import text_type
-from six.moves.urllib_parse import quote_plus
-
-from twisted.internet import reactor
-from twisted.internet.defer import inlineCallbacks, succeed
-from twisted.web.client import Agent, HTTPConnectionPool, readBody
-from twisted.web.http_headers import Headers
-from twisted.web.iweb import IBodyProducer
-
-from zope.interface import implementer
-
-import anydex.util.json_util as json
 from anydex.core.community import MarketCommunity
 from anydex.restapi.rest_manager import RESTManager
 from anydex.test.util import get_random_port
@@ -36,33 +26,12 @@ def urlencode(data):
 
 
 def urlencode_single(key, value):
-    utf8_key = quote_plus(text_type(key).encode('utf-8'))
+    utf8_key = quote_plus(str(key).encode('utf-8'))
     # Convert bool values to ints
     if isinstance(value, bool):
         value = int(value)
-    utf8_value = quote_plus(text_type(value).encode('utf-8'))
+    utf8_value = quote_plus(str(value).encode('utf-8'))
     return "%s=%s" % (utf8_key, utf8_value)
-
-
-@implementer(IBodyProducer)
-class POSTDataProducer(object):
-    """
-    This class is used for posting data by the requests made during the tests.
-    """
-    def __init__(self, data_dict, raw_data):
-        self.body = {}
-        if data_dict and not raw_data:
-            self.body = urlencode(data_dict)
-        elif raw_data:
-            self.body = raw_data.encode('utf-8')
-        self.length = len(self.body)
-
-    def startProducing(self, consumer):
-        consumer.write(self.body)
-        return succeed(None)
-
-    def stopProducing(self):
-        return succeed(None)
 
 
 class TestRestApiBase(TestBase):
@@ -81,16 +50,9 @@ class TestRestApiBase(TestBase):
         for node in self.nodes:
             node.overlay._use_main_thread = True
 
-        self.connection_pool = HTTPConnectionPool(reactor, False)
-
-    @inlineCallbacks
-    def tearDown(self):
-        yield self.close_connections()
-        yield self.restapi.stop()
-        yield super(TestRestApiBase, self).tearDown()
-
-    def close_connections(self):
-        return self.connection_pool.closeCachedConnections()
+    async def tearDown(self):
+        await self.restapi.stop()
+        await super(TestRestApiBase, self).tearDown()
 
     def create_node(self):
         dum1_wallet = DummyWallet1()
@@ -110,35 +72,27 @@ class TestRestApiBase(TestBase):
         # Start REST API
         self.restapi = RESTManager(mock_ipv8)
         random_port = get_random_port()
-        self.restapi.start(random_port)
+        ensure_future(self.restapi.start(random_port))
 
         return mock_ipv8
 
-    def parse_body(self, body):
-        if body is not None and self.should_check_equality:
-            self.assertDictEqual(self.expected_response_json, json.twisted_loads(body))
-        return body
-
-    def parse_response(self, response):
-        self.assertEqual(response.code, self.expected_response_code)
-        if response.code in (200, 400, 500):
-            return readBody(response)
-        return succeed(None)
-
-    def do_request(self, endpoint, expected_code=200, expected_json=None,
-                   request_type='GET', post_data='', raw_data=False):
+    async def do_request(self, endpoint, expected_code=200, expected_json=None,
+                         request_type='GET', post_data=None, json_response=True):
         self.expected_response_code = expected_code
         self.expected_response_json = expected_json
 
-        try:
-            request_type = request_type.encode('ascii')
-            endpoint = endpoint.encode('ascii')
-        except AttributeError:
-            pass
-        agent = Agent(reactor, pool=self.connection_pool)
-        request = agent.request(request_type, b'http://localhost:%d/%s' % (self.restapi.port, endpoint),
-                             Headers({'User-Agent': ['AnyDex'],
-                                      "Content-Type": ["text/plain; charset=utf-8"]}),
-                             POSTDataProducer(post_data, raw_data))
+        url = 'http://localhost:%d/%s' % (self.restapi.port, endpoint)
+        headers = {'User-Agent': 'AnyDex'}
 
-        return request.addCallback(self.parse_response).addCallback(self.parse_body)
+        async with ClientSession() as session:
+            async with session.request(request_type, url, data=post_data, headers=headers) as response:
+                status = response.status
+                response = await response.json(content_type=None) if json_response else await response.read()
+
+        self.assertEqual(status, self.expected_response_code)
+        if status not in (200, 400, 500):
+            return
+
+        if response is not None and self.should_check_equality:
+            self.assertDictEqual(self.expected_response_json, response)
+        return response

@@ -1,14 +1,10 @@
-from __future__ import absolute_import
-
 from binascii import hexlify
 
 from ipv8.attestation.trustchain.community import TrustChainCommunity
 from ipv8.test.base import TestBase
 from ipv8.test.mocking.ipv8 import MockIPv8
 
-from twisted.internet.defer import Deferred, inlineCallbacks
-
-from anydex.test.util import trial_timeout
+from anydex.test.util import timeout
 from anydex.wallet.tc_wallet import TrustchainWallet
 from anydex.wallet.wallet import InsufficientFunds
 
@@ -21,6 +17,10 @@ class TestTrustchainWallet(TestBase):
         self.tc_wallet = TrustchainWallet(self.nodes[0].overlay)
         self.tc_wallet.MONITOR_DELAY = 0.01
         self.tc_wallet.check_negative_balance = True
+
+    async def tearDown(self):
+        await self.tc_wallet.shutdown_task_manager()
+        await super(TestTrustchainWallet, self).tearDown()
 
     def create_node(self):
         return MockIPv8(u"curve25519", TrustChainCommunity, working_directory=u":memory:")
@@ -37,15 +37,14 @@ class TestTrustchainWallet(TestBase):
         """
         self.assertEqual(self.tc_wallet.get_identifier(), 'MB')
 
-    @trial_timeout(2)
-    @inlineCallbacks
-    def test_get_balance(self):
+    @timeout(2)
+    async def test_get_balance(self):
         """
         Test the balance retrieval of a Trustchain wallet
         """
-        yield self.introduce_nodes()
+        await self.introduce_nodes()
 
-        balance = yield self.tc_wallet.get_balance()
+        balance = await self.tc_wallet.get_balance()
         self.assertEqual(balance['available'], 0)
 
         his_pubkey = self.nodes[0].network.verified_peers[0].public_key.key_to_bin()
@@ -58,9 +57,9 @@ class TestTrustchainWallet(TestBase):
         self.nodes[0].overlay.sign_block(self.nodes[0].network.verified_peers[0], public_key=his_pubkey,
                                          block_type=b'tribler_bandwidth', transaction=tx)
 
-        yield self.deliver_messages()
+        await self.deliver_messages()
 
-        balance = yield self.tc_wallet.get_balance()
+        balance = await self.tc_wallet.get_balance()
         self.assertEqual(balance['available'], 15)
 
     def test_create_wallet(self):
@@ -69,28 +68,20 @@ class TestTrustchainWallet(TestBase):
         """
         self.assertRaises(RuntimeError, self.tc_wallet.create_wallet)
 
-    @inlineCallbacks
-    def test_transfer_invalid(self):
+    async def test_transfer_invalid(self):
         """
         Test the transfer method of a Trustchain wallet
         """
-        test_deferred = Deferred()
+        with self.assertRaises(InsufficientFunds):
+            await self.tc_wallet.transfer(200, None)
 
-        def on_error(failure):
-            self.assertIsInstance(failure.value, InsufficientFunds)
-            test_deferred.callback(None)
-
-        self.tc_wallet.transfer(200, None).addErrback(on_error)
-        yield test_deferred
-
-    @inlineCallbacks
-    def test_monitor_transaction(self):
+    async def test_monitor_transaction(self):
         """
         Test the monitoring of a transaction in a Trustchain wallet
         """
         his_pubkey = self.nodes[0].overlay.my_peer.public_key.key_to_bin()
 
-        tx_deferred = self.tc_wallet.monitor_transaction('%s.1' % hexlify(his_pubkey).decode('utf-8'))
+        tx_future = self.tc_wallet.monitor_transaction('%s.1' % hexlify(his_pubkey).decode('utf-8'))
 
         # Now create the transaction
         transaction = {
@@ -99,14 +90,13 @@ class TestTrustchainWallet(TestBase):
             b'total_up': 20 * 1024 * 1024,
             b'total_down': 5 * 1024 * 1024
         }
-        self.nodes[1].overlay.sign_block(self.nodes[1].network.verified_peers[0], public_key=his_pubkey,
+        await self.nodes[1].overlay.sign_block(self.nodes[1].network.verified_peers[0], public_key=his_pubkey,
                                          block_type=b'tribler_bandwidth', transaction=transaction)
 
-        yield tx_deferred
+        await tx_future
 
-    @trial_timeout(2)
-    @inlineCallbacks
-    def test_monitor_tx_existing(self):
+    @timeout(2)
+    async def test_monitor_tx_existing(self):
         """
         Test monitoring a transaction that already exists
         """
@@ -117,9 +107,9 @@ class TestTrustchainWallet(TestBase):
             b'total_down': 5 * 1024 * 1024
         }
         his_pubkey = self.nodes[0].overlay.my_peer.public_key.key_to_bin()
-        yield self.nodes[1].overlay.sign_block(self.nodes[1].network.verified_peers[0], public_key=his_pubkey,
+        await self.nodes[1].overlay.sign_block(self.nodes[1].network.verified_peers[0], public_key=his_pubkey,
                                                block_type=b'tribler_bandwidth', transaction=transaction)
-        yield self.tc_wallet.monitor_transaction('%s.1' % hexlify(his_pubkey).decode('utf-8'))
+        await self.tc_wallet.monitor_transaction('%s.1' % hexlify(his_pubkey).decode('utf-8'))
 
     def test_address(self):
         """
@@ -127,15 +117,12 @@ class TestTrustchainWallet(TestBase):
         """
         self.assertTrue(self.tc_wallet.get_address())
 
-    @inlineCallbacks
-    def test_get_transaction(self):
+    async def test_get_transaction(self):
         """
         Test the retrieval of transactions of a Trustchain wallet
         """
-        def on_transactions(transactions):
-            self.assertIsInstance(transactions, list)
-
-        yield self.tc_wallet.get_transactions().addCallback(on_transactions)
+        transactions = await self.tc_wallet.get_transactions()
+        self.assertIsInstance(transactions, list)
 
     def test_min_unit(self):
         """
@@ -143,15 +130,14 @@ class TestTrustchainWallet(TestBase):
         """
         self.assertEqual(self.tc_wallet.min_unit(), 1)
 
-    @inlineCallbacks
-    def test_get_statistics(self):
+    async def test_get_statistics(self):
         """
         Test fetching statistics from a Trustchain wallet
         """
         self.tc_wallet.check_negative_balance = False
         res = self.tc_wallet.get_statistics()
         self.assertEqual(res["total_blocks"], 0)
-        yield self.tc_wallet.transfer(5, self.nodes[1].overlay.my_peer)
+        await self.tc_wallet.transfer(5, self.nodes[1].overlay.my_peer)
         res = self.tc_wallet.get_statistics()
         self.assertEqual(0, res["total_up"])
         self.assertEqual(5 * 1024 * 1024, res["total_down"])

@@ -1,53 +1,24 @@
-from __future__ import absolute_import
-from __future__ import division
-
+import argparse
 import os
 import signal
 import sys
+from asyncio import ensure_future, gather, get_event_loop, sleep
 
 import anydex  # To set the IPv8 path
 
-from autobahn.twisted import WebSocketServerFactory
-
-from ipv8.attestation.trustchain.community import TrustChainTestnetCommunity
+from ipv8.attestation.trustchain.community import TrustChainCommunity, TrustChainTestnetCommunity  # noqa
 from ipv8.dht.discovery import DHTDiscoveryCommunity
 from ipv8.peerdiscovery.discovery import RandomWalk
 
 from ipv8_service import IPv8
 
-from twisted.application.service import IServiceMaker, MultiService
-from twisted.internet import reactor
-from twisted.plugin import IPlugin
-from twisted.python import usage
-from twisted.python.log import msg
-
-from zope.interface import implementer
-
 from anydex.config import get_anydex_configuration
 from anydex.core.community import MarketTestnetCommunity
 from anydex.restapi.rest_manager import RESTManager
-from anydex.restapi.websocket import AnyDexWebsocketProtocol
 from anydex.wallet.dummy_wallet import DummyWallet1, DummyWallet2
 
 
-class Options(usage.Options):
-    optParameters = [
-        ["statedir", "s", ".", "Use an alternate statedir", str],
-        ["apiport", "p", 8085, "Use an alternative port for the REST api", int],
-    ]
-    optFlags = [
-        ["no-rest-api", "a", "Autonomous: disable the REST api"],
-        ["no-matchmaker", "--no-matchmaker", "disable matchmaker functionality"],
-        ["statistics", "s", "Enable IPv8 overlay statistics"],
-        ["testnet", "t", "Join the testnet"],
-    ]
-
-
-@implementer(IPlugin, IServiceMaker)
-class AnyDexServiceMaker(object):
-    tapname = "anydex"
-    description = "AnyDex plugin"
-    options = Options
+class AnyDexService(object):
 
     def __init__(self):
         """
@@ -61,52 +32,51 @@ class AnyDexServiceMaker(object):
         self.wallets = {}
         self._stopping = False
 
-    def start_anydex(self, options):
+    async def start_anydex(self, options):
         """
         Main method to startup AnyDex.
         """
         config = get_anydex_configuration()
 
-        if options["statedir"]:
+        if options.statedir:
             # If we use a custom state directory, update various variables
             for key in config["keys"]:
-                key["file"] = os.path.join(options["statedir"], key["file"])
+                key["file"] = os.path.join(options.statedir, key["file"])
 
             for community in config["overlays"]:
                 if community["class"] == "TrustChainCommunity":
-                    community["initialize"]["working_directory"] = options["statedir"]
+                    community["initialize"]["working_directory"] = options.statedir
 
-        if 'testnet' in options and options['testnet']:
+        if options.testnet:
             for community in config["overlays"]:
                 if community["class"] == "TrustChainCommunity":
                     community["class"] = "TrustChainTestnetCommunity"
 
-        self.ipv8 = IPv8(config, enable_statistics=options['statistics'])
+        self.ipv8 = IPv8(config, enable_statistics=options.statistics)
+        await self.ipv8.start()
 
-        def signal_handler(sig, _):
-            msg("Received shut down signal %s" % sig)
+        print("Starting AnyDex")
+
+        if not options.no_rest_api:
+            self.restapi = RESTManager(self.ipv8)
+            await self.restapi.start(options.apiport)
+
+        async def signal_handler(sig):
+            print("Received shut down signal %s" % sig)
             if not self._stopping:
                 self._stopping = True
                 if self.restapi:
-                    self.restapi.stop()
-                self.ipv8.stop()
+                    await self.restapi.stop()
+                    self.restapi = None
+                await self.ipv8.stop()
+                get_event_loop().stop()
 
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
-
-        msg("Starting AnyDex")
-
-        if not options['no-rest-api']:
-            self.restapi = RESTManager(self.ipv8)
-            reactor.callLater(0.0, self.restapi.start, options['apiport'])
-
-            factory = WebSocketServerFactory(u"ws://127.0.0.1:9000")
-            factory.protocol = AnyDexWebsocketProtocol
-            reactor.listenTCP(9000, factory)
+        signal.signal(signal.SIGINT, lambda sig, _: ensure_future(signal_handler(sig)))
+        signal.signal(signal.SIGTERM, lambda sig, _: ensure_future(signal_handler(sig)))
 
         # Get Trustchain + DHT overlays
         for overlay in self.ipv8.overlays:
-            if isinstance(overlay, TrustChainTestnetCommunity):
+            if isinstance(overlay, (TrustChainCommunity, TrustChainTestnetCommunity)):
                 self.trustchain = overlay
             elif isinstance(overlay, DHTDiscoveryCommunity):
                 self.dht = overlay
@@ -123,28 +93,41 @@ class AnyDexServiceMaker(object):
                                              trustchain=self.trustchain,
                                              dht=self.dht,
                                              wallets=self.wallets,
-                                             working_directory=options["statedir"],
+                                             working_directory=options.statedir,
                                              record_transactions=False,
-                                             is_matchmaker=not options["no-matchmaker"])
+                                             is_matchmaker=not options.no_matchmaker)
 
         self.ipv8.overlays.append(self.market)
         self.ipv8.strategies.append((RandomWalk(self.market), 20))
 
-    def makeService(self, options):
-        """
-        Construct a IPv8 service.
-        """
-        ipv8_service = MultiService()
-        ipv8_service.setName("AnyDex")
 
-        reactor.callWhenRunning(self.start_anydex, options)
+def main(argv):
+    parser = argparse.ArgumentParser(add_help=False, description=('Anydex'))
+    parser.add_argument('--help', '-h', action='help', default=argparse.SUPPRESS, help='Show this help message and exit')
+    parser.add_argument('--no-rest-api', '-a', action='store_const', default=False, const=True, help='Autonomous: disable the REST api')
+    parser.add_argument('--no-matchmaker', action='store_const', default=False, const=True, help='Disable matchmaker functionality')
+    parser.add_argument('--statistics', action='store_const', default=False, const=True, help='Enable IPv8 overlay statistics')
+    parser.add_argument('--testnet', '-t', action='store_const', default=False, const=True, help='Join the testnet')
+    parser.add_argument('--statedir', '-s', default='.', type=str, help='Use an alternate statedir')
+    parser.add_argument('--apiport', '-p', default=8090, type=int, help='Use an alternative port for the REST api')
 
-        return ipv8_service
+    args = parser.parse_args(sys.argv[1:])
+    service = AnyDexService()
+
+    loop = get_event_loop()
+    coro = service.start_anydex(args)
+    ensure_future(coro)
+
+    if sys.platform == 'win32':
+        # Unfortunately, this is needed on Windows for Ctrl+C to work consistently.
+        # Should no longer be needed in Python 3.8.
+        async def wakeup():
+            while True:
+                await sleep(1)
+        ensure_future(wakeup())
+
+    loop.run_forever()
 
 
-if __name__ == '__main__':
-
-    options = Options()
-    Options.parseOptions(options, sys.argv[1:])
-    AnyDexServiceMaker().makeService(options)
-    reactor.run()
+if __name__ == "__main__":
+    main(sys.argv[1:])

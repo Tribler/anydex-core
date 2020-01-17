@@ -1,8 +1,3 @@
-from __future__ import absolute_import
-
-from twisted.internet.defer import inlineCallbacks
-
-from anydex.test.base import AbstractServer
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
 from anydex.core.message import TraderId
@@ -13,14 +8,14 @@ from anydex.core.tick import Tick
 from anydex.core.tickentry import TickEntry
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
+from anydex.test.base import AbstractServer
 
 
 class TickEntryTestSuite(AbstractServer):
     """TickEntry test cases."""
 
-    @inlineCallbacks
-    def setUp(self):
-        yield super(TickEntryTestSuite, self).setUp()
+    async def setUp(self):
+        super(TickEntryTestSuite, self).setUp()
 
         # Object creation
         tick = Tick(OrderId(TraderId(b'0' * 20), OrderNumber(1)), AssetPair(AssetAmount(60, 'BTC'),
@@ -33,32 +28,31 @@ class TickEntryTestSuite(AbstractServer):
         self.tick_entry = TickEntry(tick, self.price_level)
         self.tick_entry2 = TickEntry(tick2, self.price_level)
 
-    @inlineCallbacks
-    def tearDown(self):
-        self.tick_entry.shutdown_task_manager()
-        self.tick_entry2.shutdown_task_manager()
-        yield super(TickEntryTestSuite, self).tearDown()
+    async def tearDown(self):
+        await self.tick_entry.shutdown_task_manager()
+        await self.tick_entry2.shutdown_task_manager()
+        await super(TickEntryTestSuite, self).tearDown()
 
     def test_price_level(self):
-        self.assertEquals(self.price_level, self.tick_entry.price_level())
+        self.assertEqual(self.price_level, self.tick_entry.price_level())
 
     def test_next_tick(self):
         # Test for next tick
-        self.assertEquals(None, self.tick_entry.next_tick)
+        self.assertEqual(None, self.tick_entry.next_tick)
         self.price_level.append_tick(self.tick_entry)
         self.price_level.append_tick(self.tick_entry2)
-        self.assertEquals(self.tick_entry2, self.tick_entry.next_tick)
+        self.assertEqual(self.tick_entry2, self.tick_entry.next_tick)
 
     def test_prev_tick(self):
         # Test for previous tick
-        self.assertEquals(None, self.tick_entry.prev_tick)
+        self.assertEqual(None, self.tick_entry.prev_tick)
         self.price_level.append_tick(self.tick_entry)
         self.price_level.append_tick(self.tick_entry2)
-        self.assertEquals(self.tick_entry, self.tick_entry2.prev_tick)
+        self.assertEqual(self.tick_entry, self.tick_entry2.prev_tick)
 
     def test_str(self):
         # Test for tick string representation
-        self.assertEquals('60 BTC\t@\t0.5 MB', str(self.tick_entry))
+        self.assertEqual('60 BTC\t@\t0.5 MB', str(self.tick_entry))
 
     def test_is_valid(self):
         # Test for is valid

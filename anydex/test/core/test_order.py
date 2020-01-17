@@ -1,9 +1,5 @@
-from __future__ import absolute_import
-
 import time
 import unittest
-
-from ipv8.util import old_round
 
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
@@ -44,7 +40,7 @@ class OrderTestSuite(unittest.TestCase):
         self.order.set_verified()
         self.order2 = Order(OrderId(TraderId(b'0' * 20), OrderNumber(4)),
                             AssetPair(AssetAmount(50, 'BTC'), AssetAmount(10, 'MC')),
-                            Timeout(5), Timestamp(int(old_round(time.time() * 1000)) - 1000 * 1000), True)
+                            Timeout(5), Timestamp(int(time.time() * 1000) - 1000 * 1000), True)
         self.order2.set_verified()
 
     def test_add_trade(self):
@@ -52,9 +48,9 @@ class OrderTestSuite(unittest.TestCase):
         Test the add trade method of an order
         """
         self.order.reserve_quantity_for_tick(OrderId(TraderId(b'5' * 20), OrderNumber(1)), 10)
-        self.assertEquals(self.order.traded_quantity, 0)
+        self.assertEqual(self.order.traded_quantity, 0)
         self.order.add_trade(OrderId(TraderId(b'5' * 20), OrderNumber(1)), AssetAmount(10, 'BTC'))
-        self.assertEquals(self.order.traded_quantity, 10)
+        self.assertEqual(self.order.traded_quantity, 10)
 
         self.order.reserve_quantity_for_tick(OrderId(TraderId(b'6' * 20), OrderNumber(1)), 40)
         self.order.add_trade(OrderId(TraderId(b'6' * 20), OrderNumber(1)), AssetAmount(40, 'MC'))
@@ -102,18 +98,18 @@ class OrderTestSuite(unittest.TestCase):
 
     def test_reserve_quantity(self):
         # Test for reserve quantity
-        self.assertEquals(0, self.order.reserved_quantity)
+        self.assertEqual(0, self.order.reserved_quantity)
         self.order.reserve_quantity_for_tick(self.tick.order_id, 5)
-        self.assertEquals(5, self.order.reserved_quantity)
+        self.assertEqual(5, self.order.reserved_quantity)
         self.order.reserve_quantity_for_tick(self.tick.order_id, 5)
-        self.assertEquals(10, self.order.reserved_quantity)
+        self.assertEqual(10, self.order.reserved_quantity)
 
     def test_release_quantity(self):
         # Test for release quantity
         self.order.reserve_quantity_for_tick(self.tick.order_id, 5)
-        self.assertEquals(5, self.order.reserved_quantity)
+        self.assertEqual(5, self.order.reserved_quantity)
         self.order.release_quantity_for_tick(self.tick.order_id, 5)
-        self.assertEquals(0, self.order.reserved_quantity)
+        self.assertEqual(0, self.order.reserved_quantity)
 
         self.order.reserve_quantity_for_tick(self.tick.order_id, self.tick.assets.first.amount)
         quantity = self.tick.assets.first.amount + 1
@@ -184,22 +180,22 @@ class OrderIDTestSuite(unittest.TestCase):
 
     def test_equality(self):
         # Test for equality
-        self.assertEquals(self.order_id, self.order_id)
-        self.assertEquals(self.order_id, self.order_id2)
+        self.assertEqual(self.order_id, self.order_id)
+        self.assertEqual(self.order_id, self.order_id2)
         self.assertFalse(self.order_id == self.order_id3)
 
     def test_non_equality(self):
         # Test for non equality
-        self.assertNotEquals(self.order_id, self.order_id3)
+        self.assertNotEqual(self.order_id, self.order_id3)
 
     def test_hashes(self):
         # Test for hashes
-        self.assertEquals(self.order_id.__hash__(), self.order_id2.__hash__())
+        self.assertEqual(self.order_id.__hash__(), self.order_id2.__hash__())
         self.assertNotEqual(self.order_id.__hash__(), self.order_id3.__hash__())
 
     def test_str(self):
         # Test for string representation
-        self.assertEquals('%s.1' % ('30' * 20), str(self.order_id))
+        self.assertEqual('%s.1' % ('30' * 20), str(self.order_id))
 
 
 class OrderNumberTestSuite(unittest.TestCase):
@@ -218,23 +214,23 @@ class OrderNumberTestSuite(unittest.TestCase):
 
     def test_equality(self):
         # Test for equality
-        self.assertEquals(self.order_number, self.order_number)
-        self.assertEquals(self.order_number, self.order_number2)
+        self.assertEqual(self.order_number, self.order_number)
+        self.assertEqual(self.order_number, self.order_number2)
         self.assertFalse(self.order_number == self.order_number3)
 
     def test_non_equality(self):
         # Test for non equality
-        self.assertNotEquals(self.order_number, self.order_number3)
+        self.assertNotEqual(self.order_number, self.order_number3)
 
     def test_hashes(self):
         # Test for hashes
-        self.assertEquals(self.order_number.__hash__(), self.order_number2.__hash__())
+        self.assertEqual(self.order_number.__hash__(), self.order_number2.__hash__())
         self.assertNotEqual(self.order_number.__hash__(), self.order_number3.__hash__())
 
     def test_str(self):
         # Test for string representation
-        self.assertEquals('1', str(self.order_number))
+        self.assertEqual('1', str(self.order_number))
 
     def test_int(self):
         # Test for integer representation
-        self.assertEquals(1, int(self.order_number))
+        self.assertEqual(1, int(self.order_number))

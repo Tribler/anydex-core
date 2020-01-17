@@ -1,11 +1,8 @@
-from __future__ import absolute_import
-
 import time
 import unittest
 
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
-from ipv8.util import old_round
 
 
 class TimeoutTestSuite(unittest.TestCase):
@@ -25,8 +22,8 @@ class TimeoutTestSuite(unittest.TestCase):
 
     def test_timed_out(self):
         # Test for timed out
-        self.assertTrue(self.timeout1.is_timed_out(Timestamp(int(old_round(time.time() * 1000)) - 3700 * 1000)))
-        self.assertFalse(self.timeout2.is_timed_out(Timestamp(int(old_round(time.time() * 1000)))))
+        self.assertTrue(self.timeout1.is_timed_out(Timestamp(int(time.time() * 1000) - 3700 * 1000)))
+        self.assertFalse(self.timeout2.is_timed_out(Timestamp(int(time.time() * 1000))))
 
     def test_hash(self):
         # Test for hashes

@@ -1,13 +1,10 @@
-from __future__ import absolute_import
-
 import os
 import time
+from asyncio import Future
 # Important import, do not remove
 from binascii import hexlify
 
-from twisted.internet.defer import Deferred, fail, inlineCallbacks, succeed
-from twisted.internet.task import LoopingCall
-from twisted.python.failure import Failure
+from ipv8.util import fail, succeed
 
 from anydex.wallet import bitcoinlib_main as bitcoinlib_main
 from anydex.wallet.wallet import InsufficientFunds, Wallet
@@ -54,7 +51,7 @@ class BitcoinWallet(Wallet):
         from bitcoinlib.wallets import wallet_exists, HDWallet, WalletError
 
         if wallet_exists(self.wallet_name, databasefile=self.db_path):
-            return fail(RuntimeError("Bitcoin wallet with name %s already exists." % self.wallet_name))
+            return fail(RuntimeError(f"Bitcoin wallet with name {self.wallet_name} already exists."))
 
         self._logger.info("Creating wallet in %s", self.wallet_dir)
         try:
@@ -64,7 +61,7 @@ class BitcoinWallet(Wallet):
             self.created = True
         except WalletError as exc:
             self._logger.error("Cannot create BTC wallet!")
-            return fail(Failure(exc))
+            return fail(exc)
         return succeed(None)
 
     def get_balance(self):
@@ -82,37 +79,33 @@ class BitcoinWallet(Wallet):
 
         return succeed({"available": 0, "pending": 0, "currency": 'BTC', "precision": self.precision()})
 
-    def transfer(self, amount, address):
-        def on_balance(balance):
-            if balance['available'] >= int(amount):
-                self._logger.info("Creating Bitcoin payment with amount %f to address %s", amount, address)
-                tx = self.wallet.send_to(address, int(amount))
-                return str(tx.hash)
-            else:
-                return fail(InsufficientFunds("Insufficient funds"))
+    async def transfer(self, amount, address):
+        balance = await self.get_balance()
 
-        return self.get_balance().addCallback(on_balance)
+        if balance['available'] >= int(amount):
+            self._logger.info("Creating Bitcoin payment with amount %f to address %s", amount, address)
+            tx = self.wallet.send_to(address, int(amount))
+            return str(tx.hash)
+        raise InsufficientFunds("Insufficient funds")
 
     def monitor_transaction(self, txid):
         """
         Monitor a given transaction ID. Returns a Deferred that fires when the transaction is present.
         """
-        monitor_deferred = Deferred()
+        monitor_future = Future()
 
-        @inlineCallbacks
-        def monitor_loop():
-            transactions = yield self.get_transactions()
+        async def monitor():
+            transactions = await self.get_transactions()
             for transaction in transactions:
                 if transaction['id'] == txid:
                     self._logger.debug("Found transaction with id %s", txid)
-                    monitor_deferred.callback(None)
-                    monitor_lc.stop()
+                    monitor_future.set_result(None)
+                    monitor_task.cancel()
 
         self._logger.debug("Start polling for transaction %s", txid)
-        monitor_lc = self.register_task("btc_poll_%s" % txid, LoopingCall(monitor_loop))
-        monitor_lc.start(5)
+        monitor_task = self.register_task(f"btc_poll_{txid}", monitor, interval=5)
 
-        return monitor_deferred
+        return monitor_future
 
     def get_address(self):
         if not self.created:
@@ -176,7 +169,7 @@ class BitcoinWallet(Wallet):
                 'fee_amount': transaction.fee,
                 'currency': 'BTC',
                 'timestamp': time.mktime(transaction.date.timetuple()),
-                'description': 'Confirmations: %d' % transaction.confirmations
+                'description': f'Confirmations: {transaction.confirmations}' 
             })
 
         return succeed(transactions_list)

@@ -1,10 +1,4 @@
-from __future__ import absolute_import
-
 import os
-
-import six
-
-from twisted.internet.defer import inlineCallbacks
 
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
@@ -23,9 +17,8 @@ from anydex.test.base import AbstractServer
 
 class TestDatabase(AbstractServer):
 
-    @inlineCallbacks
-    def setUp(self):
-        yield super(TestDatabase, self).setUp()
+    async def setUp(self):
+        super(TestDatabase, self).setUp()
 
         path = os.path.join(self.getStateDir(), 'sqlite')
         if not os.path.exists(path):
@@ -51,9 +44,9 @@ class TestDatabase(AbstractServer):
 
         self.transaction1.add_payment(self.payment1)
 
-    def tearDown(self):
+    async def tearDown(self):
         self.database.close()
-        super(TestDatabase, self).tearDown()
+        await super(TestDatabase, self).tearDown()
 
     def test_add_get_order(self):
         """
@@ -177,7 +170,7 @@ class TestDatabase(AbstractServer):
         """
         Test the check of the database
         """
-        self.assertEqual(self.database.check_database(six.text_type(LATEST_DB_VERSION)), LATEST_DB_VERSION)
+        self.assertEqual(self.database.check_database(str(LATEST_DB_VERSION)), LATEST_DB_VERSION)
 
     def test_get_upgrade_script(self):
         """
