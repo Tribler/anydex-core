@@ -47,14 +47,14 @@ class TestTrustchainWallet(TestBase):
         balance = await self.tc_wallet.get_balance()
         self.assertEqual(balance['available'], 0)
 
-        his_pubkey = self.nodes[0].network.verified_peers[0].public_key.key_to_bin()
+        his_pubkey = list(self.nodes[0].network.verified_peers)[0].public_key.key_to_bin()
         tx = {
             b'up': 20 * 1024 * 1024,
             b'down': 5 * 1024 * 1024,
             b'total_up': 20 * 1024 * 1024,
             b'total_down': 5 * 1024 * 1024
         }
-        self.nodes[0].overlay.sign_block(self.nodes[0].network.verified_peers[0], public_key=his_pubkey,
+        self.nodes[0].overlay.sign_block(list(self.nodes[0].network.verified_peers)[0], public_key=his_pubkey,
                                          block_type=b'tribler_bandwidth', transaction=tx)
 
         await self.deliver_messages()
@@ -90,7 +90,7 @@ class TestTrustchainWallet(TestBase):
             b'total_up': 20 * 1024 * 1024,
             b'total_down': 5 * 1024 * 1024
         }
-        await self.nodes[1].overlay.sign_block(self.nodes[1].network.verified_peers[0], public_key=his_pubkey,
+        await self.nodes[1].overlay.sign_block(list(self.nodes[1].network.verified_peers)[0], public_key=his_pubkey,
                                          block_type=b'tribler_bandwidth', transaction=transaction)
 
         await tx_future
@@ -107,7 +107,7 @@ class TestTrustchainWallet(TestBase):
             b'total_down': 5 * 1024 * 1024
         }
         his_pubkey = self.nodes[0].overlay.my_peer.public_key.key_to_bin()
-        await self.nodes[1].overlay.sign_block(self.nodes[1].network.verified_peers[0], public_key=his_pubkey,
+        await self.nodes[1].overlay.sign_block(list(self.nodes[1].network.verified_peers)[0], public_key=his_pubkey,
                                                block_type=b'tribler_bandwidth', transaction=transaction)
         await self.tc_wallet.monitor_transaction('%s.1' % hexlify(his_pubkey).decode('utf-8'))
 
