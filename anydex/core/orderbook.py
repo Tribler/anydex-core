@@ -80,55 +80,31 @@ class OrderBook(TaskManager):
             self.cancel_pending_task("bid_%s_timeout" % order_id)
             self._bids.remove_tick(order_id)
 
-    def update_ticks(self, ask_order_dict, bid_order_dict, traded_quantity):
+    def update_ticks(self, order_id1, order_id2, traded_quantity, trade_id):
         """
         Update ticks according to a TrustChain block containing the status of the ask/bid orders.
-
-        :type ask_order_dict: dict
-        :type bid_order_dict: dict
-        :type traded_quantity: int
+        :return a set with completed orders
         """
-        ask_order_id = OrderId(TraderId(unhexlify(ask_order_dict["trader_id"])),
-                               OrderNumber(ask_order_dict["order_number"]))
-        bid_order_id = OrderId(TraderId(unhexlify(bid_order_dict["trader_id"])),
-                               OrderNumber(bid_order_dict["order_number"]))
-
         self._logger.debug("Updating ticks in order book: %s and %s (traded quantity: %s)",
-                           str(ask_order_id), str(bid_order_id), str(traded_quantity))
+                           str(order_id1), str(order_id2), str(traded_quantity))
 
-        # Update ask tick
-        ask_exists = self.tick_exists(ask_order_id)
-        if ask_exists and ask_order_dict["traded"] >= self.get_tick(ask_order_id).traded:
-            tick = self.get_tick(ask_order_id)
-            tick.traded = ask_order_dict["traded"]
-            if tick.traded >= tick.assets.first.amount:
-                self.remove_tick(tick.order_id)
-                self.completed_orders.add(tick.order_id)
-        elif not ask_exists and ask_order_dict["traded"] < ask_order_dict["assets"]["first"]["amount"] and \
-                ask_order_id not in self.completed_orders:
-            new_pair = AssetPair.from_dictionary(ask_order_dict["assets"])
-            ask = Ask(ask_order_id, new_pair, Timeout(ask_order_dict["timeout"]),
-                      Timestamp(ask_order_dict["timestamp"]), traded=ask_order_dict["traded"])
-            self.insert_ask(ask)
-        elif not ask_exists and ask_order_dict["traded"] >= ask_order_dict["assets"]["first"]["amount"]:
-            self.completed_orders.add(ask_order_id)
+        completed = set()
 
-        # Update bid tick
-        bid_exists = self.tick_exists(bid_order_id)
-        if bid_exists and bid_order_dict["traded"] >= self.get_tick(bid_order_id).traded:
-            tick = self.get_tick(bid_order_id)
-            tick.traded = bid_order_dict["traded"]
-            if tick.traded >= tick.assets.first.amount:
-                self.remove_tick(tick.order_id)
-                self.completed_orders.add(tick.order_id)
-        elif not bid_exists and bid_order_dict["traded"] < bid_order_dict["assets"]["first"]["amount"] and \
-                bid_order_id not in self.completed_orders:
-            new_pair = AssetPair.from_dictionary(bid_order_dict["assets"])
-            bid = Bid(bid_order_id, new_pair, Timeout(bid_order_dict["timeout"]),
-                      Timestamp(bid_order_dict["timestamp"]), traded=bid_order_dict["traded"])
-            self.insert_bid(bid)
-        elif not bid_exists and bid_order_dict["traded"] >= bid_order_dict["assets"]["first"]["amount"]:
-            self.completed_orders.add(bid_order_id)
+        # Update ticks
+        for order_id in [order_id1, order_id2]:
+            tick_exists = self.tick_exists(order_id)
+            if tick_exists:
+                tick = self.get_tick(order_id)
+                if trade_id in tick.trades:
+                    continue  # We already updated this tick
+                tick.traded += traded_quantity
+                tick.trades.add(trade_id)
+                if tick.traded >= tick.assets.first.amount:  # We completed the trade
+                    self.remove_tick(tick.order_id)
+                    self.completed_orders.add(tick.order_id)
+                    completed.add(tick.order_id)
+
+        return completed
 
     def tick_exists(self, order_id):
         """

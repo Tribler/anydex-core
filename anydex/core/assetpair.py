@@ -46,6 +46,10 @@ class AssetPair(object):
         """
         return Price(self.second.amount, self.first.amount, self.second.asset_id, self.first.asset_id)
 
+    @staticmethod
+    def from_price(price, first_amount):
+        return AssetPair(AssetAmount(first_amount, price.denom_type), AssetAmount(int(price.frac * first_amount), price.num_type))
+
     def proportional_downscale(self, first=None, second=None):
         """
         This method constructs a new AssetPair where the ratio between the first/second asset is preserved.

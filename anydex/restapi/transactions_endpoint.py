@@ -4,7 +4,6 @@ from aiohttp import web
 
 from ipv8.REST.base_endpoint import HTTP_NOT_FOUND, Response
 
-from anydex.core.transaction import TransactionId
 from anydex.restapi.base_market_endpoint import BaseMarketEndpoint
 
 

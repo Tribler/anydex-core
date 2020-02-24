@@ -127,6 +127,30 @@ class Trade(Message):
             timestamp
         )
 
+    @classmethod
+    def start(cls, trader_id, assets, timestamp, trade):
+        """
+        Start a trade from another node
+        :param trader_id: A message id to identify the trade
+        :param assets: The assets to be traded in this counter offer
+        :param timestamp: A timestamp when the trade was countered
+        :param trade: A proposed or counter trade
+        :type trader_id: TraderId
+        :type assets: AssetPair
+        :type timestamp: Timestamp
+        :type trade: ProposedTrade or CounterTrade
+        :return: A counter trade
+        :rtype: CounterTrade
+        """
+        return StartTrade(
+            trader_id,
+            trade.recipient_order_id,
+            trade.order_id,
+            trade.proposal_id,
+            assets,
+            timestamp
+        )
+
     @property
     def order_id(self):
         """
@@ -260,6 +284,20 @@ class CounterTrade(ProposedTrade):
             self._proposal_id,
             self._assets
         )
+
+
+class StartTrade(ProposedTrade):
+    """
+    Start trades are sent when a peer agrees with a trade proposal or counter proposal from a potential trading partner.
+    """
+    pass
+
+
+class CompletedTrade(ProposedTrade):
+    """
+    Contains information about a completed trade.
+    """
+    pass
 
 
 class DeclinedTrade(Trade):

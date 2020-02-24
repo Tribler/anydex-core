@@ -24,6 +24,8 @@ class TickEntry(TaskManager):
         self.available_for_matching = 0
         self.update_available_for_matching()
         self._blocked_for_matching = set()
+        self.trades = set()
+        self.unreserved_trades = set()
 
     @property
     def tick(self):

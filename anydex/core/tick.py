@@ -1,7 +1,5 @@
 import time
-from binascii import hexlify, unhexlify
 
-from ipv8.attestation.trustchain.block import GENESIS_HASH
 from ipv8.database import database_blob
 
 from anydex.core import MAX_ORDER_TIMEOUT
@@ -20,7 +18,7 @@ class Tick(object):
     """
     TIME_TOLERANCE = 10 * 1000  # A small tolerance for the timestamp, to account for network delays
 
-    def __init__(self, order_id, assets, timeout, timestamp, is_ask, traded=0, block_hash=GENESIS_HASH):
+    def __init__(self, order_id, assets, timeout, timestamp, is_ask, traded=0):
         """
         Don't use this class directly, use one of the class methods
 
@@ -30,14 +28,12 @@ class Tick(object):
         :param timestamp: A timestamp when the tick was created
         :param is_ask: A bool to indicate if this tick is an ask
         :param traded: How much assets have been traded already
-        :param block_hash: The hash of the block that created this tick
         :type order_id: OrderId
         :type assets: AssetPair
         :type timeout: Timeout
         :type timestamp: Timestamp
         :type is_ask: bool
         :type traded: int
-        :type block_hash: str
         """
         self._order_id = order_id
         self._assets = assets
@@ -45,24 +41,23 @@ class Tick(object):
         self._timestamp = timestamp
         self._is_ask = is_ask
         self._traded = traded
-        self._block_hash = block_hash
 
     @classmethod
     def from_database(cls, data):
         trader_id, order_number, asset1_amount, asset1_type, asset2_amount, asset2_type, timeout, timestamp,\
-        is_ask, traded, block_hash = data
+        is_ask, traded = data
 
         tick_cls = Ask if is_ask else Bid
         order_id = OrderId(TraderId(trader_id), OrderNumber(order_number))
         return tick_cls(order_id, AssetPair(AssetAmount(asset1_amount, str(asset1_type)),
                                             AssetAmount(asset2_amount, str(asset2_type))),
-                        Timeout(timeout), Timestamp(timestamp), traded=traded, block_hash=bytes(block_hash))
+                        Timeout(timeout), Timestamp(timestamp), traded=traded)
 
     def to_database(self):
         return (database_blob(bytes(self.order_id.trader_id)), int(self.order_id.order_number),
                 self.assets.first.amount, str(self.assets.first.asset_id), self.assets.second.amount,
                 str(self.assets.second.asset_id), int(self.timeout), int(self.timestamp), self.is_ask(),
-                self.traded, database_blob(self.block_hash))
+                self.traded)
 
     @classmethod
     def from_order(cls, order):
@@ -138,22 +133,6 @@ class Tick(object):
         """
         self._traded = new_traded
 
-    @property
-    def block_hash(self):
-        """
-        Return the hash of the associated block
-        :rtype str
-        """
-        return self._block_hash
-
-    @block_hash.setter
-    def block_hash(self, new_hash):
-        """
-        :param new_hash: The new block hash
-        :type new_hash: str
-        """
-        self._block_hash = new_hash
-
     def is_valid(self):
         """
         :return: True if valid, False otherwise
@@ -176,20 +155,8 @@ class Tick(object):
             self._assets,
             self._timeout,
             self._traded,
+            self._is_ask
         )
-
-    def to_block_dict(self):
-        """
-        Return a block dictionary representation of the tick, will be stored on the TrustChain
-        """
-        return {
-            "trader_id": self.order_id.trader_id.as_hex(),
-            "order_number": int(self.order_id.order_number),
-            "assets": self.assets.to_dictionary(),
-            "timeout": int(self.timeout),
-            "timestamp": int(self.timestamp),
-            "traded": self.traded
-        }
 
     def to_dictionary(self):
         """
@@ -202,8 +169,19 @@ class Tick(object):
             "timeout": int(self.timeout),
             "timestamp": int(self.timestamp),
             "traded": self.traded,
-            "block_hash": hexlify(self.block_hash).decode('utf-8'),
         }
+
+    @classmethod
+    def from_network(cls, payload):
+        """
+        Create a tick from an OrderPayload.
+        """
+        if payload.is_ask:
+            return Ask(OrderId(payload.trader_id, payload.order_number), payload.assets, payload.timeout,
+                       payload.timestamp, payload.traded)
+        else:
+            return Bid(OrderId(payload.trader_id, payload.order_number), payload.assets, payload.timeout,
+                       payload.timestamp, payload.traded)
 
     def __str__(self):
         """
@@ -216,78 +194,36 @@ class Tick(object):
 class Ask(Tick):
     """Represents an ask from a order located on another node."""
 
-    def __init__(self, order_id, assets, timeout, timestamp, traded=0, block_hash=GENESIS_HASH):
+    def __init__(self, order_id, assets, timeout, timestamp, traded=0):
         """
         :param order_id: A order id to identify the order this tick represents
         :param assets: The assets being sold/bought
         :param timeout: A timeout for the ask
         :param timestamp: A timestamp for when the ask was created
         :param traded: How much assets have been traded already
-        :param block_hash: The hash of the block that created this tick
         :type order_id: OrderId
         :type assets: AssetPair
         :type timeout: Timeout
         :type timestamp: Timestamp
         :type traded: int
-        :type block_hash: str
         """
-        super(Ask, self).__init__(order_id, assets, timeout, timestamp, True, traded=traded, block_hash=block_hash)
-
-    @classmethod
-    def from_block(cls, block):
-        """
-        Restore an ask from a TrustChain block
-
-        :param block: TrustChainBlock
-        :return: Restored ask
-        :rtype: Ask
-        """
-        tx_dict = block.transaction["tick"]
-        return cls(
-            OrderId(TraderId(unhexlify(tx_dict["trader_id"])), OrderNumber(tx_dict["order_number"])),
-            AssetPair.from_dictionary(tx_dict["assets"]),
-            Timeout(tx_dict["timeout"]),
-            Timestamp(tx_dict["timestamp"]),
-            traded=tx_dict["traded"],
-            block_hash=block.hash
-        )
+        super(Ask, self).__init__(order_id, assets, timeout, timestamp, True, traded=traded)
 
 
 class Bid(Tick):
     """Represents a bid from a order located on another node."""
 
-    def __init__(self, order_id, assets, timeout, timestamp, traded=0, block_hash=GENESIS_HASH):
+    def __init__(self, order_id, assets, timeout, timestamp, traded=0):
         """
         :param order_id: A order id to identify the order this tick represents
         :param assets: The assets being sold/bought
         :param timeout: A timeout for the bid
         :param timestamp: A timestamp for when the bid was created
         :param traded: How much assets have been traded already
-        :param block_hash: The hash of the block that created this tick
         :type order_id: OrderId
         :type assets: AssetPair
         :type timeout: Timeout
         :type timestamp: Timestamp
         :type traded: int
-        :type block_hash: str
         """
-        super(Bid, self).__init__(order_id, assets, timeout, timestamp, False, traded=traded, block_hash=block_hash)
-
-    @classmethod
-    def from_block(cls, block):
-        """
-        Restore a bid from a TrustChain block
-
-        :param data: TrustChainBlock
-        :return: Restored bid
-        :rtype: Bid
-        """
-        tx_dict = block.transaction["tick"]
-        return cls(
-            OrderId(TraderId(unhexlify(tx_dict["trader_id"])), OrderNumber(tx_dict["order_number"])),
-            AssetPair.from_dictionary(tx_dict["assets"]),
-            Timeout(tx_dict["timeout"]),
-            Timestamp(tx_dict["timestamp"]),
-            traded=tx_dict["traded"],
-            block_hash=block.hash
-        )
+        super(Bid, self).__init__(order_id, assets, timeout, timestamp, False, traded=traded)

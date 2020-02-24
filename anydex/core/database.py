@@ -8,9 +8,7 @@ from ipv8.database import database_blob
 
 from anydex.core.message import TraderId
 from anydex.core.order import Order, OrderId, OrderNumber
-from anydex.core.payment import Payment
 from anydex.core.tick import Tick
-from anydex.core.transaction import Transaction, TransactionId
 
 
 DATABASE_DIRECTORY = path.join(u"sqlite")
@@ -34,32 +32,8 @@ CREATE TABLE IF NOT EXISTS orders(
  completed_timestamp  BIGINT,
  is_ask               INTEGER NOT NULL,
  cancelled            INTEGER NOT NULL,
- verified             INTEGER NOT NULL,
 
  PRIMARY KEY (trader_id, order_number)
- );
-
- CREATE TABLE IF NOT EXISTS transactions(
-  trader_id                TEXT NOT NULL,
-  transaction_id           TEXT NOT NULL,
-  order_number             INTEGER NOT NULL,
-  partner_trader_id        TEXT NOT NULL,
-  partner_order_number     INTEGER NOT NULL,
-  asset1_amount            BIGINT NOT NULL,
-  asset1_type              TEXT NOT NULL,
-  asset1_transferred       BIGINT NOT NULL,
-  asset2_amount            BIGINT NOT NULL,
-  asset2_type              TEXT NOT NULL,
-  asset2_transferred       BIGINT NOT NULL,
-  transaction_timestamp    BIGINT NOT NULL,
-  sent_wallet_info         INTEGER NOT NULL,
-  received_wallet_info     INTEGER NOT NULL,
-  incoming_address         TEXT NOT NULL,
-  outgoing_address         TEXT NOT NULL,
-  partner_incoming_address TEXT NOT NULL,
-  partner_outgoing_address TEXT NOT NULL,
-
-  PRIMARY KEY (transaction_id)
  );
 
  CREATE TABLE IF NOT EXISTS payments(
@@ -86,7 +60,6 @@ CREATE TABLE IF NOT EXISTS orders(
   timestamp            BIGINT NOT NULL,
   is_ask               INTEGER NOT NULL,
   traded               BIGINT NOT NULL,
-  block_hash           TEXT NOT NULL,
 
   PRIMARY KEY (trader_id, order_number)
  );
@@ -146,7 +119,7 @@ class MarketDB(TrustChainDB):
         self.execute(
             u"INSERT INTO orders (trader_id, order_number, asset1_amount, asset1_type, asset2_amount, asset2_type,"
             u"traded_quantity, received_quantity, timeout, order_timestamp, completed_timestamp, is_ask, cancelled,"
-            u"verified) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            u") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
             order.to_database())
         self.commit()
 
@@ -197,107 +170,14 @@ class MarketDB(TrustChainDB):
                                   (database_blob(bytes(order_id.trader_id)), str(order_id.order_number)))
         return [(OrderId(TraderId(bytes(data[2])), OrderNumber(data[3])), data[4]) for data in db_results]
 
-    def get_all_transactions(self):
-        """
-        Return all transactions in the database.
-        """
-        db_result = self.execute(u"SELECT * FROM transactions")
-        return [Transaction.from_database(db_item,
-                                          self.get_payments(TransactionId(db_item[1])))
-                for db_item in db_result]
-
-    def get_transaction(self, transaction_id):
-        """
-        Return a transaction with a specific id.
-        """
-        try:
-            db_result = next(self.execute(u"SELECT * FROM transactions WHERE transaction_id = ?",
-                                          (database_blob(bytes(transaction_id)),)))
-        except StopIteration:
-            return None
-        return Transaction.from_database(db_result, self.get_payments(transaction_id))
-
-    def add_transaction(self, transaction):
-        """
-        Add a specific transaction to the database
-        """
-        self.execute(
-            u"INSERT INTO transactions (trader_id, transaction_id, order_number,"
-            u"partner_trader_id, partner_order_number, asset1_amount, asset1_type, asset1_transferred, asset2_amount,"
-            u"asset2_type, asset2_transferred, transaction_timestamp, sent_wallet_info, received_wallet_info,"
-            u"incoming_address, outgoing_address, partner_incoming_address, partner_outgoing_address) "
-            u"VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", transaction.to_database())
-        self.commit()
-
-        self.delete_payments(transaction.transaction_id)
-        for payment in transaction.payments:
-            self.add_payment(payment)
-
-    def insert_or_update_transaction(self, transaction):
-        """
-        Inserts or updates a specific transaction in the database, according to the timestamp.
-        Updates only if the timestamp is more recent than the one in the database.
-        """
-        self.execute(
-            u"INSERT OR IGNORE INTO transactions (trader_id, transaction_id, order_number,"
-            u"partner_trader_id, partner_order_number, asset1_amount, asset1_type, asset1_transferred, asset2_amount,"
-            u"asset2_type, asset2_transferred, transaction_timestamp, sent_wallet_info, received_wallet_info,"
-            u"incoming_address, outgoing_address, partner_incoming_address, partner_outgoing_address) "
-            u"VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", transaction.to_database())
-
-        self.execute(
-            u"UPDATE transactions SET asset1_amount = ?, asset1_transferred = ?, asset2_amount = ?, "
-            u"asset2_transferred = ?, transaction_timestamp = ? WHERE transaction_id = ?"
-            u"AND transaction_timestamp < ?", (transaction.assets.first.amount,
-                                               transaction.transferred_assets.first.amount,
-                                               transaction.assets.second.amount,
-                                               transaction.transferred_assets.second.amount,
-                                               int(transaction.timestamp),
-                                               database_blob(bytes(transaction.transaction_id)),
-                                               int(transaction.timestamp))
-        )
-
-        self.commit()
-
-    def delete_transaction(self, transaction_id):
-        """
-        Delete a specific transaction from the database
-        """
-        self.execute(u"DELETE FROM transactions WHERE transaction_id = ?", (database_blob(bytes(transaction_id)),))
-        self.delete_payments(transaction_id)
-
-    def add_payment(self, payment):
-        """
-        Add a specific transaction to the database
-        """
-        self.execute(
-            u"INSERT INTO payments (trader_id, transaction_id, payment_id,"
-            u"transferred_amount, transferred_type, address_from, address_to, timestamp) VALUES(?,?,?,?,?,?,?,?)",
-            payment.to_database())
-        self.commit()
-
-    def get_payments(self, transaction_id):
-        """
-        Return all payment tied to a specific transaction.
-        """
-        db_result = self.execute(u"SELECT * FROM payments WHERE transaction_id = ? ORDER BY timestamp ASC",
-                                 (database_blob(bytes(transaction_id)),))
-        return [Payment.from_database(db_item) for db_item in db_result]
-
-    def delete_payments(self, transaction_id):
-        """
-        Delete all payments that are associated with a specific transaction
-        """
-        self.execute(u"DELETE FROM payments WHERE transaction_id = ?", (database_blob(bytes(transaction_id)), ))
-
     def add_tick(self, tick):
         """
         Add a specific tick to the database
         """
         self.execute(
             u"INSERT INTO ticks (trader_id, order_number, asset1_amount, asset1_type, asset2_amount,"
-            u"asset2_type, timeout, timestamp, is_ask, traded, block_hash) "
-            u"VALUES(?,?,?,?,?,?,?,?,?,?,?)", tick.to_database())
+            u"asset2_type, timeout, timestamp, is_ask, traded) "
+            u"VALUES(?,?,?,?,?,?,?,?,?,?)", tick.to_database())
         self.commit()
 
     def delete_all_ticks(self):
@@ -318,8 +198,6 @@ class MarketDB(TrustChainDB):
     def get_upgrade_script(self, current_version):
         if current_version == 1 or current_version == 2 or current_version == 3 or current_version == 4:
             return u"DROP TABLE IF EXISTS orders;" \
-                   u"DROP TABLE IF EXISTS transactions;" \
-                   u"DROP TABLE IF EXISTS payments;" \
                    u"DROP TABLE IF EXISTS ticks;" \
                    u"DROP TABLE IF EXISTS orders_reserved_ticks;" \
                    u"DROP TABLE IF EXISTS option;" \

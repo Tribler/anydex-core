@@ -111,7 +111,6 @@ class Order(object):
         self._is_ask = is_ask
         self._reserved_ticks = {}
         self._cancelled = False
-        self._verified = False
         self.broadcast_peers = []
 
     @classmethod
@@ -120,7 +119,7 @@ class Order(object):
         Create an Order object based on information in the database.
         """
         (trader_id, order_number, asset1_amount, asset1_type, asset2_amount, asset2_type, traded_quantity,
-         received_quantity, timeout, order_timestamp, completed_timestamp, is_ask, cancelled, verified) = data
+         received_quantity, timeout, order_timestamp, completed_timestamp, is_ask, cancelled) = data
 
         order_id = OrderId(TraderId(bytes(trader_id)), OrderNumber(order_number))
         order = cls(order_id, AssetPair(AssetAmount(asset1_amount, str(asset1_type)),
@@ -129,7 +128,6 @@ class Order(object):
         order._traded_quantity = traded_quantity
         order._received_quantity = received_quantity
         order._cancelled = bool(cancelled)
-        order._verified = verified
         if completed_timestamp:
             order._completed_timestamp = Timestamp(completed_timestamp)
 
@@ -148,8 +146,7 @@ class Order(object):
         return (database_blob(bytes(self.order_id.trader_id)), str(self.order_id.order_number),
                 self.assets.first.amount, str(self.assets.first.asset_id), self.assets.second.amount,
                 str(self.assets.second.asset_id), self.traded_quantity, self._received_quantity,
-                int(self.timeout), int(self.timestamp), completed_timestamp, self.is_ask(), self._cancelled,
-                self._verified)
+                int(self.timeout), int(self.timestamp), completed_timestamp, self.is_ask(), self._cancelled)
 
     @property
     def reserved_ticks(self):
@@ -249,21 +246,13 @@ class Order(object):
         """
         return self._cancelled
 
-    @property
-    def verified(self):
-        """
-        :return: whether the order has been verified by an external matchmaker or not.
-        :rtype: bool
-        """
-        return self._verified
-
     def is_complete(self):
         """
         :return: True if the order is completed. We consider the order completed if we have received the assets
         we are interested in.
         :rtype: bool
         """
-        return self._traded_quantity >= self.assets.first.amount and self._received_quantity >= self.assets.second.amount
+        return self._traded_quantity >= self.assets.first.amount
 
     @property
     def status(self):
@@ -272,8 +261,6 @@ class Order(object):
         :return: The status of this order
         :rtype: str
         """
-        if not self.verified:
-            return "unverified"
         if self._cancelled:
             return "cancelled"
         elif self.is_complete():
@@ -293,12 +280,6 @@ class Order(object):
                     my_price <= other_price or abs(float(my_price.frac - other_price.frac)) < 0.0001)) or (
                            not self.is_ask() and (
                                my_price >= other_price or abs(float(my_price.frac - other_price.frac)) < 0.0001))
-
-    def set_verified(self):
-        """
-        Mark the order as verified.
-        """
-        self._verified = True
 
     def reserve_quantity_for_tick(self, order_id, quantity):
         """
@@ -381,7 +362,8 @@ class Order(object):
             self._order_id.order_number,
             self._assets,
             self._timeout,
-            self._traded_quantity
+            self._traded_quantity,
+            self._is_ask
         )
 
     def to_dictionary(self):
