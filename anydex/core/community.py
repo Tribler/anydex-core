@@ -831,7 +831,8 @@ class MarketCommunity(Community):
                         if not order.is_valid() or not order_tick_entry:
                             continue
 
-                        self.match(order_tick_entry.tick)
+                        if self.settings.first_matches_own_orders:
+                            self.match(order_tick_entry.tick)
 
                     # Only after we have matched our own orders, do the matching with other ticks if necessary
                     self.match(tick)
