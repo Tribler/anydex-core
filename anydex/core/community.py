@@ -336,6 +336,8 @@ class MarketCommunity(Community):
         self.num_received_counter_trade = 0
         self.num_received_complete_trade = 0
 
+        self.negotiation_stats = {}
+
         self.fixed_broadcast_set = []  # Used if we need to broadcast to a fixed set of other peers
 
         if self.use_database:
@@ -973,6 +975,9 @@ class MarketCommunity(Community):
             address = None
 
         if address:
+            if order.order_id not in self.negotiation_stats:
+                self.negotiation_stats[order.order_id] = {"started": 0}
+            self.negotiation_stats[order.order_id]["started"] += 1
             self.send_proposed_trade(propose_trade, address)
         else:
             order.release_quantity_for_tick(other_order_id, propose_quantity)
