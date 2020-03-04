@@ -249,7 +249,7 @@ class ProposedTradeRequestCache(NumberCache):
 
     @property
     def timeout_delay(self):
-        return 2.0
+        return 5.0
 
     def on_timeout(self):
         # Just remove the reserved quantity from the order
@@ -263,35 +263,6 @@ class ProposedTradeRequestCache(NumberCache):
         cache = self.community.request_cache.get("match", int(order.order_id.order_number))
         if cache:
             cache.received_decline_trade(self.proposed_trade.recipient_order_id, DeclinedTradeReason.OTHER)
-
-
-class OrderStatusRequestCache(RandomNumberCache):
-
-    def __init__(self, community, request_future):
-        super(OrderStatusRequestCache, self).__init__(community.request_cache, "order-status-request")
-        self.request_future = request_future
-
-    @property
-    def timeout_delay(self):
-        return 20.0
-
-    def on_timeout(self):
-        self._logger.warning("No response in time from remote peer when requesting order status")
-
-
-class PublicKeyRequestCache(RandomNumberCache):
-
-    def __init__(self, community, trader_id, request_future):
-        super(PublicKeyRequestCache, self).__init__(community.request_cache, "pk-request")
-        self.trader_id = trader_id
-        self.request_future = request_future
-
-    @property
-    def timeout_delay(self):
-        return 20.0
-
-    def on_timeout(self):
-        self._logger.warning("No response in time from remote peer when requesting public key")
 
 
 class PingRequestCache(RandomNumberCache):
