@@ -1,5 +1,5 @@
 import random
-from asyncio import Future, get_event_loop
+from asyncio import Future, get_event_loop, ensure_future
 from binascii import hexlify, unhexlify
 from functools import wraps
 
@@ -105,7 +105,7 @@ class MatchCache(NumberCache):
         if not self.queue.contains_order(other_order_id) and not (self.outstanding_request and self.outstanding_request[2] == other_order_id):
             self._logger.debug("Adding match payload with own order id %s and other id %s to queue",
                                self.order.order_id, other_order_id)
-            self.queue.insert(0, match_payload.assets.price, other_order_id)
+            self.queue.insert(0, match_payload.assets.price, other_order_id, match_payload.assets.first.amount)
 
         if not self.schedule_task:
             # Schedule a timer
@@ -142,24 +142,25 @@ class MatchCache(NumberCache):
         """
         Process the first eligible match. First, we sort the list based on price.
         """
-        if self.order.available_quantity == 0:
-            self._logger.debug("No available quantity for order when processing!")
-            return
-
-        item = self.queue.delete()
-        if not item:
-            self._logger.info("Done with processsing match queue for order %s!", self.order.order_id)
-        else:
-            retries, price, other_order_id = item
+        items_processed = 0
+        while self.order.available_quantity > 0 and not self.queue.is_empty():
+            item = self.queue.delete()
+            retries, price, other_order_id, other_quantity = item
             self.outstanding_request = item
             if retries == 0:
-                # To prevent all traders from proposing at the same time, we want a small delay
-                delay = random.uniform(0, 0)
+                propose_quantity = min(self.order.available_quantity, other_quantity)
+                self.order.reserve_quantity_for_tick(other_order_id, propose_quantity)
+                self.community.order_manager.order_repository.update(self.order)
+                ensure_future(self.community.accept_match_and_propose(
+                    self.order, other_order_id, price, other_quantity, propose_quantity=propose_quantity, should_reserve=False))
             else:
                 delay = random.uniform(1, 2)
-            self.schedule_propose = call_later(delay,
-                                               self.community.accept_match_and_propose,
-                                               self.order, other_order_id, price, ignore_errors=True)
+                self.schedule_propose = call_later(delay,
+                                                   self.community.accept_match_and_propose,
+                                                   self.order, other_order_id, price, other_quantity, ignore_errors=True)
+            items_processed += 1
+
+        self._logger.debug("Processed %d items in this batch", items_processed)
 
     def received_decline_trade(self, other_order_id, decline_reason):
         """
@@ -190,11 +191,11 @@ class MatchCache(NumberCache):
         elif decline_reason in [DeclinedTradeReason.ORDER_RESERVED, DeclinedTradeReason.ALREADY_TRADING] and \
                 self.outstanding_request:
             # Add it to the queue again
-            self._logger.debug("Adding entry (%d, %s, %s) to matching queue again", *self.outstanding_request)
-            self.queue.insert(self.outstanding_request[0] + 1, self.outstanding_request[1], self.outstanding_request[2])
+            self._logger.debug("Adding entry (%d, %s, %s, %d) to matching queue again", *self.outstanding_request)
+            self.queue.insert(self.outstanding_request[0] + 1, self.outstanding_request[1], self.outstanding_request[2], self.outstanding_request[3])
         elif decline_reason == DeclinedTradeReason.NO_AVAILABLE_QUANTITY and self.outstanding_request:
             # Re-add the item to the queue, with the same priority
-            self.queue.insert(self.outstanding_request[0], self.outstanding_request[1], self.outstanding_request[2])
+            self.queue.insert(self.outstanding_request[0], self.outstanding_request[1], self.outstanding_request[2], self.outstanding_request[3])
 
         self.outstanding_request = None
 
@@ -934,25 +935,24 @@ class MarketCommunity(Community):
         # Add the match to the cache and process it
         cache.add_match(payload)
 
-    async def accept_match_and_propose(self, order, other_order_id, other_price):
+    async def accept_match_and_propose(self, order, other_order_id, other_price, other_quantity, propose_quantity=None, should_reserve=True):
         """
         Accept an incoming match payload and propose a trade to the counterparty
         """
-        if order.available_quantity == 0:
-            self.logger.info("No available quantity for order %s - not sending outgoing proposal", order.order_id)
+        if should_reserve:
+            if order.available_quantity == 0:
+                self.logger.info("No available quantity for order %s - not sending outgoing proposal", order.order_id)
 
-            # Notify the match cache
-            cache = self.request_cache.get("match", int(order.order_id.order_number))
-            if cache:
-                cache.received_decline_trade(other_order_id, DeclinedTradeReason.NO_AVAILABLE_QUANTITY)
-            return
+                # Notify the match cache
+                cache = self.request_cache.get("match", int(order.order_id.order_number))
+                if cache:
+                    cache.received_decline_trade(other_order_id, DeclinedTradeReason.NO_AVAILABLE_QUANTITY)
+                return
 
-        # Pre-actively reserve the available quantity in the order
-        propose_quantity = order.available_quantity
-        order.reserve_quantity_for_tick(other_order_id, propose_quantity)
-        self.order_manager.order_repository.update(order)
+            propose_quantity = min(order.available_quantity, other_quantity)
+            order.reserve_quantity_for_tick(other_order_id, propose_quantity)
+            self.order_manager.order_repository.update(order)
 
-        # Otherwise, propose!
         await self.propose_trade(order, other_order_id, propose_quantity, other_price)
 
     async def propose_trade(self, order, other_order_id, propose_quantity, other_price):
@@ -1116,8 +1116,9 @@ class MarketCommunity(Community):
 
         proposed_trade = ProposedTrade.from_network(payload)
 
-        self.logger.debug("Proposed trade received from trader %s for order %s",
-                          proposed_trade.trader_id.as_hex(), str(proposed_trade.recipient_order_id))
+        self.logger.debug("Proposed trade received from trader %s for order %s (id: %s)",
+                          proposed_trade.trader_id.as_hex(), str(proposed_trade.recipient_order_id),
+                          proposed_trade.proposal_id)
 
         # Update the known IP address of the sender of this proposed trade
         self.update_ip(proposed_trade.trader_id, peer.address)

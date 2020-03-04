@@ -419,6 +419,36 @@ class TestMarketCommunity(TestMarketCommunityBase):
         self.assertEqual(self.nodes[1].overlay.trading_engine.completed_trades[1].assets.first.amount, 8)
         self.assertEqual(self.nodes[1].overlay.trading_engine.completed_trades[1].assets.second.amount, 8)
 
+    @timeout(4)
+    async def test_parallel_matches(self):
+        """
+        Test parallel processing of items in the match queue
+        """
+        self.nodes[2].overlay.settings.match_window = 0.5  # Wait 1 sec before accepting (the best) match
+
+        await self.introduce_nodes()
+
+        order1 = self.nodes[0].overlay.create_ask(AssetPair(AssetAmount(50, 'DUM1'), AssetAmount(50, 'MB')), 3600)
+        order2 = self.nodes[1].overlay.create_ask(AssetPair(AssetAmount(50, 'DUM1'), AssetAmount(50, 'MB')), 3600)
+
+        await sleep(0.5)
+
+        order3 = self.nodes[2].overlay.create_bid(AssetPair(AssetAmount(100, 'DUM1'), AssetAmount(100, 'MB')), 3600)
+
+        await sleep(0.7)  # Give it some time to complete the trade
+
+        # Verify that the trade has been made
+        self.assertTrue(order1.is_complete())
+        self.assertTrue(order2.is_complete())
+        self.assertTrue(order3.is_complete())
+        self.assertEqual(len(self.nodes[0].overlay.trading_engine.completed_trades), 1)
+        self.assertEqual(self.nodes[0].overlay.trading_engine.completed_trades[0].assets.first.amount, 50)
+        self.assertEqual(self.nodes[0].overlay.trading_engine.completed_trades[0].assets.second.amount, 50)
+        self.assertEqual(len(self.nodes[1].overlay.trading_engine.completed_trades), 1)
+        self.assertEqual(self.nodes[1].overlay.trading_engine.completed_trades[0].assets.first.amount, 50)
+        self.assertEqual(self.nodes[1].overlay.trading_engine.completed_trades[0].assets.second.amount, 50)
+        self.assertEqual(len(self.nodes[2].overlay.trading_engine.completed_trades), 2)
+
 
 class TestMarketCommunityTwoNodes(TestMarketCommunityBase):
     __testing__ = True
