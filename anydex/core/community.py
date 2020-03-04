@@ -1078,10 +1078,10 @@ class MarketCommunity(Community):
         auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin()).to_pack_list()
         payload = TradePayload(*payload).to_pack_list()
 
-        self.logger.debug("Sending proposed trade with own order id %s and other order id %s to trader "
-                          "%s, asset pair %s", str(proposed_trade.order_id),
-                          str(proposed_trade.recipient_order_id), proposed_trade.recipient_order_id.trader_id.as_hex(),
-                          proposed_trade.assets)
+        self.logger.info("Sending proposed trade with own order id %s and other order id %s to trader "
+                         "%s, asset pair %s", str(proposed_trade.order_id),
+                         str(proposed_trade.recipient_order_id), proposed_trade.recipient_order_id.trader_id.as_hex(),
+                         proposed_trade.assets)
 
         packet = self._ez_pack(self._prefix, MSG_PROPOSED_TRADE, [auth, payload])
         self.endpoint.send(address, packet, always_succeed=True)
