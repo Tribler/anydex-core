@@ -160,6 +160,9 @@ class MatchCache(NumberCache):
                     self.community.register_task(task_id, self.community.accept_match_and_propose, self.order, other_order_id, price, other_quantity, delay=delay)
             items_processed += 1
 
+            if items_processed == 20:  # Limit the number of outgoing items when processing
+                break
+
         self._logger.debug("Processed %d items in this batch", items_processed)
 
     def received_decline_trade(self, other_order_id, decline_reason):
