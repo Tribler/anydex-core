@@ -1182,10 +1182,10 @@ class MarketCommunity(Community):
             decline_reason = DeclinedTradeReason.ORDER_EXPIRED
         elif my_order.status == "cancelled":
             decline_reason = DeclinedTradeReason.ORDER_CANCELLED
-        elif not my_order.has_acceptable_price(proposed_trade.assets):
-            self.logger.info("Unacceptable price for order %s - %s vs %s", my_order.order_id,
-                             proposed_trade.assets, my_order.assets)
-            decline_reason = DeclinedTradeReason.UNACCEPTABLE_PRICE
+        # elif not my_order.has_acceptable_price(proposed_trade.assets):
+        #     self.logger.info("Unacceptable price for order %s - %s vs %s", my_order.order_id,
+        #                      proposed_trade.assets, my_order.assets)
+        #     decline_reason = DeclinedTradeReason.UNACCEPTABLE_PRICE
         else:
             should_trade = True
 
