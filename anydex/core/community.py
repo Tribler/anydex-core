@@ -154,10 +154,10 @@ class MatchCache(NumberCache):
                 ensure_future(self.community.accept_match_and_propose(
                     self.order, other_order_id, price, other_quantity, propose_quantity=propose_quantity, should_reserve=False))
             else:
-                delay = random.uniform(1, 2)
-                self.schedule_propose = call_later(delay,
-                                                   self.community.accept_match_and_propose,
-                                                   self.order, other_order_id, price, other_quantity, ignore_errors=True)
+                task_id = "%s-%s" % (self.order.order_id, other_order_id)
+                if not self.community.is_pending_task_active(task_id):
+                    delay = random.uniform(1, 2)
+                    self.community.register_task(task_id, self.community.accept_match_and_propose, self.order, other_order_id, price, other_quantity, delay=delay)
             items_processed += 1
 
         self._logger.debug("Processed %d items in this batch", items_processed)
