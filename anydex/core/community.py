@@ -831,13 +831,13 @@ class MarketCommunity(Community):
                 insert_method(tick).add_done_callback(timeout_method)
 
                 if self.order_book.tick_exists(tick.order_id):
-                    # Check for new matches against the orders of this node
-                    for order in self.order_manager.order_repository.find_all():
-                        order_tick_entry = self.order_book.get_tick(order.order_id)
-                        if not order.is_valid() or not order_tick_entry:
-                            continue
+                    if self.settings.first_matches_own_orders:
+                        # Check for new matches against the orders of this node
+                        for order in self.order_manager.order_repository.find_all():
+                            order_tick_entry = self.order_book.get_tick(order.order_id)
+                            if not order.is_valid() or not order_tick_entry:
+                                continue
 
-                        if self.settings.first_matches_own_orders:
                             self.match(order_tick_entry.tick)
 
                     # Only after we have matched our own orders, do the matching with other ticks if necessary
