@@ -844,6 +844,9 @@ class MarketCommunity(Community):
                     self.match(tick)
 
     def send_match_messages(self, matching_ticks, order_id):
+        if self.settings.selfish_matching:
+            matching_ticks = matching_ticks[1:]
+
         for tick_entry in matching_ticks:
             self.send_match_message(tick_entry.tick, order_id)
 
