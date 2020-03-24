@@ -331,7 +331,7 @@ class MarketDB(TrustChainDB):
         :param database_version: Current version of the database.
         :return:
         """
-        assert isinstance(database_version, str)
+        assert isinstance(database_version, bytes)
         assert database_version.isdigit()
         assert int(database_version) >= 0
         database_version = int(database_version)

@@ -170,7 +170,7 @@ class TestDatabase(AbstractServer):
         """
         Test the check of the database
         """
-        self.assertEqual(self.database.check_database(str(LATEST_DB_VERSION)), LATEST_DB_VERSION)
+        self.assertEqual(self.database.check_database(b"%d" % LATEST_DB_VERSION), LATEST_DB_VERSION)
 
     def test_get_upgrade_script(self):
         """
@@ -183,4 +183,4 @@ class TestDatabase(AbstractServer):
         self.database.execute(u"DROP TABLE ticks;")
         self.database.execute(u"CREATE TABLE orders(x INTEGER PRIMARY KEY ASC);")
         self.database.execute(u"CREATE TABLE ticks(x INTEGER PRIMARY KEY ASC);")
-        self.assertEqual(self.database.check_database(u"1"), 5)
+        self.assertEqual(self.database.check_database(b"1"), 5)
