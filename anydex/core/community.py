@@ -929,7 +929,7 @@ class MarketCommunity(Community, BlockListener):
 
         for peer in broadcast_peers:
             self.endpoint.send(peer.address, packet)
-        self.trustchain.relayed_broadcasts.append(block.block_id)
+        self.trustchain.relayed_broadcasts.add(block.block_id)
 
         return broadcast_peers
 
@@ -951,7 +951,7 @@ class MarketCommunity(Community, BlockListener):
 
         for peer in broadcast_peers:
             self.endpoint.send(peer.address, packet)
-        self.trustchain.relayed_broadcasts.append(block1.block_id)
+        self.trustchain.relayed_broadcasts.add(block1.block_id)
 
         return broadcast_peers
 
