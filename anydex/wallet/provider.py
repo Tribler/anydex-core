@@ -6,10 +6,9 @@ class Provider(metaclass=abc.ABCMeta):
     Abstract class to create providers from.
     A provider is an abstraction used to interact with the blockchain.
 
-    For each cryptocurrency, A new abstract class specific to that
-    cryptpcurrency should be created and any method specific to the cryptocurrency should be specified.
+    For each cryptocurrency, a new abstract class specific to that
+    cryptocurrency should be created and any method specific to the cryptocurrency should be specified.
     That class can than be subclassed and implemented.
-
     """
 
     @abc.abstractmethod
