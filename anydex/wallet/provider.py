@@ -37,3 +37,9 @@ class Provider(metaclass=abc.ABCMeta):
         :return: A list of all transactions retrieved
         """
         return
+
+
+class RateExceeded(Exception):
+    """
+    Used for throwing exceptions when either too many requests have been sent or requests have been sent too fast.
+    """
