@@ -1,5 +1,6 @@
 import logging
 import socket
+import yaml # TODO requires installation of `pyyaml`
 from enum import Enum, auto
 from ipaddress import ip_address, IPv4Address
 from time import time
@@ -61,6 +62,15 @@ class Node:
                f'latency: {self.latency}'
 
 
+def read_default_nodes():
+    with open('nodes.yaml') as file:
+        try:
+            nodes = yaml.safe_load(file)
+        except yaml.YAMLError as err:
+            _logger.error(f'YAML-file containing default nodes cannot be parsed: {err}')
+    return nodes
+
+
 def create_node(network: Cryptocurrency) -> Node:
     """
     Constructs a Node from user-provided parameters if key is present in `config.py`-dictionary.
@@ -101,7 +111,12 @@ def create_node(network: Cryptocurrency) -> Node:
         params['name'] = ''
 
         # TODO select best default node for user
-        pass
+        default_nodes = read_default_nodes()
+        if network == network.MONERO:
+            select_best_node(default_nodes['monero'])
+        elif network == network.IOTA:
+            pass
+        # ... etc.
 
         # TODO determine country location
         # country = 'US'
@@ -115,6 +130,10 @@ def create_node(network: Cryptocurrency) -> Node:
 
 
 class MissingParameterException(Exception):
+    pass
+
+
+def select_best_node(nodes):
     pass
 
 
@@ -138,18 +157,27 @@ def determine_latency(host: str, port: int) -> float:
         sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
 
     cfg = get_anydex_configuration()
+    # TODO config example parameters and location
     timeout = cfg['default_node']['timeout']
     sock.settimeout(timeout)
 
-    start_time = time()
+    retry: int = cfg['default_node']['retry']
+    durations = []
 
-    try:
-        sock.connect((host, port))
-        sock.shutdown(socket.SHUT_RD)
-    except socket.timeout:
-        _logger.warning(f'Ping attempt to host {host} timed out after {timeout} seconds')
-        return float('inf')
-    except OSError:
-        return float('inf')
+    for count in range(retry):
+        start_time = time()
+        try:
+            sock.connect((host, port))
+            sock.shutdown(socket.SHUT_RD)
+        except socket.timeout:
+            _logger.warning(f'Ping attempt to host {host} timed out after {timeout} seconds')
+            return float('inf')
+        except OSError:
+            return float('inf')
+        durations.append(time() - start_time)
 
-    return round((time() - start_time) * 1000, 2)
+    return round(avg(durations) * 1000, 2)
+
+
+def avg(elements: list):
+    return sum(elements) / len(elements)
