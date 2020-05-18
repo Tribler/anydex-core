@@ -1,6 +1,6 @@
+import json
 import logging
 import socket
-import yaml # TODO requires installation of `pyyaml`
 from enum import Enum, auto
 from ipaddress import ip_address, IPv4Address
 from time import time
@@ -25,14 +25,14 @@ class Cryptocurrency(Enum):
     Enum representing curerntly implemented cryptocurrencies.
     """
 
-    BITCOIN = auto()
-    BANDWIDTH_TOKEN = auto()
-    ETHEREUM = auto()
-    RIPPLE = auto()
-    LITECOIN = auto()
-    IOTA = auto()
-    MONERO = auto()
-    ZCASH = auto()
+    BITCOIN = 'bitcoin'
+    BANDWIDTH_TOKEN = 'bandwidth_token'
+    ETHEREUM = 'ethereum'
+    RIPPLE = 'ripple'
+    LITECOIN = 'litecoin'
+    IOTA = 'iota'
+    MONERO = 'monero'
+    ZCASH = 'zcash'
 
 
 class Node:
@@ -45,30 +45,20 @@ class Node:
     """
 
     def __init__(self, name: str, host: str, port: int, source: Source,
-                 network: Cryptocurrency, country: str, latency: float):
+                 network: Cryptocurrency, latency: float):
         self.name = name
         self.host = host
         self.port = port
         self.source = source
         self.network = network
-        self.country = country
         self.latency = latency
 
     def __repr__(self):
         return f'{self.name}\n' \
                f'address: {self.host}:{self.port}\n' \
-               f'network: {self.network}\n' \
-               f'country: {self.country}\n' \
+               f'source: {self.source}\n' \
+               f'network: {self.network.value}\n' \
                f'latency: {self.latency}'
-
-
-def read_default_nodes():
-    with open('nodes.yaml') as file:
-        try:
-            nodes = yaml.safe_load(file)
-        except yaml.YAMLError as err:
-            _logger.error(f'YAML-file containing default nodes cannot be parsed: {err}')
-    return nodes
 
 
 def create_node(network: Cryptocurrency) -> Node:
@@ -87,54 +77,70 @@ def create_node(network: Cryptocurrency) -> Node:
     if 'node' in config:
         _logger.info('Parsing user node config')
 
-        node_config = config['node']
+        node_config = config['nodes']['node']
         params['source'] = Source.USER
         params['name'] = node_config.get('name', '')
 
         try:
             params['host'] = node_config['host']
         except KeyError:
-            raise MissingParameterException('Missing key `host` from node config')
+            raise CannotCreateNodeException('Missing key `host` from node config')
 
         try:
             params['port'] = node_config['port']
         except KeyError:
-            raise MissingParameterException('Missing key `port` from node config')
+            raise CannotCreateNodeException('Missing key `port` from node config')
 
-        # TODO determine country location
-        # country = 'US'
-        params['country'] = ''
+        params['latency'] = determine_latency(params['host'], params['port'])
     else:
-        _logger.info('Finding best node from default node pool')
+        _logger.info('Finding best host from pool of default hosts')
 
         params['source'] = Source.DEFAULT
         params['name'] = ''
 
-        # TODO select best default node for user
-        default_nodes = read_default_nodes()
-        if network == network.MONERO:
-            select_best_node(default_nodes['monero'])
-        elif network == network.IOTA:
-            pass
-        # ... etc.
+        default_hosts = read_default_hosts()
 
-        # TODO determine country location
-        # country = 'US'
-        params['country'] = ''
+        try:
+            network_hosts = default_hosts[network.value]
+        except KeyError:
+            raise CannotCreateNodeException(f'Missing default nodes for {network.value}')
 
-    params['latency'] = determine_latency(params['host'], params['port'])
+        selected_host, latency = select_best_host(network_hosts)
+        params['host'], params['port'] = selected_host.split(':')
 
     node = Node(**params)
     _logger.info(f'Using following node:\n{node}')
     return node
 
 
-class MissingParameterException(Exception):
+class CannotCreateNodeException(Exception):
     pass
 
 
-def select_best_node(nodes):
-    pass
+def read_default_hosts():
+    nodes = dict()
+
+    with open('hosts.json') as file:
+        try:
+            nodes = json.loads(file.read())
+        except json.JSONDecodeError as err:
+            _logger.error(f'Default nodes file could not be decoded: {err}')
+
+    return nodes
+
+
+def select_best_host(hosts) -> tuple:
+    results = dict()
+
+    for host in hosts:
+        # TODO investigate possibilities for multi-threaded or async approach
+        _logger.info(f'Determining latency for {host} at port {port}')
+        address, port = host.split(':')
+        latency = determine_latency(address, port)
+        results[host] = latency
+
+    best_host = [(k, v) for k, v in sorted(results.items(), key=lambda el: el[1])][0]
+    return best_host
 
 
 def determine_latency(host: str, port: int) -> float:
@@ -157,11 +163,10 @@ def determine_latency(host: str, port: int) -> float:
         sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
 
     cfg = get_anydex_configuration()
-    # TODO config example parameters and location
-    timeout = cfg['default_node']['timeout']
+    timeout = cfg['nodes']['timeout']
     sock.settimeout(timeout)
 
-    retry: int = cfg['default_node']['retry']
+    retry: int = cfg['nodes']['retry']
     durations = []
 
     for count in range(retry):
