@@ -75,7 +75,12 @@ default = {
             'initialize': {},
             'on_start': []
         }
-    ]
+    ],
+    'nodes': {
+        'node': {},
+        'timeout': 10.0,
+        'retry': 3
+    }
 }
 
 
