@@ -11,7 +11,7 @@ class TestWalletsEndpoint(TestRestApiBase):
     def setUp(self):
         super(TestWalletsEndpoint, self).setUp()
 
-        from anydex.wallet.btc_wallet import BitcoinWallet, BitcoinTestnetWallet
+        from anydex.wallet.bitcoinlib_wallet import BitcoinWallet, BitcoinTestnetWallet
         wallet_path = self.temporary_directory()
         btc_wallet = BitcoinWallet(wallet_path)
         btc_testnet_wallet = BitcoinTestnetWallet(wallet_path)
@@ -48,7 +48,7 @@ class TestWalletsEndpoint(TestRestApiBase):
         """
         Test creating a BTC wallet
         """
-        self.nodes[0].overlay.wallets['BTC'].create_wallet = lambda: succeed(None)
+        self.nodes[0].overlay.wallets['BTC'].create_bitcoinlib_wallet = lambda: succeed(None)
         self.should_check_equality = False
         await self.do_request('wallets/BTC', expected_code=200, request_type='PUT')
 

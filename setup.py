@@ -16,12 +16,13 @@ setup(
     py_modules=[],
     install_requires=[
         "autobahn",
-        "bitcoinlib==0.4.5",
+        "bitcoinlib==0.4.14",
         "cryptography",
         "libnacl",
         "netifaces",
         "aiohttp",
-        "pyOpenSSL"
+        "pyOpenSSL",
+        "sqlalchemy"
     ],
     classifiers=[
         "Development Status :: 5 - Production/Stable",
