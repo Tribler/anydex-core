@@ -41,10 +41,10 @@ class BitcoinlibWallet(Wallet):
         self.wallet = None
         self.unlocked = True
         self.db_path = os.path.join(wallet_dir, 'wallets.sqlite')
-        self.wallet_name = 'tribler testnet' if self.testnet else 'tribler_' + network
+        self.wallet_name = f'tribler_testnet_{network}' if self.testnet else 'tribler_' + network
 
         if wallet_exists(self.wallet_name, db_uri=self.db_path):
-            self.wallet_dir = HDWallet(self.wallet_name, db_uri=self.db_path)
+            self.wallet = HDWallet(self.wallet_name, db_uri=self.db_path)
             self.created = True
 
         self.lib_init()
