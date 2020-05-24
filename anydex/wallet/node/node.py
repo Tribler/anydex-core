@@ -93,6 +93,7 @@ def create_node(network: Cryptocurrency) -> Node:
 
         selected_host, latency = select_best_host(network_hosts)
         params['host'], params['port'] = selected_host.split(':')
+        params['latency'] = latency
 
     node = Node(**params)
     _logger.info(f'Using following node:\n{node}')
@@ -126,8 +127,8 @@ def select_best_host(hosts) -> tuple:
 
     for host in hosts:
         # TODO investigate possibilities for multi-threaded or async approach
-        _logger.info(f'Determining latency for {host} at port {port}')
         address, port = host.split(':')
+        _logger.info(f'Determining latency for {host} at port {port}')
         latency = determine_latency(address, port)
         results[host] = latency
 

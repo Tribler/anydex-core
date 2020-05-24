@@ -22,7 +22,11 @@ setup(
         "netifaces",
         "aiohttp",
         "pyOpenSSL",
-        "sqlalchemy"
+        "requests",
+        "web3",
+        "sqlalchemy",
+        "responses"
+
     ],
     classifiers=[
         "Development Status :: 5 - Production/Stable",

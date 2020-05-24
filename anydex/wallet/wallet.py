@@ -69,3 +69,10 @@ class Wallet(TaskManager, metaclass=abc.ABCMeta):
         For fiat currency, the precision would be 2 since the minimum unit is often 0.01.
         """
         return
+
+    @abc.abstractmethod
+    def monitor_transaction(self, txid):
+        """
+        Monitor a given transaction ID. Returns a Deferred that fires when the transaction is present.
+        """
+        return

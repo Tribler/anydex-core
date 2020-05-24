@@ -1,3 +1,3 @@
 """
-This module contains code for nodes used to access various cryptocurrency backends.
+This package contains code for nodes used to access various cryptocurrency backends.
 """
