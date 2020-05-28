@@ -76,22 +76,6 @@ class TestOrderBook(AbstractTestOrderBook):
         self.assertTrue(self.order_book.get_tick(self.ask.order_id))
         self.assertTrue(self.order_book.get_tick(self.bid.order_id))
 
-    @timeout(10)
-    async def test_ask_insertion_invalid(self):
-        """
-        Test whether we get an error when we add an invalid ask to the order book
-        """
-        with self.assertRaises(RuntimeError):
-            await self.order_book.insert_ask(self.invalid_ask)
-
-    @timeout(10)
-    async def test_bid_insertion_invalid(self):
-        """
-        Test whether we get an error when we add an invalid bid to the order book
-        """
-        with self.assertRaises(RuntimeError):
-            await self.order_book.insert_bid(self.invalid_bid)
-
     def test_ask_removal(self):
         # Test for ask removal
         self.order_book.insert_ask(self.ask2)

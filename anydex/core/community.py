@@ -644,12 +644,6 @@ class MarketCommunity(Community, BlockListener):
         self.logger.debug("Updating ip of trader %s to (%s, %s)", trader_id.as_hex(), ip[0], ip[1])
         self.mid_register[trader_id] = ip
 
-    def on_ask_timeout(self, future_ask):
-        pass
-
-    def on_bid_timeout(self, future_bid):
-        pass
-
     def process_tick_block(self, block):
         """
         Process a TradeChain block containing a tick, only if we have a verified order.
@@ -876,7 +870,7 @@ class MarketCommunity(Community, BlockListener):
         if self.is_matchmaker:
             tick.block_hash = block.hash
             # Search for matches
-            self.order_book.insert_ask(tick).add_done_callback(self.on_ask_timeout)
+            self.order_book.insert_ask(tick)
             self.match(tick)
         return order
 
@@ -908,7 +902,7 @@ class MarketCommunity(Community, BlockListener):
         if self.is_matchmaker:
             tick.block_hash = block.hash
             # Search for matches
-            self.order_book.insert_bid(tick).add_done_callback(self.on_bid_timeout)
+            self.order_book.insert_bid(tick)
             self.match(tick)
         return order
 
@@ -1111,11 +1105,10 @@ class MarketCommunity(Community, BlockListener):
 
         if self.is_matchmaker:
             insert_method = self.order_book.insert_ask if isinstance(tick, Ask) else self.order_book.insert_bid
-            timeout_method = self.on_ask_timeout if isinstance(tick, Ask) else self.on_bid_timeout
 
             if not self.order_book.tick_exists(tick.order_id) and tick.order_id not in self.cancelled_orders:
                 self.logger.info("Inserting tick %s from %s, asset pair: %s", tick, tick.order_id, tick.assets)
-                insert_method(tick).add_done_callback(timeout_method)
+                insert_method(tick)
 
                 if self.order_book.tick_exists(tick.order_id):
                     # Check for new matches against the orders of this node
