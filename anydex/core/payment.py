@@ -31,7 +31,7 @@ class Payment(Message):
          address_from, address_to, timestamp) = data
 
         transaction_id = TransactionId(bytes(transaction_id))
-        return cls(TraderId(bytes(trader_id)), transaction_id, AssetAmount(transferred_amount, str(transferred_id)),
+        return cls(TraderId(bytes(trader_id)), transaction_id, AssetAmount(transferred_amount, transferred_id.decode()),
                    WalletAddress(str(address_from)), WalletAddress(str(address_to)), PaymentId(str(payment_id)),
                    Timestamp(timestamp))
 
@@ -42,7 +42,7 @@ class Payment(Message):
         """
         return (database_blob(bytes(self.trader_id)), database_blob(bytes(self.transaction_id)),
                 str(self.payment_id), self.transferred_assets.amount,
-                str(self.transferred_assets.asset_id), str(self.address_from),
+                self.transferred_assets.asset_id, str(self.address_from),
                 str(self.address_to), int(self.timestamp))
 
     @classmethod

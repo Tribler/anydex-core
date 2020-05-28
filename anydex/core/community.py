@@ -13,7 +13,7 @@ from ipv8.messaging.payload_headers import BinMemberAuthenticationPayload
 from ipv8.messaging.payload_headers import GlobalTimeDistributionPayload
 from ipv8.peer import Peer
 from ipv8.requestcache import NumberCache, RandomNumberCache, RequestCache
-from ipv8.util import fail, succeed
+from ipv8.util import succeed
 
 from anydex.core import DeclineMatchReason, DeclinedTradeReason, MAX_ORDER_TIMEOUT
 from anydex.core.block import MarketBlock
@@ -434,6 +434,14 @@ class MarketCommunity(Community, BlockListener):
             self.update_ip(trader_id, peers[0].address)
             return peers[0].address
 
+    def get_peer_from_mid(self, peer_mid):
+        """
+        Find a peer by mid.
+        """
+        peers = self.network.verified_peers
+        matches = [p for p in peers if p.mid == peer_mid]
+        return matches[0] if matches else None
+
     async def should_sign(self, block):
         """
         Check whether we should sign the incoming block.
@@ -444,6 +452,9 @@ class MarketCommunity(Community, BlockListener):
             transaction = self.transaction_manager.find_by_id(txid)
             if not transaction or not block.is_valid_tx_payment_block():
                 return False
+
+            if not transaction.trading_peer:
+                transaction.trading_peer = self.get_peer_from_mid(bytes(transaction.partner_order_id.trader_id))
 
             # Start polling for the payment
             asset_id = tx["payment"]["transferred"]["type"]
@@ -470,6 +481,7 @@ class MarketCommunity(Community, BlockListener):
 
         elif block.type == b"tx_init":
             if not block.is_valid_tx_init_done_block():
+                self.logger.info("Block %s not valid!", block)
                 return False
 
             # Create a transaction, based on the information in the block
@@ -1683,6 +1695,8 @@ class MarketCommunity(Community, BlockListener):
 
         transaction = self.transaction_manager.find_by_id(payload.transaction_id)
         transaction.received_wallet_info = True
+        if not transaction.trading_peer:
+            transaction.trading_peer = self.get_peer_from_mid(bytes(transaction.partner_order_id.trader_id))
 
         transaction.partner_outgoing_address = payload.outgoing_address
         transaction.partner_incoming_address = payload.incoming_address

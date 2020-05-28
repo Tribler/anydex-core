@@ -106,6 +106,11 @@ class TestDatabase(AbstractServer):
         self.assertEqual(len(transactions), 1)
         self.assertEqual(len(self.database.get_payments(self.transaction1.transaction_id)), 1)
 
+        # Verify that the assets are correctly decoded
+        assets = transactions[0].assets
+        self.assertEqual(assets.first.asset_id, "BTC")
+        self.assertEqual(assets.second.asset_id, "MB")
+
     def test_insert_or_update_transaction(self):
         """
         Test the conditional insertion or update of a transaction in the database
@@ -156,6 +161,9 @@ class TestDatabase(AbstractServer):
         self.database.add_payment(self.payment1)
         payments = self.database.get_payments(self.transaction_id1)
         self.assertEqual(len(payments), 1)
+
+        # Verify that the assets are correctly decoded
+        self.assertEqual(payments[0].transferred_assets.asset_id, "BTC")
 
     def test_add_remove_tick(self):
         """
