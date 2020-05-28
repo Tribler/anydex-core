@@ -98,14 +98,14 @@ class Transaction(object):
 
         transaction_id = TransactionId(bytes(transaction_id))
         transaction = cls(transaction_id,
-                          AssetPair(AssetAmount(asset1_amount, str(asset1_type)),
-                                    AssetAmount(asset2_amount, str(asset2_type))),
+                          AssetPair(AssetAmount(asset1_amount, asset1_type.decode()),
+                                    AssetAmount(asset2_amount, asset2_type.decode())),
                           OrderId(TraderId(bytes(trader_id)), OrderNumber(order_number)),
                           OrderId(TraderId(bytes(partner_trader_id)), OrderNumber(partner_order_number)),
                           Timestamp(transaction_timestamp))
 
-        transaction._transferred_assets = AssetPair(AssetAmount(asset1_transferred, str(asset1_type)),
-                                                    AssetAmount(asset2_transferred, str(asset2_type)))
+        transaction._transferred_assets = AssetPair(AssetAmount(asset1_transferred, asset1_type.decode()),
+                                                    AssetAmount(asset2_transferred, asset2_type.decode()))
         transaction.sent_wallet_info = sent_wallet_info
         transaction.received_wallet_info = received_wallet_info
         transaction.incoming_address = WalletAddress(str(incoming_address))

@@ -57,6 +57,11 @@ class TestDatabase(AbstractServer):
         orders = self.database.get_all_orders()
         self.assertEqual(len(orders), 2)
 
+        # Verify that the assets are correctly decoded
+        assets = orders[0].assets
+        self.assertEqual(assets.first.asset_id, "BTC")
+        self.assertEqual(assets.second.asset_id, "EUR")
+
     def test_get_specific_order(self):
         """
         Test the retrieval of a specific order
@@ -100,6 +105,11 @@ class TestDatabase(AbstractServer):
         transactions = self.database.get_all_transactions()
         self.assertEqual(len(transactions), 1)
         self.assertEqual(len(self.database.get_payments(self.transaction1.transaction_id)), 1)
+
+        # Verify that the assets are correctly decoded
+        assets = transactions[0].assets
+        self.assertEqual(assets.first.asset_id, "BTC")
+        self.assertEqual(assets.second.asset_id, "MB")
 
     def test_insert_or_update_transaction(self):
         """
@@ -151,6 +161,9 @@ class TestDatabase(AbstractServer):
         self.database.add_payment(self.payment1)
         payments = self.database.get_payments(self.transaction_id1)
         self.assertEqual(len(payments), 1)
+
+        # Verify that the assets are correctly decoded
+        self.assertEqual(payments[0].transferred_assets.asset_id, "BTC")
 
     def test_add_remove_tick(self):
         """

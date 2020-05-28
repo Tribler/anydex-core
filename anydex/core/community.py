@@ -13,7 +13,7 @@ from ipv8.messaging.payload_headers import BinMemberAuthenticationPayload
 from ipv8.messaging.payload_headers import GlobalTimeDistributionPayload
 from ipv8.peer import Peer
 from ipv8.requestcache import NumberCache, RandomNumberCache, RequestCache
-from ipv8.util import fail, succeed
+from ipv8.util import succeed
 
 from anydex.core import DeclineMatchReason, DeclinedTradeReason, MAX_ORDER_TIMEOUT
 from anydex.core.block import MarketBlock
@@ -434,6 +434,14 @@ class MarketCommunity(Community, BlockListener):
             self.update_ip(trader_id, peers[0].address)
             return peers[0].address
 
+    def get_peer_from_mid(self, peer_mid):
+        """
+        Find a peer by mid.
+        """
+        peers = self.network.verified_peers
+        matches = [p for p in peers if p.mid == peer_mid]
+        return matches[0] if matches else None
+
     async def should_sign(self, block):
         """
         Check whether we should sign the incoming block.
@@ -444,6 +452,9 @@ class MarketCommunity(Community, BlockListener):
             transaction = self.transaction_manager.find_by_id(txid)
             if not transaction or not block.is_valid_tx_payment_block():
                 return False
+
+            if not transaction.trading_peer:
+                transaction.trading_peer = self.get_peer_from_mid(bytes(transaction.partner_order_id.trader_id))
 
             # Start polling for the payment
             asset_id = tx["payment"]["transferred"]["type"]
@@ -470,6 +481,7 @@ class MarketCommunity(Community, BlockListener):
 
         elif block.type == b"tx_init":
             if not block.is_valid_tx_init_done_block():
+                self.logger.info("Block %s not valid!", block)
                 return False
 
             # Create a transaction, based on the information in the block
@@ -643,12 +655,6 @@ class MarketCommunity(Community, BlockListener):
         """
         self.logger.debug("Updating ip of trader %s to (%s, %s)", trader_id.as_hex(), ip[0], ip[1])
         self.mid_register[trader_id] = ip
-
-    def on_ask_timeout(self, future_ask):
-        pass
-
-    def on_bid_timeout(self, future_bid):
-        pass
 
     def process_tick_block(self, block):
         """
@@ -876,7 +882,7 @@ class MarketCommunity(Community, BlockListener):
         if self.is_matchmaker:
             tick.block_hash = block.hash
             # Search for matches
-            self.order_book.insert_ask(tick).add_done_callback(self.on_ask_timeout)
+            self.order_book.insert_ask(tick)
             self.match(tick)
         return order
 
@@ -908,7 +914,7 @@ class MarketCommunity(Community, BlockListener):
         if self.is_matchmaker:
             tick.block_hash = block.hash
             # Search for matches
-            self.order_book.insert_bid(tick).add_done_callback(self.on_bid_timeout)
+            self.order_book.insert_bid(tick)
             self.match(tick)
         return order
 
@@ -1111,11 +1117,10 @@ class MarketCommunity(Community, BlockListener):
 
         if self.is_matchmaker:
             insert_method = self.order_book.insert_ask if isinstance(tick, Ask) else self.order_book.insert_bid
-            timeout_method = self.on_ask_timeout if isinstance(tick, Ask) else self.on_bid_timeout
 
             if not self.order_book.tick_exists(tick.order_id) and tick.order_id not in self.cancelled_orders:
                 self.logger.info("Inserting tick %s from %s, asset pair: %s", tick, tick.order_id, tick.assets)
-                insert_method(tick).add_done_callback(timeout_method)
+                insert_method(tick)
 
                 if self.order_book.tick_exists(tick.order_id):
                     # Check for new matches against the orders of this node
@@ -1690,6 +1695,8 @@ class MarketCommunity(Community, BlockListener):
 
         transaction = self.transaction_manager.find_by_id(payload.transaction_id)
         transaction.received_wallet_info = True
+        if not transaction.trading_peer:
+            transaction.trading_peer = self.get_peer_from_mid(bytes(transaction.partner_order_id.trader_id))
 
         transaction.partner_outgoing_address = payload.outgoing_address
         transaction.partner_incoming_address = payload.incoming_address

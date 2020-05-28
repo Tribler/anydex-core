@@ -123,8 +123,8 @@ class Order(object):
          received_quantity, timeout, order_timestamp, completed_timestamp, is_ask, cancelled, verified) = data
 
         order_id = OrderId(TraderId(bytes(trader_id)), OrderNumber(order_number))
-        order = cls(order_id, AssetPair(AssetAmount(asset1_amount, str(asset1_type)),
-                                        AssetAmount(asset2_amount, str(asset2_type))),
+        order = cls(order_id, AssetPair(AssetAmount(asset1_amount, asset1_type.decode()),
+                                        AssetAmount(asset2_amount, asset2_type.decode())),
                     Timeout(timeout), Timestamp(order_timestamp), bool(is_ask))
         order._traded_quantity = traded_quantity
         order._received_quantity = received_quantity
@@ -146,8 +146,8 @@ class Order(object):
         """
         completed_timestamp = int(self.completed_timestamp) if self.completed_timestamp else None
         return (database_blob(bytes(self.order_id.trader_id)), str(self.order_id.order_number),
-                self.assets.first.amount, str(self.assets.first.asset_id), self.assets.second.amount,
-                str(self.assets.second.asset_id), self.traded_quantity, self._received_quantity,
+                self.assets.first.amount, self.assets.first.asset_id, self.assets.second.amount,
+                self.assets.second.asset_id, self.traded_quantity, self._received_quantity,
                 int(self.timeout), int(self.timestamp), completed_timestamp, self.is_ask(), self._cancelled,
                 self._verified)
 
