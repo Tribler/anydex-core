@@ -57,6 +57,11 @@ class TestDatabase(AbstractServer):
         orders = self.database.get_all_orders()
         self.assertEqual(len(orders), 2)
 
+        # Verify that the assets are correctly decoded
+        assets = orders[0].assets
+        self.assertEqual(assets.first.asset_id, "BTC")
+        self.assertEqual(assets.second.asset_id, "EUR")
+
     def test_get_specific_order(self):
         """
         Test the retrieval of a specific order
