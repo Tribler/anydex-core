@@ -1,3 +1,4 @@
+import os
 from asyncio import Future, sleep
 
 from ipv8.dht import DHTError
@@ -30,6 +31,12 @@ class TestMarketCommunityBase(TestBase):
         for node in self.nodes:
             node.overlay._use_main_thread = True
 
+    def get_db_location(self):
+        return ":memory:"
+
+    def use_database(self):
+        return False
+
     def create_node(self):
         dum1_wallet = DummyWallet1()
         dum2_wallet = DummyWallet2()
@@ -39,7 +46,8 @@ class TestMarketCommunityBase(TestBase):
         wallets = {'DUM1': dum1_wallet, 'DUM2': dum2_wallet}
 
         mock_ipv8 = MockIPv8(u"curve25519", MarketCommunity, create_trustchain=True, create_dht=True,
-                             is_matchmaker=True, wallets=wallets, use_database=False, working_directory=u":memory:")
+                             is_matchmaker=True, wallets=wallets, use_database=self.use_database(),
+                             working_directory=self.get_db_location())
         tc_wallet = TrustchainWallet(mock_ipv8.trustchain)
         mock_ipv8.overlay.wallets['MB'] = tc_wallet
 
@@ -749,3 +757,49 @@ class TestMarketCommunitySingle(TestMarketCommunityBase):
         with self.assertRaises(RuntimeError):
             await self.nodes[0].overlay.create_ask(AssetPair(AssetAmount(10, 'DUM1'),
                                                              AssetAmount(10, 'DUM2')), 3600 * 1000)
+
+
+class TestMarketCommunityWithDatabase(TestMarketCommunityBase):
+    __testing__ = True
+    NUM_NODES = 3
+
+    def get_db_location(self):
+        self.total_dbs += 1
+        return os.path.join(self.temp_dir, "db_%d" % self.total_dbs)
+
+    def use_database(self):
+        return True
+
+    def setUp(self):
+        self.total_dbs = 0
+        self.temp_dir = self.temporary_directory()
+        super(TestMarketCommunityWithDatabase, self).setUp()
+
+        self.nodes[0].overlay.disable_matchmaker()
+        self.nodes[1].overlay.disable_matchmaker()
+
+    @timeout(3)
+    async def test_e2e_trade(self):
+        """
+        Test trading dummy tokens against bandwidth tokens between two persons, with a matchmaker
+        """
+        await self.introduce_nodes()
+
+        await self.nodes[0].overlay.create_ask(AssetPair(AssetAmount(50, 'DUM1'), AssetAmount(50, 'MB')), 3600)
+        await self.nodes[1].overlay.create_bid(AssetPair(AssetAmount(50, 'DUM1'), AssetAmount(50, 'MB')), 3600)
+
+        await sleep(1)  # Give it some time to complete the trade
+
+        # Verify that the trade has been made
+        self.assertTrue(list(self.nodes[0].overlay.transaction_manager.find_all()))
+        self.assertTrue(list(self.nodes[1].overlay.transaction_manager.find_all()))
+
+        balance1 = await self.nodes[0].overlay.wallets['DUM1'].get_balance()
+        balance2 = await self.nodes[0].overlay.wallets['MB'].get_balance()
+        self.assertEqual(balance1['available'], 950)
+        self.assertEqual(balance2['available'], 50)
+
+        balance1 = await self.nodes[1].overlay.wallets['DUM1'].get_balance()
+        balance2 = await self.nodes[1].overlay.wallets['MB'].get_balance()
+        self.assertEqual(balance1['available'], 1050)
+        self.assertEqual(balance2['available'], -50)
