@@ -1,0 +1,40 @@
+name: Testing and Linting
+
+
+on:
+  push:
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test:
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.7]
+
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        # Upgrade pip
+        python -m pip install --upgrade pip
+        # Used for testing and linting
+        pip install nose twisted asynctest decorator pylint pylint-exit
+        # Install all other requirements
+        python setup.py install
+        # Install IPv8
+        pip install pyipv8
+    - name: Lint with pylint
+      run: |
+        # Execute bash script
+        bash .scripts/runpylint.sh
+    - name: Test using nose
+      run: |
+        python run_nose.py

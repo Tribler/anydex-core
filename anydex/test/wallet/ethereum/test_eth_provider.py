@@ -166,7 +166,7 @@ class TestEthereumBlockChairProvider(TestCase):
                       f'{self.bcp.base_url}/dashboards/address/0x3282791d6fd713f1e94f4bfd565eaa78b3a0599d',
                       json=self.sample_address_response)
         self.assertEqual(2,
-                         self.bcp.get_transaction_count(0x3282791d6fd713f1e94f4bfd565eaa78b3a0599d))
+                         self.bcp.get_transaction_count("0x3282791d6fd713f1e94f4bfd565eaa78b3a0599d"))
 
     @responses.activate
     def test_get_gas_price(self):

@@ -10,7 +10,7 @@ from anydex.wallet.node.node import create_node, CannotCreateNodeException
 from anydex.wallet.provider import NotSupportedOperationException
 from anydex.wallet.provider import Provider
 from anydex.wallet.provider import RequestLimit, Blocked, RateExceeded, RequestException, ConnectionException
-from wallet.cryptocurrency import Cryptocurrency
+from anydex.wallet.cryptocurrency import Cryptocurrency
 
 
 class EthereumProvider(Provider, metaclass=abc.ABCMeta):
@@ -134,7 +134,7 @@ class EthereumBlockchairProvider(EthereumProvider):
         self.base_url = f"{base_url}{network}"
         self.network = network
 
-    def send_request(self, path, data={}, method='get'):
+    def send_request(self, path, data=None, method='get'):
         """
         Makes a request to the specified path.
 
@@ -148,6 +148,8 @@ class EthereumBlockchairProvider(EthereumProvider):
         :return: the response object
         """
         response = None
+        if not data:
+            data = {}
         if method == 'get':
             response = requests.get(f'{self.base_url}{path}', data)
         elif method == 'post':
@@ -166,7 +168,6 @@ class EthereumBlockchairProvider(EthereumProvider):
         return response.json()['data']['best_block_height']
 
     def get_transaction_count(self, address):
-        # Todo: return also unconfirmed txs
         response = self.send_request(f'/dashboards/address/{address}')
         return response.json()['data'][address.lower()]['address']['transaction_count']
 
@@ -258,7 +259,7 @@ class EthereumBlockcypherProvider(EthereumProvider):
     def __init__(self, api_url='https://api.blockcypher.com/', network="ethereum"):
         self.base_url = f'{api_url}v1/eth/main/'
 
-    def send_request(self, path, data={}, method="get"):
+    def send_request(self, path, data=None, method="get"):
         """
         Makes a request to the specified path.
 
@@ -271,6 +272,8 @@ class EthereumBlockcypherProvider(EthereumProvider):
         :param method: The type of the request (get, post...)
         :return: the response object
         """
+        if not data:
+            data = {}
         response = None
         if method == 'get':
             response = requests.get(f'{self.base_url}{path}', data)
@@ -337,7 +340,7 @@ class EtherscanProvider(EthereumProvider):
             raise ValueError(f'expected ethereum or testnet but got : {network}')
         self.network = network
 
-    def _send_request(self, data={}, method='get'):
+    def _send_request(self, data=None, method='get'):
         """
        Makes a request to the specified path.
 
@@ -353,6 +356,8 @@ class EtherscanProvider(EthereumProvider):
         headers = {
             'User-Agent': 'Anydex'
         }
+        if not data:
+            data = {}
         response = None
         if method == 'get':
             response = requests.get(self.base_url, data=data, headers=headers)
@@ -383,7 +388,7 @@ class EtherscanProvider(EthereumProvider):
         return propose_gas_price
 
     def get_transactions(self, address, start_block=None, end_block=None):
-        # Todo does this include pending tx?
+        # does not include pending transactions
         data = {
             'module': 'account',
             'action': 'txlist',

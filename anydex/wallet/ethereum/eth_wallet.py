@@ -248,8 +248,6 @@ class EthereumWallet(Wallet):
             return row[0] + 1  # nonce + 1
         return 0
 
-        pass
-
 
 class EthereumTestnetWallet(EthereumWallet):
     """

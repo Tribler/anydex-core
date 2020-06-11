@@ -15,3 +15,4 @@ class Cryptocurrency(Enum):
     IOTA = 'iota'
     MONERO = 'monero'
     ZCASH = 'zcash'
+    STELLAR = 'stellar'

@@ -25,7 +25,8 @@ setup(
         "requests",
         "web3",
         "sqlalchemy",
-        "responses"
+        "responses",
+        "stellar-sdk"
 
     ],
     classifiers=[
