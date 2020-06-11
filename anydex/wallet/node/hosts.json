@@ -1,12 +1,12 @@
 {
   "monero": [
-    "opennode.xmr-tw.org:18089",
-    "node.moneroworld.com:18089",
-    "node.xmrbackb.one:18081",
-    "uwillrunanodesoon.moneroworld.com:18089",
-    "node.xmr.to:18081",
-    "nodes.hashvault.pro:18081",
-    "node.supportxmr.com:18081"
+    "http://opennode.xmr-tw.org:18089",
+    "http://node.moneroworld.com:18089",
+    "http://node.xmrbackb.one:18081",
+    "http://uwillrunanodesoon.moneroworld.com:18089",
+    "http://node.xmr.to:18081",
+    "http://nodes.hashvault.pro:18081",
+    "http://node.supportxmr.com:18081"
   ],
   "ethereum": [
     "https://api.myetherapi.com/eth",

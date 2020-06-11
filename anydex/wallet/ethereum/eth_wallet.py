@@ -48,7 +48,7 @@ class EthereumWallet(Wallet):
         if self.account:
             return fail(RuntimeError(f'Ethereum wallet with name {self.wallet_name} already exists'))
 
-        self._logger.info(f'Creating Ethereum wallet with name {self.wallet_name}')
+        self._logger.info('Creating Ethereum wallet with name %s', self.wallet_name)
         if not self.account:
             self.account = Web3().eth.account.create()
             self.created = True
@@ -108,7 +108,7 @@ class EthereumWallet(Wallet):
         if balance['available'] < int(amount):
             raise InsufficientFunds('Insufficient funds')
 
-        self._logger.info(f'Creating Ethereum payment with amount {amount} to address {address}')
+        self._logger.info('Creating Ethereum payment with amount %f to address %s', amount, address)
 
         transaction = {
             'from': self.get_address(),

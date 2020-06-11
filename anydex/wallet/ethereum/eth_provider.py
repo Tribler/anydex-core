@@ -23,7 +23,7 @@ class EthereumProvider(Provider, metaclass=abc.ABCMeta):
         """
         return
 
-    def estimate_gas(self, tx):
+    def estimate_gas(self):
         """
         Estimate the amount of gas needed for this transaction.
         :param tx: the transaction for which to estimate the gas
@@ -160,6 +160,34 @@ class EthereumBlockchairProvider(EthereumProvider):
         return response
 
     def get_balance(self, address):
+        response = self.send_request(f"/dashboards/address/{address}")
+        return int(response.json()["data"][address.lower()]["address"]["balance"])
+
+    def get_transaction_count(self, address):
+        # Todo: return also unconfirmed txs
+        response = self.send_request(f"/dashboards/address/{address}")
+        return response.json()["data"][address.lower()]["address"]["transaction_count"]
+
+    # def estimate_gas(self, tx):
+    #     # Todo estimate the gas better or just set to the max for smiple transactions (21000)
+    #     response = self.send_request("/stats")
+    #     return response.json()["data"]["median_simple_transaction_fee_24h"]
+
+    def get_gas_price(self):
+        response = self.send_request("/stats")
+        return response.json()["data"]["mempool_median_gas_price"]
+
+    def submit_transaction(self, raw_tx):
+        response = self.send_request("/push/transactions", data={"data": raw_tx}, method="post")
+        return response.json()["data"]["transaction_hash"]
+
+    def get_transactions_received(self, address):
+        response = self.send_request("/transactions", data={"q": f"recipient({address})"})
+        response_mempool = self.send_request("/mempool/transactions", data={"q": f"recipient({address})"})
+        txs = response.json()["data"] + response_mempool.json()["data"]
+        return self._normalize_transactions(txs)
+
+    def get_transactions(self, address):
         response = self.send_request(f'/dashboards/address/{address}')
         return int(response.json()['data'][address.lower()]['address']['balance'])
 
@@ -212,11 +240,11 @@ class EthereumBlockchairProvider(EthereumProvider):
         if response.status_code in request_exceeded:
             raise RequestLimit(
                 'The server indicated the request limit has been exceeded')
-        elif response.status_code in blocked_codes:
+        if response.status_code in blocked_codes:
             raise Blocked('The server has blocked you')
-        elif response.status_code == 435:
+        if response.status_code == 435:
             raise RateExceeded('You are sending requests too fast')
-        elif response.status_code != 200:
+        if response.status_code != 200:
             raise RequestException(f'something went wrong, status code was : {response.status_code}')
 
     def _normalize_transactions(self, txs):
@@ -256,7 +284,7 @@ class EthereumBlockcypherProvider(EthereumProvider):
     Wrapper around blockcypher
     """
 
-    def __init__(self, api_url='https://api.blockcypher.com/', network="ethereum"):
+    def __init__(self, api_url='https://api.blockcypher.com/'):
         self.base_url = f'{api_url}v1/eth/main/'
 
     def send_request(self, path, data=None, method="get"):
@@ -321,7 +349,7 @@ class EthereumBlockcypherProvider(EthereumProvider):
         if response.status_code == 429:
             raise RateExceeded(
                 'The server indicated the rate limit has been reached')
-        elif response.status_code != 200:
+        if response.status_code != 200:
             raise RequestException(f'something went wrong, status code was : {response.status_code}')
 
 

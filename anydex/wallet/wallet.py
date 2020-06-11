@@ -10,7 +10,6 @@ class InsufficientFunds(Exception):
     """
     Used for throwing exception when there isn't sufficient funds available to transfer assets.
     """
-    pass
 
 
 class Wallet(TaskManager, metaclass=abc.ABCMeta):

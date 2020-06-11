@@ -9,8 +9,9 @@ from binascii import hexlify
 from configparser import ConfigParser
 
 from ipv8.util import fail, succeed
-from anydex.wallet.wallet import InsufficientFunds, Wallet
 from bitcoinlib.wallets import wallet_exists, HDWallet, WalletError
+
+from anydex.wallet.wallet import InsufficientFunds, Wallet
 
 
 class UnsupportedNetwork(Exception):
@@ -30,7 +31,7 @@ class BitcoinlibWallet(Wallet):
 
     def __init__(self, wallet_dir, testnet, network, name, currency):
         if network not in self.SUPPORTED_NETWORKS:
-            raise(UnsupportedNetwork(network))
+            raise UnsupportedNetwork(network)
         super(BitcoinlibWallet, self).__init__()
         self.testnet = testnet
         self.network = network
@@ -108,7 +109,7 @@ class BitcoinlibWallet(Wallet):
             self.wallet.new_key('tribler_change', change=1)
             self.created = True
         except WalletError as exc:
-            self._logger.error(f"Cannot create {self.network} wallet!")
+            self._logger.error("Cannot create %s wallet!", self.network)
             return fail(exc)
         return succeed(None)
 
@@ -128,7 +129,8 @@ class BitcoinlibWallet(Wallet):
         balance = await self.get_balance()
 
         if balance['available'] >= int(amount):
-            self._logger.info(f"Creating {self.network} payment with amount %f to address %s", amount, address)
+            self._logger.info("Creating %s payment with amount %f to address %s",
+                              self.network, amount, address)
             tx = self.wallet.send_to(address, int(amount))
             return str(tx.hash)
         raise InsufficientFunds("Insufficient funds")

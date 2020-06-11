@@ -25,6 +25,7 @@ setup(
         "requests",
         "web3",
         "sqlalchemy",
+        "monero",
         "responses",
         "stellar-sdk"
 
