@@ -1,20 +1,45 @@
 {
-  "monero": [
-    "http://opennode.xmr-tw.org:18089",
-    "http://node.moneroworld.com:18089",
-    "http://node.xmrbackb.one:18081",
-    "http://uwillrunanodesoon.moneroworld.com:18089",
-    "http://node.xmr.to:18081",
-    "http://nodes.hashvault.pro:18081",
-    "http://node.supportxmr.com:18081"
-  ],
-  "ethereum": [
-    "https://api.myetherapi.com/eth",
-    "https://main-rpc.linkpool.io/"
-  ],
-  "bitcoin": [],
-  "iota": [],
-  "ripple": [],
-  "litecoin": [],
-  "zcash": []
+  "monero": {
+    "non_testnet": [
+      "http://opennode.xmr-tw.org:18089",
+      "http://node.moneroworld.com:18089",
+      "http://node.xmrbackb.one:18081",
+      "http://uwillrunanodesoon.moneroworld.com:18089",
+      "http://node.xmr.to:18081",
+      "http://nodes.hashvault.pro:18081",
+      "http://node.supportxmr.com:18081"
+    ],
+    "testnet": [
+
+    ]
+  },
+  "ethereum": {
+    "non_testnet": [
+      "https://api.myetherapi.com/eth",
+      "https://main-rpc.linkpool.io/"
+    ],
+    "testnet": [
+
+    ]
+  },
+  "bitcoin": {
+    "non_testnet": [],
+    "testnet": []
+  },
+  "iota": {
+    "non_testnet": [],
+    "testnet": []
+  },
+  "litecoin": {
+    "non_testnet": [],
+    "testnet": []
+  },
+  "zcash": {
+    "non_testnet": [],
+    "testnet": []
+  },
+  "stellar": {
+    "non_testnet": [],
+    "testnet": []
+  }
 }

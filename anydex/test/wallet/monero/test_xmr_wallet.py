@@ -22,7 +22,9 @@ TEST_PID = 'test_paymentid'
 
 def succeed_backend():
     mock_backend = MockObject()
-    mock_backend.accounts = lambda *_: []
+    mock_backend.accounts = lambda *_: [monero.account.Account(mock_backend, 0)]
+    mock_backend.addresses = lambda **_: [TEST_ADDRESS]
+    mock_backend.new_address = lambda **_: (TEST_ADDRESS, 1)
     monero.backends.jsonrpc.JSONRPCWallet.__new__ = lambda *_, **__: mock_backend
 
 
@@ -539,6 +541,30 @@ class TestMoneroWallet(AbstractServer):
         p = Payment()
         self.assertEqual(4, await w.get_confirmations(p))
         w.cancel_all_pending_tasks()
+
+    def test_new_address(self):
+        """
+        Test creation of new address in main wallet account.
+        """
+        w = MoneroWallet()
+
+        succeed_backend()
+        w.create_wallet()
+        self.assertListEqual([TEST_ADDRESS], w.get_addresses())
+        self.assertEqual(TEST_ADDRESS, w.generate_subaddress())
+
+    def test_get_addresses(self):
+        """
+        Test retrieval of addresses in main wallet account.
+        """
+        w = MoneroWallet()
+
+        succeed_backend()
+        w.create_wallet()
+        addresses = w.get_addresses()
+
+        self.assertEqual(1, len(addresses))
+        self.assertListEqual([TEST_ADDRESS], addresses)
 
 
 class TestTestnetMoneroWallet(AbstractServer):
