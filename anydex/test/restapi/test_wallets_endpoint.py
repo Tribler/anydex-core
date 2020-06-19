@@ -4,6 +4,7 @@ from sqlalchemy.orm import session as db_session
 
 from anydex.test.restapi.base import TestRestApiBase
 from anydex.test.util import timeout
+from anydex.wallet.bitcoinlib.bitcoinlib_wallets import BitcoinWallet, BitcoinTestnetWallet
 
 
 class TestWalletsEndpoint(TestRestApiBase):
@@ -11,7 +12,6 @@ class TestWalletsEndpoint(TestRestApiBase):
     def setUp(self):
         super(TestWalletsEndpoint, self).setUp()
 
-        from anydex.wallet.bitcoinlib_wallet import BitcoinWallet, BitcoinTestnetWallet
         wallet_path = self.temporary_directory()
         btc_wallet = BitcoinWallet(wallet_path)
         btc_testnet_wallet = BitcoinTestnetWallet(wallet_path)

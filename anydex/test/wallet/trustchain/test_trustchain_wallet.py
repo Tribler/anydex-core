@@ -5,7 +5,7 @@ from ipv8.test.base import TestBase
 from ipv8.test.mocking.ipv8 import MockIPv8
 
 from anydex.test.util import timeout
-from anydex.wallet.tc_wallet import TrustchainWallet
+from anydex.wallet.trustchain.tc_wallet import TrustchainWallet
 from anydex.wallet.wallet import InsufficientFunds
 
 
@@ -115,7 +115,7 @@ class TestTrustchainWallet(TestBase):
         """
         Test the address of a Trustchain wallet
         """
-        self.assertTrue(self.tc_wallet.get_address())
+        self.assertTrue(self.tc_wallet.get_address().result())
 
     async def test_get_transaction(self):
         """

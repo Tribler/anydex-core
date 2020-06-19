@@ -1,4 +1,3 @@
-import abc
 import time
 from datetime import datetime
 
@@ -8,30 +7,51 @@ from stellar_sdk import Keypair
 
 from anydex.test.base import AbstractServer
 from anydex.test.util import MockObject, timeout
-from anydex.wallet.stellar.xlm_db import Secret, Transaction
+from anydex.wallet.stellar.xlm_database import Secret, Transaction
 from anydex.wallet.stellar.xlm_wallet import StellarWallet, StellarTestnetWallet
 from anydex.wallet.wallet import InsufficientFunds
 
 
-# Does not include "Test" in name because nose runs all classes with test in their name.
-class AbstractStellarWallet(metaclass=abc.ABCMeta):
+class TestStellarWallet(AbstractServer):
     """
     Test class containing the common tests for the testnet and normal stellar wallet.
     """
 
-    def test_get_identifier(self):
-        self.assertEqual(self.expected_identifier(), self.wallet.get_identifier())
+    def setUp(self):
+        super().setUp()
+        mock = MockObject()
+        mock.get_account_sequence = lambda *_: 100
+        self.wallet = StellarWallet(self.session_base_dir, mock)
+        self.identifier = 'XLM'
+        self.name = 'stellar'
 
-    @abc.abstractmethod
+        self.tx = Transaction(
+            hash='96ad71731b1b46fceb0f1c32adbcc16a93cefad1e6eb167efe8a8c8e4e0cbb98',
+            ledger_nr=26529414,
+            date_time=datetime.fromisoformat('2020-06-05T08:45:33'),
+            source_account='GDQWI6FKB72DPOJE4CGYCFQZKRPQQIOYXRMZ5KEVGXMG6UUTGJMBCASH',
+            operation_count=1,
+            transaction_envelope="AAAAAOFkeKoP9De5JOCNgRYZVF8IIdi8WZ6olTXYb1KTMlgRAAAAZAGOO+wAAAA9AAAAAQAAAAAAAAAA"
+                                 "AAAAAAAAAAAAAAADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAQAAAADhZHiq"
+                                 "D/Q3uSTgjYEWGVRfCCHYvFmeqJU12G9SkzJYEQAAAAAAAAAAXQbflbQZVvhfaHtF6ESvgGrNnl2gi440"
+                                 "84MWUaGbmNkAAAAAAcnDgAAAAAAAAAABHvBc2AAAAEBUL1wo8IGHEpgpQ7llGaFE+rC9v5kk2KPJe53/"
+                                 "gIdWF+792HYg5yTTmhJII97YgM+Be8yponPH0YjMjeYphewI",
+            fee=100,
+            is_pending=False,
+            succeeded=True,
+            sequence_number=112092925529161789,
+            min_time_bound=datetime.fromisoformat('1970-01-01T00:00:00')
+        )
+
+    async def tearDown(self):
+        db_session.close_all_sessions()
+        await super().tearDown()
+
     def new_wallet(self):
-        """
-        Create a new wallet
-        :return: the new wallet
-        """
-
-    @abc.abstractmethod
-    def expected_identifier(self):
-        return
+        mock = MockObject()
+        mock.get_account_sequence = lambda *_: 100
+        mock.check_account_created = lambda *_: None
+        return StellarWallet(self.session_base_dir, mock)
 
     def create_wallet(self):
         """
@@ -41,16 +61,22 @@ class AbstractStellarWallet(metaclass=abc.ABCMeta):
         self.wallet.create_wallet()
         self.wallet.created_on_network = True
 
+    def test_get_identifier(self):
+        self.assertEqual(self.identifier, self.wallet.get_identifier())
+
+    def test_get_name(self):
+        self.assertEqual(self.name, self.wallet.get_name())
+
     def test_create_wallet(self):
         """
         Test for wallet creation
         """
-
         self.create_wallet()
-        addr = self.wallet.stellar_db.session.query(Secret.address).first()[0]
+        addr = self.wallet.database.session.query(Secret.address).first()[0]
         self.assertIsNotNone(self.wallet.keypair)
         self.assertTrue(self.wallet.created)
-        self.assertEqual(addr, self.wallet.get_address())
+        result = self.wallet.get_address()
+        self.assertEqual(addr, result.result())
 
     def test_init_wallet_created(self):
         """
@@ -71,10 +97,6 @@ class AbstractStellarWallet(metaclass=abc.ABCMeta):
 
         self.assertIsInstance(future.exception(), RuntimeError)
 
-    @abc.abstractmethod
-    def test_get_name(self):
-        return
-
     async def test_get_balance_not_created(self):
         """
         Test for getting balance when the wallet has not yet been created
@@ -82,7 +104,7 @@ class AbstractStellarWallet(metaclass=abc.ABCMeta):
         balance = {
             'available': 0,
             'pending': 0,
-            'currency': self.expected_identifier(),
+            'currency': self.identifier,
             'precision': 7
         }
         self.wallet.check_and_update_created_on_network = lambda *_: None
@@ -97,7 +119,7 @@ class AbstractStellarWallet(metaclass=abc.ABCMeta):
         balance = {
             'available': 100 * 1e7,  # balance form api is not in the lowest denomination
             'pending': 0,
-            'currency': self.expected_identifier(),
+            'currency': self.identifier,
             'precision': 7
         }
         self.assertEquals(balance, await self.wallet.get_balance())
@@ -106,10 +128,10 @@ class AbstractStellarWallet(metaclass=abc.ABCMeta):
         """
         Test for getting sequence number from the database
         """
-        self.wallet.stellar_db.session.add(
+        self.wallet.database.session.add(
             Transaction(sequence_number=10000, succeeded=True, source_account=f'sequence {self.wallet.testnet}'))
-        self.wallet.stellar_db.session.commit()
-        self.wallet.get_address = lambda: f'sequence {self.wallet.testnet}'
+        self.wallet.database.session.commit()
+        self.wallet.get_address = lambda: succeed(f'sequence {self.wallet.testnet}')
         sequence_nr = self.wallet.get_sequence_number()
         self.assertEqual(10000, sequence_nr)
 
@@ -124,8 +146,8 @@ class AbstractStellarWallet(metaclass=abc.ABCMeta):
         """
         Test for get_address when the wallet has not been created
         """
-
-        self.assertEqual('', self.wallet.get_address())
+        result = self.wallet.get_address().result()
+        self.assertEqual('', result)
 
     def test_get_address_created(self):
         """
@@ -135,7 +157,8 @@ class AbstractStellarWallet(metaclass=abc.ABCMeta):
         address = 'GCEYPGQX75YWCWL77NOWWHHMGS2R5DP2FAOWLT65NSORFXZHQIDDCOO7'
         self.create_wallet()
         self.wallet.keypair = Keypair.from_secret(secret)
-        self.assertEqual(address, self.wallet.get_address())
+        result = self.wallet.get_address().result()
+        self.assertEqual(address, result)
 
     def test_precision(self):
         self.assertEqual(7, self.wallet.precision())
@@ -152,9 +175,8 @@ class AbstractStellarWallet(metaclass=abc.ABCMeta):
         """
         Test for get_transactions when wallet has been created
         """
-
-        self.wallet.stellar_db.insert_transaction(self.tx)
-        self.wallet.get_address = lambda: 'GBOQNX4VWQMVN6C7NB5UL2CEV6AGVTM6LWQIXDRU6OBRMUNBTOMNSOAW'
+        self.wallet.database.insert_transaction(self.tx)
+        self.wallet.get_address = lambda: succeed('GBOQNX4VWQMVN6C7NB5UL2CEV6AGVTM6LWQIXDRU6OBRMUNBTOMNSOAW')
         self.wallet.provider = MockObject()
         self.wallet.provider.get_ledger_height = lambda: 26529414
         self.wallet.provider.get_transactions = lambda *_: []
@@ -167,7 +189,7 @@ class AbstractStellarWallet(metaclass=abc.ABCMeta):
             'to': 'GBOQNX4VWQMVN6C7NB5UL2CEV6AGVTM6LWQIXDRU6OBRMUNBTOMNSOAW',
             'amount': 30000000,
             'fee_amount': 100,
-            'currency': self.expected_identifier(),
+            'currency': self.identifier,
             'timestamp': None,  # timestamp is timezone specific
             'description': f'confirmations: 1'
         }
@@ -177,7 +199,7 @@ class AbstractStellarWallet(metaclass=abc.ABCMeta):
 
         self.assertEqual([payment_dict], payments_from_wallet)
 
-    @timeout(10)
+    @timeout(5)
     async def test_monitor_transactions_found(self):
         """
         Test for monitor_transactions when the transaction is found
@@ -185,29 +207,30 @@ class AbstractStellarWallet(metaclass=abc.ABCMeta):
         """
         self.wallet.created = True
         self.wallet.created_on_network = True
-        self.wallet.stellar_db.insert_transaction(self.tx)
-        self.wallet.get_address = lambda: 'GDQWI6FKB72DPOJE4CGYCFQZKRPQQIOYXRMZ5KEVGXMG6UUTGJMBCASH'
+        self.wallet.database.insert_transaction(self.tx)
+        self.wallet.get_address = lambda: succeed('GDQWI6FKB72DPOJE4CGYCFQZKRPQQIOYXRMZ5KEVGXMG6UUTGJMBCASH')
         self.wallet.provider = MockObject()
         self.wallet.provider.get_ledger_height = lambda: 26529414
         self.wallet.provider.get_transactions = lambda *_: []
 
-        self.assertIsNone(
-            await self.wallet.monitor_transaction('96ad71731b1b46fceb0f1c32adbcc16a93cefad1e6eb167efe8a8c8e4e0cbb98'))
+        self.assertIsNone(await self.wallet.monitor_transaction(
+            '96ad71731b1b46fceb0f1c32adbcc16a93cefad1e6eb167efe8a8c8e4e0cbb98', interval=1))
 
-    @timeout(10)
+    @timeout(5)
     async def test_monitor_transactions_not_found(self):
         """
-        Test for monitor_transactions when the transaction is found
+        Test for monitor_transactions when the transaction is not found
         """
         self.wallet.created = True
-        self.wallet.get_address = lambda: 'GBOQNX4VWQMVN6C7NB5UL2CEV6AGVTM6LWQIXDRU6OBRMUNBTOMNSOAW'
+        self.wallet.get_address = lambda: succeed('GBOQNX4VWQMVN6C7NB5UL2CEV6AGVTM6LWQIXDRU6OBRMUNBTOMNSOAW')
         self.wallet.provider = MockObject()
         self.wallet.provider.get_ledger_height = lambda: 26529414
         self.wallet.provider.get_transactions = lambda *_: []
 
-        future = self.wallet.monitor_transaction('96ad71731b1b46fceb0f1c32adbcc16a93cefad1e6eb167efe8a8c8e4e0cbb98')
+        future = self.wallet.monitor_transaction(
+            '96ad71731b1b46fceb0f1c32adbcc16a93cefad1e6eb167efe8a8c8e4e0cbb98', interval=1)
         # the monitor transaction runs every 5 secs so this should be enough
-        time.sleep(6)
+        time.sleep(2)
         self.assertFalse(future.done())
 
     async def test_transfer_no_balance(self):
@@ -230,95 +253,36 @@ class AbstractStellarWallet(metaclass=abc.ABCMeta):
                          await self.wallet.merge_account('GDQWI6FKB72DPOJE4CGYCFQZKRPQQIOYXRMZ5KEVGXMG6UUTGJMBCASH'))
 
 
-class TestStellarWallet(AbstractServer, AbstractStellarWallet):
+class TestStellarTestnetWallet(TestStellarWallet):
 
-    def setUp(self):
-        super().setUp()
-        mock = MockObject()
-        mock.get_account_sequence = lambda *_: 100
-        self.wallet = StellarWallet(self.session_base_dir, mock)
-        self.tx = Transaction(hash='96ad71731b1b46fceb0f1c32adbcc16a93cefad1e6eb167efe8a8c8e4e0cbb98',
-                              ledger_nr=26529414,
-                              date_time=datetime.fromisoformat('2020-06-05T08:45:33'),
-                              source_account='GDQWI6FKB72DPOJE4CGYCFQZKRPQQIOYXRMZ5KEVGXMG6UUTGJMBCASH',
-                              operation_count=1,
-                              transaction_envelope="AAAAAOFkeKoP9De5JOCNgRYZVF8IIdi8WZ6olTXYb1KTMlgRAAAAZAGOO"
-                                                   "+wAAAA9AAAAAQAAAAAAAAAAAAAAAAAAAAAAAAADAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-                                                   "A"
-                                                   "AAA"
-                                                   "AAAAAAAAAAAAAAABAAAAAQAAAADhZHiqD/Q3uSTgjYEWGVRfCCHYvFmeqJU12G9SkzJ"
-                                                   "YEQA"
-                                                   "AAAAAAAAAXQbflbQZVvhfaHtF6ESvgGrNnl2gi44084MWUaGbmNkAAAAAAcnDgAAAA"
-                                                   "AAAAA"
-                                                   "ABHvBc2AAAAEBUL1wo8IGHEpgpQ7llGaFE+rC9v5kk2KPJe53/gIdWF+792HYg5yT"
-                                                   "TmhJII"
-                                                   "97YgM+Be8yponPH0YjMjeYphewI",
-                              fee=100,
-                              is_pending=False,
-                              succeeded=True,
-                              sequence_number=112092925529161789,
-                              min_time_bound=datetime.fromisoformat('1970-01-01T00:00:00'))
-
-    async def tearDown(self):
-        db_session.close_all_sessions()
-        await super().tearDown()
-
-    def new_wallet(self):
-        mock = MockObject()
-        mock.get_account_sequence = lambda *_: 100
-        mock.check_account_created = lambda *_: None
-        return StellarWallet(self.session_base_dir, mock)
-
-    def test_get_identifier(self):
-        self.assertEqual('XLM', self.wallet.get_identifier())
-
-    def test_get_name(self):
-        self.assertEqual('stellar', self.wallet.get_name())
-
-    def expected_identifier(self):
-        return 'XLM'
-
-
-class TestStellarTestnetWallet(AbstractServer, AbstractStellarWallet):
     def setUp(self):
         super().setUp()
         mock = MockObject()
         mock.get_account_sequence = lambda *_: 100
         self.wallet = StellarTestnetWallet(self.session_base_dir, mock)
+        self.identifier = 'TXLM'
+        self.name = 'testnet stellar'
 
-        self.tx = Transaction(hash='96ad71731b1b46fceb0f1c32adbcc16a93cefad1e6eb167efe8a8c8e4e0cbb98',
-                              ledger_nr=26529414,
-                              date_time=datetime.fromisoformat('2020-06-05T08:45:33'),
-                              source_account='GDQWI6FKB72DPOJE4CGYCFQZKRPQQIOYXRMZ5KEVGXMG6UUTGJMBCASH',
-                              operation_count=1,
-                              transaction_envelope="AAAAAOFkeKoP9De5JOCNgRYZVF8IIdi8WZ6olTXYb1KTMlgRAAAAZAGOO"
-                                                   "+wAAAA9AAAAAQAAAAAAAAAAAAAAAAAAAAAAAAADAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-                                                   "AAAA"
-                                                   "AAAAAAAAAAAAAAABAAAAAQAAAADhZHiqD/Q3uSTgjYEWGVRfCCHYvFmeqJU12G9Skz"
-                                                   "JYEQA"
-                                                   "AAAAAAAAAXQbflbQZVvhfaHtF6ESvgGrNnl2gi44084MWUaGbmNkAAAAAAcnDgAAA"
-                                                   "AAAAAA"
-                                                   "ABHvBc2AAAAEBUL1wo8IGHEpgpQ7llGaFE+rC9v5kk2KPJe53/gIdWF+792HYg5yT"
-                                                   "TmhJII"
-                                                   "97YgM+Be8yponPH0YjMjeYphewI",
-                              fee=100,
-                              is_pending=False,
-                              succeeded=True,
-                              sequence_number=112092925529161789,
-                              min_time_bound=datetime.fromisoformat('1970-01-01T00:00:00'))
-
-    async def tearDown(self):
-        db_session.close_all_sessions()
-        await super().tearDown()
+        self.tx = Transaction(
+            hash='96ad71731b1b46fceb0f1c32adbcc16a93cefad1e6eb167efe8a8c8e4e0cbb98',
+            ledger_nr=26529414,
+            date_time=datetime.fromisoformat('2020-06-05T08:45:33'),
+            source_account='GDQWI6FKB72DPOJE4CGYCFQZKRPQQIOYXRMZ5KEVGXMG6UUTGJMBCASH',
+            operation_count=1,
+            transaction_envelope="AAAAAOFkeKoP9De5JOCNgRYZVF8IIdi8WZ6olTXYb1KTMlgRAAAAZAGOO+wAAAA9AAAAAQAAAAAAAAAA"
+                                 "AAAAAAAAAAAAAAADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAQAAAADhZHiq"
+                                 "D/Q3uSTgjYEWGVRfCCHYvFmeqJU12G9SkzJYEQAAAAAAAAAAXQbflbQZVvhfaHtF6ESvgGrNnl2gi440"
+                                 "84MWUaGbmNkAAAAAAcnDgAAAAAAAAAABHvBc2AAAAEBUL1wo8IGHEpgpQ7llGaFE+rC9v5kk2KPJe53/"
+                                 "gIdWF+792HYg5yTTmhJII97YgM+Be8yponPH0YjMjeYphewI",
+            fee=100,
+            is_pending=False,
+            succeeded=True,
+            sequence_number=112092925529161789,
+            min_time_bound=datetime.fromisoformat('1970-01-01T00:00:00')
+        )
 
     def new_wallet(self):
         mock = MockObject()
-        mock.check_account_created = lambda *_: None
         mock.get_account_sequence = lambda *_: 100
+        mock.check_account_created = lambda *_: None
         return StellarTestnetWallet(self.session_base_dir, mock)
-
-    def test_get_name(self):
-        self.assertEqual('testnet stellar', self.wallet.get_name())
-
-    def expected_identifier(self):
-        return 'TXLM'

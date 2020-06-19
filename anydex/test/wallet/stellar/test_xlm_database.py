@@ -3,7 +3,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import session as db_session
 
-from anydex.wallet.stellar.xlm_db import StellarDb, Secret, Transaction
+from anydex.wallet.stellar.xlm_database import StellarDb, Secret, Transaction
 from anydex.test.base import AbstractServer
 
 

@@ -10,7 +10,6 @@ from urllib.parse import urlparse
 from ipv8.util import fail
 
 from anydex.config import get_anydex_configuration
-from anydex.wallet.cryptocurrency import Cryptocurrency
 
 _logger = logging.getLogger(__name__)
 
@@ -46,7 +45,7 @@ class Node:
     a DefaultNode-class implementation.
     """
 
-    def __init__(self, name: str, host_config: HostConfig, source: Source, network: Cryptocurrency,
+    def __init__(self, name: str, host_config: HostConfig, source: Source, network: str,
                  latency: float, username='', password='', testnet=False):
         self.name = name
         self.host = host_config.host
@@ -63,12 +62,12 @@ class Node:
         return f'{self.name}\n' \
                f'address: {self.host}:{self.port}\n' \
                f'source: {self.source}\n' \
-               f'network: {self.network.value}\n' \
+               f'network: {self.network}\n' \
                f'latency: {self.latency}\n' \
                f'protocol: {self.protocol}'
 
 
-def create_node(network: Cryptocurrency, testnet=False) -> Node:
+def create_node(network: str, testnet=False) -> Node:
     """
     Constructs a Node from user-provided parameters if key is present in `config.py`-dictionary.
     Else: constructs Node picked from set of default nodes provided by AnyDex.
@@ -114,12 +113,12 @@ def create_node(network: Cryptocurrency, testnet=False) -> Node:
 
         try:
             if testnet:
-                network_hosts = default_hosts[network.value]['testnet']
+                network_hosts = default_hosts[network]['testnet']
                 params['testnet'] = True
             else:
-                network_hosts = default_hosts[network.value]['non_testnet']
+                network_hosts = default_hosts[network]['non_testnet']
         except KeyError:
-            return fail(CannotCreateNodeException(f'Missing default nodes for {network.value}'))
+            return fail(CannotCreateNodeException(f'Missing default nodes for {network}'))
 
         # host format: protocol://username:password@domain:port
         selected_host, latency = select_best_host(network_hosts)

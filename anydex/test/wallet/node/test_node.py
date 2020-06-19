@@ -1,7 +1,6 @@
 import unittest
 
 import anydex.wallet.node.node as node
-from anydex.wallet.cryptocurrency import Cryptocurrency
 
 
 class TestNode(unittest.TestCase):
@@ -68,7 +67,7 @@ class TestNode(unittest.TestCase):
         Verify correct instantiation of Node instance.
         """
         host_config = node.HostConfig(self.host, 80, 'https')
-        test_node = node.Node('test_node', host_config, node.Source.USER, Cryptocurrency.MONERO,
+        test_node = node.Node('test_node', host_config, node.Source.USER, 'monero',
                               20.2, 'test_username')  # leave password void
 
         self.assertEqual('', test_node.password)
@@ -80,11 +79,11 @@ class TestNode(unittest.TestCase):
         Node instance should belong to the Monero cryptocurrency.
         Verify process for many provides node hosts.
         """
-        test_node = node.create_node(Cryptocurrency.MONERO)
+        test_node = node.create_node('monero')
         self.assertEqual('', test_node.name)
         self.assertIsNotNone(test_node.host)
         self.assertIn(test_node.host, self.monero_hosts)
-        self.assertEqual(Cryptocurrency.MONERO, test_node.network)
+        self.assertEqual('monero', test_node.network)
 
     def test_create_node_default_hosts_few(self):
         """
@@ -92,14 +91,7 @@ class TestNode(unittest.TestCase):
         Node instance should belong to the Ethereum cryptocurrency.
         Verify process for just a few node hosts.
         """
-        test_node = node.create_node(Cryptocurrency.ETHEREUM)
+        test_node = node.create_node('ethereum')
         self.assertEqual('', test_node.name)
         self.assertIn(test_node.host, self.ethereum_hosts)
-        self.assertEqual(Cryptocurrency.ETHEREUM, test_node.network)
-
-    def test_create_node_non_existent_network(self):
-        """
-        Verify that `create_node` fails in case of faulty `network`.
-        """
-        with self.assertRaises(AttributeError):
-            node.create_node('test_network')
+        self.assertEqual('ethereum', test_node.network)

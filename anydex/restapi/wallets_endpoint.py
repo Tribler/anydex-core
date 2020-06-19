@@ -11,6 +11,8 @@ class WalletsEndpoint(BaseMarketEndpoint):
     """
     This class represents the root endpoint of the wallets resource.
     """
+    TRANSFER_NETWORKS = ['BTC', 'TBTC', 'LTC', 'XLT', 'DASH', 'TDASH',
+                         'ETH', 'TETH', 'IOTA', 'TIOTA', 'XMR', 'TXMR', 'XLM', 'TXLM']
 
     def setup_routes(self):
         self.app.add_routes([web.get('', self.get_wallets),
@@ -56,10 +58,11 @@ class WalletsEndpoint(BaseMarketEndpoint):
 
         async def add_wallet(wallet_id, wallet):
             balance = await wallet.get_balance()
+            address = await wallet.get_address()
             wallets[wallet_id] = {
                 'created': wallet.created,
                 'unlocked': wallet.unlocked,
-                'address': wallet.get_address(),
+                'address': address,
                 'name': wallet.get_name(),
                 'precision': wallet.precision(),
                 'min_unit': wallet.min_unit(),
@@ -172,8 +175,7 @@ class WalletsEndpoint(BaseMarketEndpoint):
             .. sourcecode:: none
 
                 curl -X POST http://localhost:8085/wallets/BTC/transfer
-                --data "amount=0.3&destination=mpC1DDgSP4PKc5HxJzQ5w9q6CGLBEQuLsN"
-
+                    --data "amount=0.3&destination=mpC1DDgSP4PKc5HxJzQ5w9q6CGLBEQuLsN"
             **Example response**:
 
             .. sourcecode:: javascript
@@ -185,9 +187,8 @@ class WalletsEndpoint(BaseMarketEndpoint):
         parameters = await request.post()
 
         identifier = request.match_info['wallet_id']
-        if identifier != "BTC" and identifier != "TBTC":
-            return Response({"error": "currently, currency transfers using the API "
-                                      "is only supported for Bitcoin"}, status=HTTP_BAD_REQUEST)
+        if identifier not in self.TRANSFER_NETWORKS:
+            return Response({"error": "unsupported currency"}, status=HTTP_BAD_REQUEST)
 
         wallet = self.get_market_community().wallets[identifier]
 

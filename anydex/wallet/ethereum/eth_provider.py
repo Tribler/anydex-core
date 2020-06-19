@@ -5,12 +5,11 @@ from time import sleep
 import requests
 from web3 import Web3
 
-from anydex.wallet.ethereum.eth_db import Transaction
+from anydex.wallet.ethereum.eth_database import Transaction
 from anydex.wallet.node.node import create_node, CannotCreateNodeException
 from anydex.wallet.provider import NotSupportedOperationException
 from anydex.wallet.provider import Provider
 from anydex.wallet.provider import RequestLimit, Blocked, RateExceeded, RequestException, ConnectionException
-from anydex.wallet.cryptocurrency import Cryptocurrency
 
 
 class EthereumProvider(Provider, metaclass=abc.ABCMeta):
@@ -516,7 +515,7 @@ class AutoEthereumProvider(EthereumProvider):
 
     def __init__(self):
         try:
-            node = create_node(Cryptocurrency.ETHEREUM)
+            node = create_node('ethereum')
             address = f'{node.host}:{node.port}' if node.port else node.host
             web3 = Web3Provider(address)
         except (ConnectionException, CannotCreateNodeException):

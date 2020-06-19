@@ -6,7 +6,7 @@ from stellar_sdk.client.response import Response
 from stellar_sdk.exceptions import NotFoundError
 
 from anydex.wallet.provider import ConnectionException, RequestException
-from anydex.wallet.stellar.xlm_db import Transaction
+from anydex.wallet.stellar.xlm_database import Transaction
 from anydex.wallet.stellar.xlm_provider import HorizonProvider
 from anydex.test.util import MockObject
 

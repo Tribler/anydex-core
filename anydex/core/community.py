@@ -13,7 +13,7 @@ from ipv8.messaging.payload_headers import BinMemberAuthenticationPayload
 from ipv8.messaging.payload_headers import GlobalTimeDistributionPayload
 from ipv8.peer import Peer
 from ipv8.requestcache import NumberCache, RandomNumberCache, RequestCache
-from ipv8.util import fail, succeed
+from ipv8.util import succeed
 
 from anydex.core import DeclineMatchReason, DeclinedTradeReason, MAX_ORDER_TIMEOUT
 from anydex.core.block import MarketBlock
@@ -43,7 +43,7 @@ from anydex.core.transaction_repository import DatabaseTransactionRepository,\
     MemoryTransactionRepository
 from anydex.core.wallet_address import WalletAddress
 from anydex.util.asyncio import call_later
-from anydex.wallet.tc_wallet import TrustchainWallet
+from anydex.wallet.trustchain.tc_wallet import TrustchainWallet
 
 
 # Message definitions
@@ -583,16 +583,16 @@ class MarketCommunity(Community, BlockListener):
         """
         return self.my_estimated_lan if self.use_local_address else self.my_estimated_wan
 
-    def get_order_addresses(self, order):
+    async def get_order_addresses(self, order):
         """
         Return a tuple of incoming and outgoing payment address of an order.
         """
         if order.is_ask():
-            return (WalletAddress(self.wallets[order.assets.second.asset_id].get_address()),
-                    WalletAddress(self.wallets[order.assets.first.asset_id].get_address()))
+            return (WalletAddress(await self.wallets[order.assets.second.asset_id].get_address()),
+                    WalletAddress(await self.wallets[order.assets.first.asset_id].get_address()))
         else:
-            return (WalletAddress(self.wallets[order.assets.first.asset_id].get_address()),
-                    WalletAddress(self.wallets[order.assets.second.asset_id].get_address()))
+            return (WalletAddress(await self.wallets[order.assets.first.asset_id].get_address()),
+                    WalletAddress(await self.wallets[order.assets.second.asset_id].get_address()))
 
     def match_order_ids(self, order_ids):
         """
@@ -1615,7 +1615,7 @@ class MarketCommunity(Community, BlockListener):
         if not order:
             return
 
-        incoming_address, outgoing_address = self.get_order_addresses(order)
+        incoming_address, outgoing_address = await self.get_order_addresses(order)
 
         # Create a tx_init block to capture that we are going to initiate a transaction
         transaction = await self.create_new_tx_init_block(peer, accepted_trade)
@@ -1696,7 +1696,7 @@ class MarketCommunity(Community, BlockListener):
 
         if not transaction.sent_wallet_info:
             order = self.order_manager.order_repository.find_by_id(transaction.order_id)
-            incoming_address, outgoing_address = self.get_order_addresses(order)
+            incoming_address, outgoing_address = await self.get_order_addresses(order)
             self.send_wallet_info(transaction, incoming_address, outgoing_address)
         else:
             self.logger.info("Wallet info exchanged for transaction %s - starting payments",
@@ -1733,7 +1733,7 @@ class MarketCommunity(Community, BlockListener):
             return
 
         payment = Payment(TraderId(self.mid), transaction.transaction_id, transfer_amount,
-                          wallet.get_address(), str(transaction.partner_incoming_address), PaymentId(txid),
+                          wallet.get_address().result(), str(transaction.partner_incoming_address), PaymentId(txid),
                           Timestamp.now())
 
         # Add it to the transaction

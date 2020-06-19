@@ -1,4 +1,5 @@
 import time
+from abc import ABCMeta
 from asyncio.futures import Future
 from decimal import Decimal
 
@@ -9,11 +10,10 @@ import monero.wallet
 from monero.backends.jsonrpc import JSONRPCWallet
 from monero.transaction import OutgoingPayment, Payment
 
-from anydex.wallet.cryptocurrency import Cryptocurrency
 from anydex.wallet.wallet import Wallet, InsufficientFunds
 
 
-class MoneroWallet(Wallet):
+class AbstractMoneroWallet(Wallet, metaclass=ABCMeta):
     """
     This class is responsible for handling your Monero wallet.
     The class operates on the Monero wallet connected to the `monero-wallet-rpc` server.
@@ -23,17 +23,15 @@ class MoneroWallet(Wallet):
     NOTE: no support for account management or multiple accounts as of yet.
     """
 
-    TESTNET = False
+    def __init__(self, testnet, host: str, port: int):
+        super(AbstractMoneroWallet, self).__init__()
 
-    def __init__(self, host: str = '127.0.0.1', port: int = 18081):
-        super().__init__()
-
-        self.network = 'testnet' if self.TESTNET else Cryptocurrency.MONERO.value
-        self.min_confirmations = 0
+        self.network = 'monero_testnet' if testnet else 'monero'
+        self.wallet_name = f'tribler_{self.network}'
+        self.testnet = testnet
         self.unlocked = True
-        # set internal name, irrelevant with regards to actual wallet name
-        self.wallet_name = 'tribler_testnet' if self.TESTNET else 'tribler'
 
+        self.min_confirmations = 0
         self.host = host
         self.port = port
 
@@ -53,9 +51,6 @@ class MoneroWallet(Wallet):
             except requests.exceptions.ConnectionError:
                 pass
         return False
-
-    def get_name(self):
-        return Cryptocurrency.MONERO.value
 
     def create_wallet(self):
         """
@@ -82,21 +77,21 @@ class MoneroWallet(Wallet):
                     In case wallet does not exist yet, return balance of 0.
                     Convert Monero Decimal output to float.
         """
-        if self._wallet_connection_alive():
-            unlocked_balance = self.wallet.balance(unlocked=True)
-            total_balance = self.wallet.balance(unlocked=False)
-
-            balance = {
-                'available': float(unlocked_balance),  # convert Decimal to float
-                'pending': float(total_balance - unlocked_balance),
-                'currency': 'XMR',
+        if not self._wallet_connection_alive():
+            return succeed({
+                'available': 0,
+                'pending': 0,
+                'currency': self.get_identifier(),
                 'precision': self.precision()
-            }
-            return succeed(balance)
+            })
+
+        unlocked_balance = self.wallet.balance(unlocked=True)
+        total_balance = self.wallet.balance(unlocked=False)
+
         return succeed({
-            'available': 0,
-            'pending': 0,
-            'currency': 'XMR',
+            'available': float(unlocked_balance),  # convert Decimal to float
+            'pending': float(total_balance - unlocked_balance),
+            'currency': self.get_identifier(),
             'precision': self.precision()
         })
 
@@ -122,7 +117,7 @@ class MoneroWallet(Wallet):
                 return fail(InsufficientFunds('Insufficient funds found in Monero wallet'))
 
             self._logger.info('Transfer %f to %s', amount, address)
-            transaction = self.wallet.transfer(address, Decimal(str(amount)), **kwargs, relay=False)
+            transaction = await self.wallet.transfer(address, Decimal(str(amount)), **kwargs, relay=False)
             return succeed(transaction.hash)
         return succeed(None)
 
@@ -143,7 +138,7 @@ class MoneroWallet(Wallet):
             return fail(InsufficientFunds('Insufficient funds found in Monero wallet for all transfers'))
 
         if self._wallet_connection_alive():
-            results = self.wallet.transfer_multiple(transfers, **kwargs)
+            results = await self.wallet.transfer_multiple(transfers, **kwargs)
             hashes = [result[0].hash for result in results]
             return succeed(hashes)
         return fail(WalletConnectionError('No connection to wallet for making transfers'))
@@ -153,9 +148,35 @@ class MoneroWallet(Wallet):
         If wallet exists or connection is alive, return address.
         """
         if self._wallet_connection_alive():
-            return self.wallet.address()
+            return succeed(self.wallet.address())
         else:
-            return ''
+            return succeed('')
+
+    def get_integrated_address(self, payment_id) -> monero.address.IntegratedAddress:
+        """
+        Get integrated address from `get_address` and `payment_id` parameter.
+        :param payment_id: payment_id to include into address
+                    PaymentID must be either an int or hexadecimal string, or bytes
+        :return: integrated address
+        """
+        address = self.wallet.address()
+        return address.with_payment_id(payment_id)
+
+    def generate_subaddress(self) -> monero.address.SubAddress:
+        """
+        Generate a new subaddress in main wallet account.
+        NOTE: no support for account management or multiple accounts yet.
+        :return: subaddress in main wallet account: str
+        """
+        address, _ = self.wallet.new_address()
+        return address
+
+    def get_addresses(self) -> list:
+        """
+        Return list of all addresses contained in this main wallet account.
+        :return: list of `monero.address.Address`.
+        """
+        return self.wallet.addresses()
 
     async def get_transactions(self):
         """
@@ -231,16 +252,6 @@ class MoneroWallet(Wallet):
             return succeed(self.wallet.outgoing(confirmed=confirmed, unconfirmed=(not confirmed)))
         return fail(WalletConnectionError())
 
-    def min_unit(self):
-        # atomic unit: single piconero
-        return 1
-
-    def precision(self):
-        return 12
-
-    def get_identifier(self):
-        return 'XMR'
-
     def get_confirmations(self, transaction: Payment):
         """
         Return number of confirmations transactions has received.
@@ -252,56 +263,33 @@ class MoneroWallet(Wallet):
             return succeed(self.wallet.confirmations(transaction))
         return fail(WalletConnectionError())
 
-    def monitor_transaction(self, txid):
-        """
-        Blockchain is used to retrieve all transactions related to wallet.
-        No need for database and `monitor_transaction` method to store historical transactions.
+    def min_unit(self):
+        return 1  # atomic unit: single piconero
 
-        :param txid: transaction id
-        """
-
-    def get_integrated_address(self, payment_id) -> monero.address.IntegratedAddress:
-        """
-        Get integrated address from `get_address` and `payment_id` parameter.
-
-        :param payment_id: payment_id to include into address
-                    PaymentID must be either an int or hexadecimal string, or bytes
-        :return: integrated address
-        """
-        address = self.wallet.address()
-        return address.with_payment_id(payment_id)
-
-    def generate_subaddress(self) -> monero.address.SubAddress:
-        """
-        Generate a new subaddress in main wallet account.
-        NOTE: no support for account management or multiple accounts yet.
-
-        :return: subaddress in main wallet account: str
-        """
-        address, _ = self.wallet.new_address()
-        return address
-
-    def get_addresses(self) -> list:
-        """
-        Return list of all addresses contained in this main wallet account.
-
-        :return: list of `monero.address.Address`.
-        """
-        return self.wallet.addresses()
+    def precision(self):
+        return 12
 
 
-class MoneroTestnetWallet(MoneroWallet):
-    """
-    This wallet represents a wallet or account in the Monero testnet.
-    """
+class MoneroWallet(AbstractMoneroWallet):
+    def __init__(self, host: str = '127.0.0.1', port: int = 18081):
+        super(MoneroWallet, self).__init__(False, host, port)
 
-    TESTNET = True
+    def get_identifier(self):
+        return 'XMR'
 
     def get_name(self):
-        return 'Testnet XMR'
+        return 'monero'
+
+
+class MoneroTestnetWallet(AbstractMoneroWallet):
+    def __init__(self, host: str = '127.0.0.1', port: int = 18081):
+        super(MoneroTestnetWallet, self).__init__(True, host, port)
 
     def get_identifier(self):
         return 'TXMR'
+
+    def get_name(self):
+        return 'testnet monero'
 
 
 class NotSupportedOperationException(Exception):

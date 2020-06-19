@@ -1,15 +1,12 @@
-import abc
-from abc import ABCMeta
-
 import os
 import time
 
-from asyncio import Future
 from binascii import hexlify
 from configparser import ConfigParser
 
+from bitcoinlib.wallets import wallet_exists, HDWallet, WalletError, DbTransaction, DbTransactionInput
+from bitcoinlib.transactions import Transaction
 from ipv8.util import fail, succeed
-from bitcoinlib.wallets import wallet_exists, HDWallet, WalletError
 
 from anydex.wallet.wallet import InsufficientFunds, Wallet
 
@@ -22,27 +19,30 @@ class UnsupportedNetwork(Exception):
         super(UnsupportedNetwork, self).__init__(f'Network {network} is not supported.')
 
 
+SUPPORTED_NETWORKS = ['bitcoin', 'litecoin', 'dash', 'testnet', 'litecoin_testnet', 'dash_testnet']
+
+
 class BitcoinlibWallet(Wallet):
     """
     Superclass used for the implementation of bitcoinlib wallets.
     """
 
-    SUPPORTED_NETWORKS = ['bitcoin', 'litecoin', 'dash', 'litecoin_testnet', 'dash_testnet', 'testnet']
-
-    def __init__(self, wallet_dir, testnet, network, name, currency):
-        if network not in self.SUPPORTED_NETWORKS:
+    def __init__(self, wallet_dir, testnet, network, currency):
+        if network not in SUPPORTED_NETWORKS:
             raise UnsupportedNetwork(network)
+
         super(BitcoinlibWallet, self).__init__()
-        self.testnet = testnet
+
         self.network = network
+        self.wallet_name = f'tribler_{self.network}'
+        self.testnet = testnet
+        self.unlocked = True
+
         self.currency = currency
-        self.name = name
         self.wallet_dir = wallet_dir
         self.min_confirmations = 0
         self.wallet = None
-        self.unlocked = True
         self.db_path = os.path.join(wallet_dir, 'wallets.sqlite')
-        self.wallet_name = f'tribler_testnet_{network}' if self.testnet else 'tribler_' + network
 
         if wallet_exists(self.wallet_name, db_uri=self.db_path):
             self.wallet = HDWallet(self.wallet_name, db_uri=self.db_path)
@@ -52,7 +52,7 @@ class BitcoinlibWallet(Wallet):
 
     def cfg_init(self):
         """
-        Adjusts the bitcoinlib configuration for the creation of a wallet
+        Adjusts the bitcoinlib configuration for the creation of a wallet.
         """
         config = ConfigParser()
 
@@ -74,15 +74,16 @@ class BitcoinlibWallet(Wallet):
         # common['service_caching_enabled'] = 'True'
 
         config['logs'] = {}
-        # logs = config['logs']
-        # logs['enable_bitcoinlib_logging'] = 'True'
-        # logs['loglevel'] = 'WARNING'
+        logs = config['logs']
+        logs['enable_bitcoinlib_logging'] = 'False'
+        logs['loglevel'] = 'INFO'
 
         return config
 
     def lib_init(self):
-        """Initializes bitcoinlib by creating a configuration file and
-        Setting the environmental variable.
+        """
+        Initializes bitcoinlib by creating a configuration file and
+        setting the environmental variable.
         """
         cfg_name = 'bcl_config.ini'
 
@@ -92,14 +93,14 @@ class BitcoinlibWallet(Wallet):
 
         os.environ['BCL_CONFIG_FILE'] = os.path.abspath(cfg_name)
 
-    def get_name(self):
-        return self.name
-
     def get_identifier(self):
         return self.currency
 
+    def get_name(self):
+        return self.network
+
     def create_wallet(self):
-        if wallet_exists(self.wallet_name, db_uri=self.db_path):
+        if self.created:
             return fail(RuntimeError(f"{self.network} wallet with name {self.wallet_name} already exists."))
 
         self._logger.info("Creating wallet in %s", self.wallet_dir)
@@ -114,61 +115,46 @@ class BitcoinlibWallet(Wallet):
         return succeed(None)
 
     def get_balance(self):
-        if self.created:
-            self.wallet.utxos_update(networks=self.network)
+        if not self.created:
             return succeed({
-                "available": self.wallet.balance(network=self.network),
+                "available": 0,
                 "pending": 0,
                 "currency": self.currency,
                 "precision": self.precision()
             })
 
-        return succeed({"available": 0, "pending": 0, "currency": self.currency, "precision": self.precision()})
+        self.wallet.utxos_update(networks=self.network)
+
+        return succeed({
+            "available": self.wallet.balance(network=self.network),
+            "pending": 0,
+            "currency": self.currency,
+            "precision": self.precision()
+        })
 
     async def transfer(self, amount, address):
         balance = await self.get_balance()
 
         if balance['available'] >= int(amount):
-            self._logger.info("Creating %s payment with amount %f to address %s",
-                              self.network, amount, address)
+            self._logger.info("Creating %s payment with amount %d to address %s",
+                              self.network, int(amount), address)
             tx = self.wallet.send_to(address, int(amount))
             return str(tx.hash)
         raise InsufficientFunds("Insufficient funds")
 
-    def monitor_transaction(self, txid):
-        """
-        Monitor a given transaction ID. Returns a Deferred that fires when the transaction is present.
-        """
-        monitor_future = Future()
-
-        async def monitor():
-            transactions = await self.get_transactions()
-            for transaction in transactions:
-                if transaction['id'] == txid:
-                    self._logger.debug("Found transaction with id %s", txid)
-                    monitor_future.set_result(None)
-                    monitor_task.cancel()
-
-        self._logger.debug("Start polling for transaction %s", txid)
-        monitor_task = self.register_task(f"{self.name}_poll_{txid}", monitor, interval=5)
-
-        return monitor_future
-
     def get_address(self):
         if not self.created:
-            return ''
-        return self.wallet.keys(name='tribler_payments', is_active=False)[0].address
+            return succeed('')
+        return succeed(self.wallet.keys(name='tribler_payments', is_active=False)[-1].address)
 
     def get_transactions(self):
         if not self.created:
             return succeed([])
 
-        from bitcoinlib.transactions import Transaction
-        from bitcoinlib.wallets import DbTransaction, DbTransactionInput
-
         # Update all transactions
         self.wallet.transactions_update(network=self.network)
 
+        # TODO: 'Access to a protected member _session of a class'
         txs = self.wallet._session.query(DbTransaction.raw, DbTransaction.confirmations,
                                          DbTransaction.date, DbTransaction.fee) \
             .filter(DbTransaction.wallet_id == self.wallet.wallet_id) \
@@ -222,49 +208,82 @@ class BitcoinlibWallet(Wallet):
         return succeed(transactions_list)
 
     def min_unit(self):
-        return 100000  # For LTC, BTC and DASH, the minimmum trade should be 100.000 basic units (Satoshi, duffs)
+        return 100000  # For LTC, BTC and DASH, the minimum trade should be 100.000 basic units (Satoshi, duffs)
 
     def precision(self):
         return 8       # The precision for LTC, BTC and DASH is the same.
 
-    @abc.abstractmethod
     def is_testnet(self):
-        return
+        return self.testnet
 
 
-class ConcreteBitcoinlibWallet(BitcoinlibWallet):
+class BitcoinWallet(BitcoinlibWallet):
     """
-    Superclass for all concrete wallets, from which real assets can be traded.
+    This class is responsible for handling your bitcoin wallet.
     """
-    NETWORK_INFO = {
-        'bitcoin': ['Bitcoin', 'BTC'],
-        'litecoin': ['Litecoin Network', 'LTC'],
-        'dash': ['Dash Network', 'DASH']
-    }
-
-    def is_testnet(self):
-        return False
-
-    def __init__(self, wallet_dir, network):
-        super(ConcreteBitcoinlibWallet, self)\
-            .__init__(wallet_dir, False, network, self.NETWORK_INFO[network][0], self.NETWORK_INFO[network][1])
+    def __init__(self, wallet_dir):
+        super(BitcoinWallet, self)\
+            .__init__(wallet_dir=wallet_dir,
+                      testnet=False,
+                      network='bitcoin',
+                      currency='BTC')
 
 
-class TestnetBitcoinlibWallet(BitcoinlibWallet, metaclass=ABCMeta):
+class LitecoinWallet(BitcoinlibWallet):
     """
-    Superclass for all testnet wallets, from which testnet assets can be traded.
+    This class is responsible for handling your litecoin wallet.
     """
+    def __init__(self, wallet_dir):
+        super(LitecoinWallet, self) \
+            .__init__(wallet_dir=wallet_dir,
+                      testnet=False,
+                      network='litecoin',
+                      currency='LTC')
 
-    # Names of the networks and identifiers are mirroring those of bitcoinlib
-    NETWORK_INFO = {
-        'testnet': ['Bitcoin Test Network 3', 'TBTC'],
-        'litecoin_testnet': ['Litecoin Test Network', 'XLT'],
-        'dash_testnet': ['Dash Testnet Network', 'tDASH']
-    }
 
-    def is_testnet(self):
-        return True
+class DashWallet(BitcoinlibWallet):
+    """
+    This class is responsible for handling your dash wallet.
+    """
+    def __init__(self, wallet_dir):
+        super(DashWallet, self) \
+            .__init__(wallet_dir=wallet_dir,
+                      testnet=False,
+                      network='dash',
+                      currency='DASH')
 
-    def __init__(self, wallet_dir, network):
-        super(TestnetBitcoinlibWallet, self)\
-            .__init__(wallet_dir, True, network, self.NETWORK_INFO[network][0], self.NETWORK_INFO[network][1])
+
+class BitcoinTestnetWallet(BitcoinlibWallet):
+    """
+    This class is responsible for handling your bitcoin testnet wallet.
+    """
+    def __init__(self, wallet_dir):
+        super(BitcoinTestnetWallet, self)\
+            .__init__(wallet_dir=wallet_dir,
+                      testnet=True,
+                      network='testnet',
+                      currency='TBTC')
+
+
+class LitecoinTestnetWallet(BitcoinlibWallet):
+    """
+    This class is responsible for handling your litecoin testnet wallet.
+    """
+    def __init__(self, wallet_dir):
+        super(LitecoinTestnetWallet, self) \
+            .__init__(wallet_dir=wallet_dir,
+                      testnet=True,
+                      network='litecoin_testnet',
+                      currency='XLT')
+
+
+class DashTestnetWallet(BitcoinlibWallet):
+    """
+    This class is responsible for handling your dash testnet wallet.
+    """
+    def __init__(self, wallet_dir):
+        super(DashTestnetWallet, self) \
+            .__init__(wallet_dir=wallet_dir,
+                      testnet=True,
+                      network='dash_testnet',
+                      currency='TDASH')

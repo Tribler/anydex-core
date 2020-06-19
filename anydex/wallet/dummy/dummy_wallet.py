@@ -58,24 +58,24 @@ class BaseDummyWallet(Wallet):
         })
         return str(quantity)
 
-    def monitor_transaction(self, transaction_id):
+    def monitor_transaction(self, txid, **kwargs):
         """
         Monitor an incoming transaction with a specific ID.
         """
         def on_transaction_done():
             self.transaction_history.append({
-                'id': transaction_id,
+                'id': txid,
                 'outgoing': True,
                 'from': '',
                 'to': self.address,
-                'amount': float(str(transaction_id)),
+                'amount': float(str(txid)),
                 'fee_amount': 0.0,
                 'currency': self.get_identifier(),
                 'timestamp': '',
                 'description': ''
             })
 
-            self.balance += float(str(transaction_id))  # txid = amount of money transferred
+            self.balance += float(str(txid))  # txid = amount of money transferred
 
         if self.MONITOR_DELAY == 0:
             return succeed(on_transaction_done())
@@ -83,7 +83,7 @@ class BaseDummyWallet(Wallet):
             return self.register_anonymous_task('monitor_transaction', on_transaction_done, delay=self.MONITOR_DELAY)
 
     def get_address(self):
-        return self.address
+        return succeed(self.address)
 
     def get_transactions(self):
         return succeed(self.transaction_history)

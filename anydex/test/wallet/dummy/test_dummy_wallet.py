@@ -1,8 +1,6 @@
-from asyncio import Future
-
 from anydex.test.base import AbstractServer
 from anydex.test.util import timeout
-from anydex.wallet.dummy_wallet import BaseDummyWallet, DummyWallet1, DummyWallet2
+from anydex.wallet.dummy.dummy_wallet import BaseDummyWallet, DummyWallet1, DummyWallet2
 from anydex.wallet.wallet import InsufficientFunds
 
 
@@ -84,7 +82,7 @@ class TestDummyWallet(AbstractServer):
         """
         Test the address of a dummy wallet
         """
-        self.assertIsInstance(self.dummy_wallet.get_address(), str)
+        self.assertIsInstance(self.dummy_wallet.get_address().result(), str)
 
     @timeout(10)
     async def test_get_transaction(self):

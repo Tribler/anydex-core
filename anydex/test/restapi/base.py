@@ -9,7 +9,7 @@ from ipv8.test.mocking.ipv8 import MockIPv8
 from anydex.core.community import MarketCommunity
 from anydex.restapi.rest_manager import RESTManager
 from anydex.test.util import get_random_port
-from anydex.wallet.dummy_wallet import DummyWallet1, DummyWallet2
+from anydex.wallet.dummy.dummy_wallet import DummyWallet1, DummyWallet2
 
 
 def urlencode(data):

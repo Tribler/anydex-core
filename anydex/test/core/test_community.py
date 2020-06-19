@@ -16,8 +16,8 @@ from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
 from anydex.core.transaction import Transaction, TransactionId
 from anydex.test.util import MockObject, timeout
-from anydex.wallet.dummy_wallet import DummyWallet1, DummyWallet2
-from anydex.wallet.tc_wallet import TrustchainWallet
+from anydex.wallet.dummy.dummy_wallet import DummyWallet1, DummyWallet2
+from anydex.wallet.trustchain.tc_wallet import TrustchainWallet
 
 
 class TestMarketCommunityBase(TestBase):

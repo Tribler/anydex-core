@@ -4,7 +4,7 @@ from unittest import TestCase
 import responses
 
 from anydex.test.util import MockObject
-from anydex.wallet.ethereum.eth_db import Transaction
+from anydex.wallet.ethereum.eth_database import Transaction
 from anydex.wallet.ethereum.eth_provider import EthereumBlockchairProvider, EthereumBlockcypherProvider, \
     AutoEthereumProvider, EtherscanProvider
 from anydex.wallet.provider import *

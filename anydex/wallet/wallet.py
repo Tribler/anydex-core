@@ -2,6 +2,7 @@ import abc
 import logging
 import random
 import string
+from asyncio import Future
 
 from ipv8.taskmanager import TaskManager
 
@@ -22,6 +23,7 @@ class Wallet(TaskManager, metaclass=abc.ABCMeta):
         self._logger = logging.getLogger(self.__class__.__name__)
         self.created = False
         self.unlocked = False
+        self.network = None
 
     def generate_txid(self, length=10):
         """
@@ -69,9 +71,21 @@ class Wallet(TaskManager, metaclass=abc.ABCMeta):
         """
         return
 
-    @abc.abstractmethod
-    def monitor_transaction(self, txid):
+    def monitor_transaction(self, txid, interval=5, field='id'):
         """
         Monitor a given transaction ID. Returns a Deferred that fires when the transaction is present.
         """
-        return
+        monitor_future = Future()
+
+        async def monitor():
+            transactions = await self.get_transactions()
+            for transaction in transactions:
+                if transaction[field] == txid:
+                    self._logger.debug("Found transaction with id %s", txid)
+                    monitor_future.set_result(None)
+                    monitor_task.cancel()
+
+        self._logger.debug("Start polling for transaction %s", txid)
+        monitor_task = self.register_task(f"{self.network}_poll_{txid}", monitor, interval=interval)
+
+        return monitor_future

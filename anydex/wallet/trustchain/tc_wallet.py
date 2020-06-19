@@ -136,7 +136,7 @@ class TrustchainWallet(Wallet, BlockListener):
         return monitor_future
 
     def get_address(self):
-        return b64encode(self.trustchain.my_peer.public_key.key_to_bin()).decode('utf-8')
+        return succeed(b64encode(self.trustchain.my_peer.public_key.key_to_bin()).decode('utf-8'))
 
     def get_transactions(self):
         return succeed(self.transaction_history)
