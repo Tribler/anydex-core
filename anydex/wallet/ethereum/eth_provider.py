@@ -162,34 +162,6 @@ class EthereumBlockchairProvider(EthereumProvider):
         response = self.send_request(f"/dashboards/address/{address}")
         return int(response.json()["data"][address.lower()]["address"]["balance"])
 
-    def get_transaction_count(self, address):
-        # Todo: return also unconfirmed txs
-        response = self.send_request(f"/dashboards/address/{address}")
-        return response.json()["data"][address.lower()]["address"]["transaction_count"]
-
-    # def estimate_gas(self, tx):
-    #     # Todo estimate the gas better or just set to the max for smiple transactions (21000)
-    #     response = self.send_request("/stats")
-    #     return response.json()["data"]["median_simple_transaction_fee_24h"]
-
-    def get_gas_price(self):
-        response = self.send_request("/stats")
-        return response.json()["data"]["mempool_median_gas_price"]
-
-    def submit_transaction(self, raw_tx):
-        response = self.send_request("/push/transactions", data={"data": raw_tx}, method="post")
-        return response.json()["data"]["transaction_hash"]
-
-    def get_transactions_received(self, address):
-        response = self.send_request("/transactions", data={"q": f"recipient({address})"})
-        response_mempool = self.send_request("/mempool/transactions", data={"q": f"recipient({address})"})
-        txs = response.json()["data"] + response_mempool.json()["data"]
-        return self._normalize_transactions(txs)
-
-    def get_transactions(self, address):
-        response = self.send_request(f'/dashboards/address/{address}')
-        return int(response.json()['data'][address.lower()]['address']['balance'])
-
     def get_latest_blocknr(self):
         response = self.send_request('/stats')
         return response.json()['data']['best_block_height']
@@ -199,7 +171,7 @@ class EthereumBlockchairProvider(EthereumProvider):
         return response.json()['data'][address.lower()]['address']['transaction_count']
 
     # def estimate_gas(self, tx):
-    #     # Todo estimate the gas better or just set to the max for smiple transactions (21000)
+    #     # Todo estimate the gas better or just set to the max for simple transactions (21000)
     #     response = self.send_request('/stats')
     #     return response.json()['data']['median_simple_transaction_fee_24h']
 
@@ -213,16 +185,13 @@ class EthereumBlockchairProvider(EthereumProvider):
 
     def get_transactions_received(self, address, start_block=None, end_block=None):
         response = self.send_request('/transactions', data={'q': f'recipient({address})'})
-        response_mempool = self.send_request('/mempool/transactions', data={'q': f'recipient({address})'})
-        txs = response.json()['data'] + response_mempool.json()['data']
+        txs = response.json()['data']
         return self._normalize_transactions(txs)
 
     def get_transactions(self, address, start_block=None, end_block=None):
         sent = self.send_request('/transactions', data={'q': f'sender({address})'})
         sent_data = sent.json()['data']
-        sent_mempool = self.send_request('/mempool/transactions', data={'q': f'sender({address})'})
-        sent_mempool_data = sent_mempool.json()['data']
-        txs = sent_data + sent_mempool_data
+        txs = sent_data
         return self._normalize_transactions(txs) + self.get_transactions_received(address)
 
     def _check_response(self, response):
@@ -254,8 +223,10 @@ class EthereumBlockchairProvider(EthereumProvider):
         """
         normalized_txs = []
         for tx in txs:
+            if tx['input_hex'] not in ['0x', '']:  # We only care about ether transactions here
+                continue
             normalized_txs.append(self._normalize_transaction(tx))
-        return normalized_txs
+        return list(set(normalized_txs))  # https://stackoverflow.com/questions/7961363/removing-duplicates-in-lists
 
     def _normalize_transaction(self, tx) -> Transaction:
         """
@@ -469,7 +440,7 @@ class EtherscanProvider(EthereumProvider):
         normalized_txs = []
         for tx in txs:
             normalized_txs.append(self._normalize_transaction(tx))
-        return normalized_txs
+        return list(set(normalized_txs))  # duplicates
 
     def _normalize_transaction(self, tx) -> Transaction:
         """
@@ -516,22 +487,22 @@ class AutoEthereumProvider(EthereumProvider):
     def __init__(self):
         try:
             node = create_node('ethereum')
-            address = f'{node.host}:{node.port}' if node.port else node.host
-            web3 = Web3Provider(address)
+            address = f'{node.protocol}://{node.host}:{node.port}' if node.port else f'{node.protocol}://{node.host}'
+            self.web3 = Web3Provider(address)
         except (ConnectionException, CannotCreateNodeException):
-            web3 = None
+            self.web3 = None
 
-        blockchair = EthereumBlockchairProvider()
-        blockcypher = EthereumBlockcypherProvider()
-        etherscan = EtherscanProvider()
+        self.blockchair = EthereumBlockchairProvider()
+        self.blockcypher = EthereumBlockcypherProvider()
+        self.etherscan = EtherscanProvider()
         self.providers = {
-            'get_transaction_count': [web3, etherscan, blockcypher, blockchair],
-            'get_gas_price': [web3, etherscan, blockcypher, blockchair],
-            'get_transactions': [blockchair, etherscan],
-            'get_transactions_received': [blockchair],
-            'get_latest_blocknr': [web3, blockcypher, etherscan, blockchair],
-            'submit_transaction': [web3, etherscan, blockchair],
-            'get_balance': [web3, etherscan, blockcypher, blockchair]
+            'get_transaction_count': [self.web3, self.etherscan, self.blockcypher, self.blockchair],
+            'get_gas_price': [self.web3, self.etherscan, self.blockcypher, self.blockchair],
+            'get_transactions': [self.blockchair, self.etherscan],
+            'get_transactions_received': [self.blockchair],
+            'get_latest_blocknr': [self.web3, self.blockcypher, self.etherscan, self.blockchair],
+            'submit_transaction': [self.web3, self.etherscan, self.blockchair],
+            'get_balance': [self.web3, self.etherscan, self.blockcypher, self.blockchair]
         }
 
     def _make_request(self, fun, *args, **kwargs):
@@ -588,23 +559,20 @@ class AutoTestnetEthereumProvider(AutoEthereumProvider):
     """
 
     def __init__(self):
-        # try:
-        #     node = create_node(Cryptocurrency.ETHEREUM)
-        #     address = f"{node.host}:{node.port}" if node.port else node.host
-        #     web3 = Web3Provider(address)
-        # except (ConnectionException, CannotCreateNodeException):
-        #     web3 = None
+        try:
+            node = create_node('ethereum', True)
+            address = f'{node.protocol}://{node.host}:{node.port}' if node.port else f'{node.protocol}://{node.host}'
+            self.web3 = Web3Provider(address)
+        except (ConnectionException, CannotCreateNodeException):
+            self.web3 = None
 
-        # blockchair = EthereumBlockchairProvider()
-        # blockcypher = EthereumBlockcypherProvider(network="testnet")
-        web3 = Web3Provider('https://ropsten-rpc.linkpool.io/')  # Todo fix config so we don't have to hardcode this.
-        etherscan = EtherscanProvider('testnet')
+        self.etherscan = EtherscanProvider('testnet')
         self.providers = {
-            'get_transaction_count': [web3, etherscan],
-            'get_gas_price': [web3, etherscan],
-            'get_transactions': [etherscan],
+            'get_transaction_count': [self.web3, self.etherscan],
+            'get_gas_price': [self.web3, self.etherscan],
+            'get_transactions': [self.etherscan],
             'get_transactions_received': [],
-            'get_latest_blocknr': [web3, etherscan],
-            'submit_transaction': [web3, etherscan],
-            'get_balance': [web3, etherscan]
+            'get_latest_blocknr': [self.web3, self.etherscan],
+            'submit_transaction': [self.web3, self.etherscan],
+            'get_balance': [self.web3, self.etherscan]
         }

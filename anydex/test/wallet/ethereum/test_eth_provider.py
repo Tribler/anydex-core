@@ -11,7 +11,7 @@ from anydex.wallet.provider import *
 
 
 class TestEthereumBlockChairProvider(TestCase):
-    sample_transactions_repsonse = {
+    sample_transactions_response = {
         'data': [
             {
                 'block_id': 46147,
@@ -200,34 +200,10 @@ class TestEthereumBlockChairProvider(TestCase):
                            is_pending=False,
                            value=31337,
                            block_number=46147),
-               Transaction(hash='0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060',
-                           date_time=datetime(2015, 8, 7, 3, 30, 33),
-                           from_='0xa1e4380a3b1f749673e270229993ee55f35663b4',
-                           to='0x5df9b87991262f6ba471f09758cde1c0fc1de734',
-                           gas=21000,
-                           gas_price=50000000000000,
-                           nonce=0,
-                           is_pending=False,
-                           value=31337,
-                           block_number=46147),
-               Transaction(hash='0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060',
-                           date_time=datetime(2015, 8, 7, 3, 30, 33),
-                           from_='0xa1e4380a3b1f749673e270229993ee55f35663b4',
-                           to='0x5df9b87991262f6ba471f09758cde1c0fc1de734',
-                           gas=21000,
-                           gas_price=50000000000000,
-                           nonce=0,
-                           is_pending=False,
-                           value=31337,
-                           block_number=46147)
                ]
         responses.add(responses.GET,
                       f'{self.bcp.base_url}/transactions',
-                      json=self.sample_transactions_repsonse)
-        responses.add(responses.GET,
-                      f'{self.bcp.base_url}/mempool/transactions',
-                      json=self.sample_transactions_repsonse)
-
+                      json=self.sample_transactions_response)
         self.assertEqual(txs,
                          self.bcp.get_transactions('0xa1e4380a3b1f749673e270229993ee55f35663b4'))
 

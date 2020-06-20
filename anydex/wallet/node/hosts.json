@@ -10,7 +10,6 @@
       "http://node.supportxmr.com:18081"
     ],
     "testnet": [
-
     ]
   },
   "ethereum": {
@@ -19,7 +18,7 @@
       "https://main-rpc.linkpool.io/"
     ],
     "testnet": [
-
+      "https://ropsten-rpc.linkpool.io/"
     ]
   },
   "bitcoin": {

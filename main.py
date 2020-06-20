@@ -121,9 +121,9 @@ class AnyDexService(object):
         # self.wallets[dash_testnet_wallet.get_identifier()] = dash_testnet_wallet
 
         # Initialize ethereum wallets
-        # eth_wallet = EthereumWallet(os.path.join(options.statedir, 'sqlite'))
-        # eth_wallet.create_wallet()
-        # self.wallets[eth_wallet.get_identifier()] = eth_wallet
+        eth_wallet = EthereumWallet(os.path.join(options.statedir, 'sqlite'))
+        eth_wallet.create_wallet()
+        self.wallets[eth_wallet.get_identifier()] = eth_wallet
 
         eth_testnet_wallet = EthereumTestnetWallet(os.path.join(options.statedir, 'sqlite'))
         eth_testnet_wallet.create_wallet()

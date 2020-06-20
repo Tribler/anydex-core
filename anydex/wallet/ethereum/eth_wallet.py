@@ -1,12 +1,12 @@
 import os
 import time
 from abc import ABCMeta
+from asyncio import Future
 
 from ipv8.util import fail, succeed
-from sqlalchemy import func, or_
 from web3 import Web3
 
-from anydex.wallet.ethereum.eth_database import initialize_db, Key, Transaction
+from anydex.wallet.ethereum.eth_database import Transaction, EthereumDb
 from anydex.wallet.ethereum.eth_provider import AutoEthereumProvider, AutoTestnetEthereumProvider
 from anydex.wallet.wallet import Wallet, InsufficientFunds
 
@@ -27,16 +27,16 @@ class AbstractEthereumWallet(Wallet, metaclass=ABCMeta):
         self.chain_id = chain_id
         self.min_confirmations = 0
         self.account = None
-        self._session = initialize_db(os.path.join(db_path, 'eth.db'))
+        self.database = EthereumDb(os.path.join(db_path, 'eth.db'))
 
         if provider:
             self.provider = provider
         else:  # the testnet we are currently using is ropsten
             self.provider = AutoTestnetEthereumProvider() if testnet else AutoEthereumProvider()
 
-        existing_wallet = self._session.query(Key).filter(Key.name == self.wallet_name).first()
-        if existing_wallet:
-            self.account = Web3().eth.account.from_key(existing_wallet.private_key)
+        existing_key = self.database.get_wallet_private_key(self.wallet_name)
+        if existing_key:
+            self.account = Web3().eth.account.from_key(existing_key)
             self.created = True
 
     def create_wallet(self):
@@ -50,8 +50,7 @@ class AbstractEthereumWallet(Wallet, metaclass=ABCMeta):
         if not self.account:
             self.account = Web3().eth.account.create()
             self.created = True
-            self._session.add(Key(name=self.wallet_name, private_key=self.account.key, address=self.account.address))
-            self._session.commit()
+            self.database.add_key(self.wallet_name, self.account.key, self.account.address)
 
         return succeed(None)
 
@@ -64,33 +63,15 @@ class AbstractEthereumWallet(Wallet, metaclass=ABCMeta):
                 'precision': self.precision()
             })
 
-        self._update_database(self.get_transactions())
-        pending_outgoing = self.get_outgoing_amount()
+        self.get_transactions()
+        pending_outgoing = self.database.get_outgoing_amount(self.get_address().result(), self.get_identifier())
 
         return succeed({
             'available': self.provider.get_balance(self.get_address().result()) - pending_outgoing,
-            'pending': self.get_incoming_amount(),
+            'pending': self.database.get_incoming_amount(self.get_address().result(), self.get_identifier()),
             'currency': self.get_identifier(),
             'precision': self.precision()
         })
-
-    def get_outgoing_amount(self):
-        """
-        Get the current amount of ethereum that we are sending, but is still unconfirmed.
-        :return: pending outgoing amount
-        """
-        outgoing = self._session.query(func.sum(Transaction.value)).filter(Transaction.is_pending.is_(True)).filter(
-            func.lower(Transaction.from_) == self.account.address.lower()).first()[0]
-        return outgoing if outgoing else 0
-
-    def get_incoming_amount(self):
-        """
-        Get the current amount of ethereum that is being sent to us, but is still unconfirmed.
-        :return: pending incoming amount
-        """
-        incoming = self._session.query(func.sum(Transaction.value)).filter(Transaction.is_pending.is_(True)).filter(
-            func.lower(Transaction.to) == self.account.address.lower()).first()[0]
-        return incoming if incoming else 0
 
     async def transfer(self, amount, address) -> str:
         """
@@ -110,20 +91,20 @@ class AbstractEthereumWallet(Wallet, metaclass=ABCMeta):
 
         transaction = {
             'from': self.get_address().result(),
-            'to': address,
+            'to': Web3.toChecksumAddress(address),  # addresses should be checksumaddresses to work
             'value': int(amount),
-            'nonce': self.get_transaction_count(),
+            'nonce': self.database.get_transaction_count(self.get_address().result()),
             'gasPrice': self.provider.get_gas_price(),
             'chainId': self.chain_id
         }
 
-        transaction['gas'] = self.provider.estimate_gas(transaction)
+        transaction['gas'] = self.provider.estimate_gas()
         # submit to blockchain
         signed = self.account.sign_transaction(transaction)
         self.provider.submit_transaction(signed['rawTransaction'].hex())
 
         # add transaction to database
-        self._session.add(
+        self.database.add(
             Transaction(
                 from_=transaction['from'],
                 to=transaction['to'],
@@ -132,10 +113,10 @@ class AbstractEthereumWallet(Wallet, metaclass=ABCMeta):
                 nonce=transaction['nonce'],
                 gas_price=transaction['gasPrice'],
                 hash=signed['hash'].hex(),
-                is_pending=True
+                is_pending=True,
+                token_identifier=self.get_identifier()
             )
         )
-        self._session.commit()
         return signed['hash'].hex()
 
     def get_address(self):
@@ -154,13 +135,10 @@ class AbstractEthereumWallet(Wallet, metaclass=ABCMeta):
 
         transactions = self.provider.get_transactions(self.get_address().result())
 
-        self._update_database(transactions)
+        self.database.update_database(transactions, self.get_identifier())
         # in the future we might use the provider to only retrieve transactions past a certain date/block
 
-        transactions_db = self._session.query(Transaction).filter(
-            or_(func.lower(Transaction.from_) == self.get_address().result().lower(),
-                func.lower(Transaction.to) == self.get_address().result().lower()
-                )).all()
+        transactions_db = self.database.get_transactions(self.get_address().result(), self.get_identifier())
 
         transactions_to_return = []
         latest_block_height = self.provider.get_latest_blocknr()
@@ -180,40 +158,8 @@ class AbstractEthereumWallet(Wallet, metaclass=ABCMeta):
 
         return succeed(transactions_to_return)
 
-    def _update_database(self, transactions):
-        """
-        Update transactions in the database.
-        Pending transactions that have been confirmed will be updated to have a block number and will no longer be
-        pending.
-        Other transactions that are not in the database will be added.
-
-        :param transactions: list of transactions retrieved by self.provider
-        """
-        pending_transactions = self._session.query(Transaction).filter(Transaction.is_pending.is_(True)).all()
-        confirmed_transactions = self._session.query(Transaction).filter(Transaction.is_pending.is_(False)).all()
-        self._logger.debug('Updating ethereum database')
-        for transaction in transactions:
-            if transaction in pending_transactions:
-                # update transaction set is_pending = false where hash = ''
-                self._session.query(Transaction).filter(Transaction.hash == transaction.hash).update({
-                    Transaction.is_pending: False,
-                    Transaction.block_number: transaction.block_number
-                })
-            elif transaction not in confirmed_transactions:
-                self._session.add(transaction)
-        self._session.commit()
-
-    def get_transaction_count(self):
-        """
-        Get the amount of transactions sent by this wallet
-        """
-        row = self._session.query(Transaction.nonce).filter(Transaction.from_ == self.get_address().result()).order_by(
-            Transaction.nonce.desc()).first()
-        if row:
-            return row[0] + 1  # nonce + 1
-        return 0
-
     def min_unit(self):
+        # TODO determine minimal transfer unit
         return 1
 
     def precision(self):

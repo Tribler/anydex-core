@@ -1,0 +1,6 @@
+{
+  "identifier": "TLINK",
+  "name": "Testnet ChainLink Token",
+  "precision": 18,
+  "contract_address": "0x20fE562d797A42Dcb3399062AE9546cd06f63280"
+}
