@@ -16,8 +16,6 @@ from anydex.restapi.rest_manager import RESTManager
 from anydex.wallet.dummy.dummy_wallet import DummyWallet1, DummyWallet2
 from anydex.wallet.ethereum.eth_wallet import EthereumTestnetWallet, EthereumWallet
 from anydex.wallet.iota.iota_wallet import IotaTestnetWallet, IotaWallet
-from anydex.wallet.bitcoinlib.bitcoinlib_wallets import BitcoinTestnetWallet, BitcoinWallet, LitecoinWallet, \
-    LitecoinTestnetWallet, DashWallet, DashTestnetWallet
 from anydex.wallet.monero.xmr_wallet import MoneroTestnetWallet, MoneroWallet
 from anydex.wallet.stellar.xlm_wallet import StellarTestnetWallet, StellarWallet
 
@@ -80,6 +78,8 @@ class AnyDexService(object):
 
         # Get Trustchain + DHT overlays
         for overlay in self.ipv8.overlays:
+            # Logger level required by bitcoinlib import
+            overlay.logger.setLevel('INFO')
             if isinstance(overlay, (TrustChainCommunity, TrustChainTestnetCommunity)):
                 self.trustchain = overlay
             elif isinstance(overlay, DHTDiscoveryCommunity):
@@ -91,6 +91,10 @@ class AnyDexService(object):
 
         dummy_wallet2 = DummyWallet2()
         self.wallets[dummy_wallet2.get_identifier()] = dummy_wallet2
+
+        # Bitcoinlib imports required to be later due to logger overlap
+        from anydex.wallet.bitcoinlib.bitcoinlib_wallets import BitcoinTestnetWallet, BitcoinWallet, LitecoinWallet, \
+            LitecoinTestnetWallet, DashWallet, DashTestnetWallet
 
         # Initialize bitcoin wallets
         btc_wallet = BitcoinWallet(os.path.join(options.statedir, 'sqlite'))
