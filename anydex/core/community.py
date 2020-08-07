@@ -337,11 +337,10 @@ class MarketCommunity(Community, BlockListener):
     def __init__(self, *args, **kwargs):
         self.is_matchmaker = kwargs.pop('is_matchmaker', True)
         self.wallets = kwargs.pop('wallets', {})
-        self.trustchain = kwargs.pop('trustchain')
+        self.trustchain = kwargs.pop('trustchain', None)
+        if self.trustchain:
+            self.initialize_trustchain()
         self.record_transactions = kwargs.pop('record_transactions', False)
-        market_block_types = [b'ask', b'bid', b'cancel_order', b'tx_init', b'tx_payment', b'tx_done']
-        self.trustchain.settings.block_types_bc_disabled |= set(market_block_types)
-        self.trustchain.add_listener(self, market_block_types)
         self.dht = kwargs.pop('dht', None)
         self.use_database = kwargs.pop('use_database', True)
         self.settings = MarketSettings()
@@ -405,6 +404,11 @@ class MarketCommunity(Community, BlockListener):
         })
 
         self.logger.info("Market community initialized with mid %s", hexlify(self.mid))
+
+    def initialize_trustchain(self):
+        market_block_types = [b'ask', b'bid', b'cancel_order', b'tx_init', b'tx_payment', b'tx_done']
+        self.trustchain.settings.block_types_bc_disabled |= set(market_block_types)
+        self.trustchain.add_listener(self, market_block_types)
 
     async def get_address_for_trader(self, trader_id):
         """

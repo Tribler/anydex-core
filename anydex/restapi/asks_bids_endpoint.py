@@ -114,7 +114,7 @@ class AsksEndpoint(BaseAsksBidsEndpoint):
                     "trader_id": "9695c9e15201d08586e4230f4a8524799ebcb2d7"
                 }
         """
-        parameters = await request.post()
+        parameters = await request.json()
 
         if 'first_asset_amount' not in parameters or 'second_asset_amount' not in parameters:
             return Response({"error": "asset amount parameter missing"}, status=HTTP_BAD_REQUEST)
@@ -216,7 +216,7 @@ class BidsEndpoint(BaseAsksBidsEndpoint):
                     "trader_id": "9695c9e15201d08586e4230f4a8524799ebcb2d7"
                 }
         """
-        parameters = await request.post()
+        parameters = await request.json()
 
         if 'first_asset_amount' not in parameters or 'second_asset_amount' not in parameters:
             return Response({"error": "asset amount parameter missing"}, status=HTTP_BAD_REQUEST)
