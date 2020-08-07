@@ -1,60 +1,30 @@
-from asyncio import ensure_future
-from urllib.parse import quote_plus
-
-from aiohttp import ClientSession
-
-from ipv8.test.base import TestBase
-from ipv8.test.mocking.ipv8 import MockIPv8
-
 from anydex.core.community import MarketCommunity
-from anydex.restapi.rest_manager import RESTManager
-from anydex.test.util import get_random_port
 from anydex.wallet.dummy_wallet import DummyWallet1, DummyWallet2
+from anydex.restapi.root_endpoint import RootEndpoint
+
+from ipv8.attestation.trustchain.community import TrustChainCommunity
+from ipv8.test.REST.rest_base import RESTTestBase, MockRestIPv8, partial_cls
+from ipv8.REST.rest_manager import RESTManager
 
 
-def urlencode(data):
-    # Convert all keys and values in the data to utf-8 unicode strings
-    utf8_items = []
-    for key, value in data.items():
-        if isinstance(value, list):
-            utf8_items.extend([urlencode_single(key, list_item) for list_item in value if value])
-        else:
-            utf8_items.append(urlencode_single(key, value))
-
-    data = "&".join(utf8_items)
-    return data.encode('utf-8')
-
-
-def urlencode_single(key, value):
-    utf8_key = quote_plus(str(key).encode('utf-8'))
-    # Convert bool values to ints
-    if isinstance(value, bool):
-        value = int(value)
-    utf8_value = quote_plus(str(value).encode('utf-8'))
-    return "%s=%s" % (utf8_key, utf8_value)
-
-
-class TestRestApiBase(TestBase):
-    __testing__ = False
+class MarketRESTTestBase(RESTTestBase):
     NUM_NODES = 1
 
-    def setUp(self):
-        super(TestRestApiBase, self).setUp()
+    async def setUp(self):
+        super(MarketRESTTestBase, self).setUp()
+        await self.initialize([partial_cls(TrustChainCommunity, working_directory=':memory:'),
+                               partial_cls(MarketCommunity, working_directory=':memory:')], 1)
 
-        self.expected_response_code = 200
-        self.expected_response_json = None
-        self.should_check_equality = True
-        self.restapi = None
+        self.market_community = self.nodes[0].get_overlay(MarketCommunity)
+        self.market_community.trustchain = self.nodes[0].get_overlay(TrustChainCommunity)
 
-        self.initialize(MarketCommunity, self.NUM_NODES)
-        for node in self.nodes:
-            node.overlay._use_main_thread = True
+    async def create_node(self, *args, **kwargs):
+        ipv8 = MockRestIPv8(u"curve25519", overlay_classes=self.overlay_classes, *args, **kwargs)
+        self.rest_manager = RESTManager(ipv8, root_endpoint_class=RootEndpoint)
+        ipv8.rest_manager = self.rest_manager
+        await self.rest_manager.start(0)
+        ipv8.rest_port = self.rest_manager.site._server.sockets[0].getsockname()[1]
 
-    async def tearDown(self):
-        await self.restapi.stop()
-        await super(TestRestApiBase, self).tearDown()
-
-    def create_node(self):
         dum1_wallet = DummyWallet1()
         dum2_wallet = DummyWallet2()
         dum1_wallet.MONITOR_DELAY = 0
@@ -62,37 +32,9 @@ class TestRestApiBase(TestBase):
 
         wallets = {'DUM1': dum1_wallet, 'DUM2': dum2_wallet}
 
-        mock_ipv8 = MockIPv8(u"curve25519", MarketCommunity, create_trustchain=True, create_dht=True,
-                             is_matchmaker=True, wallets=wallets, use_database=False, working_directory=u":memory:")
+        market_community = ipv8.get_overlay(MarketCommunity)
+        market_community.wallets = wallets
+        market_community.settings.single_trade = False
+        market_community.clearing_policies = []
 
-        mock_ipv8.overlay.settings.single_trade = False
-        mock_ipv8.overlay.clearing_policies = []
-        mock_ipv8.overlays = [mock_ipv8.overlay]
-
-        # Start REST API
-        self.restapi = RESTManager(mock_ipv8)
-        random_port = get_random_port()
-        ensure_future(self.restapi.start(random_port))
-
-        return mock_ipv8
-
-    async def do_request(self, endpoint, expected_code=200, expected_json=None,
-                         request_type='GET', post_data=None, json_response=True):
-        self.expected_response_code = expected_code
-        self.expected_response_json = expected_json
-
-        url = 'http://localhost:%d/%s' % (self.restapi.port, endpoint)
-        headers = {'User-Agent': 'AnyDex'}
-
-        async with ClientSession() as session:
-            async with session.request(request_type, url, data=post_data, headers=headers) as response:
-                status = response.status
-                response = await response.json(content_type=None) if json_response else await response.read()
-
-        self.assertEqual(status, self.expected_response_code)
-        if status not in (200, 400, 500):
-            return
-
-        if response is not None and self.should_check_equality:
-            self.assertDictEqual(self.expected_response_json, response)
-        return response
+        return ipv8

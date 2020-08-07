@@ -182,7 +182,7 @@ class WalletsEndpoint(BaseMarketEndpoint):
                     "txid": "abcd"
                 }
         """
-        parameters = await request.post()
+        parameters = await request.json()
 
         identifier = request.match_info['wallet_id']
         if identifier != "BTC" and identifier != "TBTC":

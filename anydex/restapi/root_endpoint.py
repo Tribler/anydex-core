@@ -32,12 +32,8 @@ class RootEndpoint(BaseEndpoint):
     It will dispatch requests regarding torrents, channels, settings etc to the right child endpoint.
     """
 
-    def __init__(self, enable_ipv8_endpoints=True):
-        self._logger = logging.getLogger(self.__class__.__name__)
-        self.app = web.Application(middlewares=[error_middleware])
-        self.session = None
-        self.endpoints = {}
-        self.setup_routes()
+    def __init__(self, middlewares=(), enable_ipv8_endpoints=True):
+        super(RootEndpoint, self).__init__(middlewares)
 
         self.ipv8_endpoint = None
         if enable_ipv8_endpoints:
