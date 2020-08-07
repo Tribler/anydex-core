@@ -403,7 +403,7 @@ class MarketCommunity(Community, BlockListener):
             chr(MSG_PK_RESPONSE): self.received_trader_pk_response
         })
 
-        self.logger.info("Market community initialized with mid %s", hexlify(self.mid))
+        self.logger.info("Market community initialized with mid %s", hexlify(self.mid).decode())
 
     def initialize_trustchain(self):
         market_block_types = [b'ask', b'bid', b'cancel_order', b'tx_init', b'tx_payment', b'tx_done']
