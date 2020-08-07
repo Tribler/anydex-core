@@ -403,7 +403,7 @@ class MarketCommunity(Community, BlockListener):
             chr(MSG_PK_RESPONSE): self.received_trader_pk_response
         })
 
-        self.logger.info("Market community initialized with mid %s", hexlify(self.mid))
+        self.logger.info("Market community initialized with mid %s", hexlify(self.mid).decode())
 
     def initialize_trustchain(self):
         market_block_types = [b'ask', b'bid', b'cancel_order', b'tx_init', b'tx_payment', b'tx_done']
@@ -700,6 +700,9 @@ class MarketCommunity(Community, BlockListener):
             if not transaction:
                 self.logger.warning("Could not find transaction associated for signed payment block %s", block)
                 return
+
+            if not transaction.trading_peer:
+                transaction.trading_peer = self.get_peer_from_mid(bytes(transaction.partner_order_id.trader_id))
 
             if transaction.is_payment_complete():
                 order = self.order_manager.order_repository.find_by_id(transaction.order_id)
