@@ -701,6 +701,9 @@ class MarketCommunity(Community, BlockListener):
                 self.logger.warning("Could not find transaction associated for signed payment block %s", block)
                 return
 
+            if not transaction.trading_peer:
+                transaction.trading_peer = self.get_peer_from_mid(bytes(transaction.partner_order_id.trader_id))
+
             if transaction.is_payment_complete():
                 order = self.order_manager.order_repository.find_by_id(transaction.order_id)
 
