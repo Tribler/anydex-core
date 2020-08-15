@@ -313,7 +313,7 @@ class TestMarketCommunity(TestMarketCommunityBase):
         """
         await self.introduce_nodes()
 
-        self.nodes[0].overlay.decode_map[chr(10)] = lambda *_: None
+        self.nodes[0].overlay.decode_map[10] = None
 
         ask_order = await self.nodes[0].overlay.create_ask(
             AssetPair(AssetAmount(1, 'DUM1'), AssetAmount(1, 'DUM2')), 3600)
