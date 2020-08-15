@@ -385,23 +385,21 @@ class MarketCommunity(Community, BlockListener):
             self.enable_matchmaker()
 
         # Register messages
-        self.decode_map.update({
-            chr(MSG_MATCH): self.received_match,
-            chr(MSG_MATCH_DECLINE): self.received_decline_match,
-            chr(MSG_PROPOSED_TRADE): self.received_proposed_trade,
-            chr(MSG_DECLINED_TRADE): self.received_decline_trade,
-            chr(MSG_COUNTER_TRADE): self.received_counter_trade,
-            chr(MSG_ACCEPT_TRADE): self.received_accept_trade,
-            chr(MSG_WALLET_INFO): self.received_wallet_info,
-            chr(MSG_ORDER_QUERY): self.received_order_status_request,
-            chr(MSG_ORDER_RESPONSE): self.received_order_status,
-            chr(MSG_BOOK_SYNC): self.received_orderbook_sync,
-            chr(MSG_PING): self.received_ping,
-            chr(MSG_PONG): self.received_pong,
-            chr(MSG_MATCH_DONE): self.received_matched_tx_complete,
-            chr(MSG_PK_QUERY): self.received_trader_pk_request,
-            chr(MSG_PK_RESPONSE): self.received_trader_pk_response
-        })
+        self.decode_map[MSG_MATCH] = self.received_match
+        self.decode_map[MSG_MATCH_DECLINE] = self.received_decline_match
+        self.decode_map[MSG_PROPOSED_TRADE] = self.received_proposed_trade
+        self.decode_map[MSG_DECLINED_TRADE] = self.received_decline_trade
+        self.decode_map[MSG_COUNTER_TRADE] = self.received_counter_trade
+        self.decode_map[MSG_ACCEPT_TRADE] = self.received_accept_trade
+        self.decode_map[MSG_WALLET_INFO] = self.received_wallet_info
+        self.decode_map[MSG_ORDER_QUERY] = self.received_order_status_request
+        self.decode_map[MSG_ORDER_RESPONSE] = self.received_order_status
+        self.decode_map[MSG_BOOK_SYNC] = self.received_orderbook_sync
+        self.decode_map[MSG_PING] = self.received_ping
+        self.decode_map[MSG_PONG] = self.received_pong
+        self.decode_map[MSG_MATCH_DONE] = self.received_matched_tx_complete
+        self.decode_map[MSG_PK_QUERY] = self.received_trader_pk_request
+        self.decode_map[MSG_PK_RESPONSE] = self.received_trader_pk_response
 
         self.logger.info("Market community initialized with mid %s", hexlify(self.mid).decode())
 
