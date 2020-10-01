@@ -244,8 +244,8 @@ class MatchCache(NumberCache):
 
             linked_block = self.community.trustchain.persistence.get_linked(block) or block
             global_time = self.community.claim_global_time()
-            dist = GlobalTimeDistributionPayload(global_time).to_pack_list()
-            payload = HalfBlockPairPayload.from_half_blocks(block, linked_block).to_pack_list()
+            dist = GlobalTimeDistributionPayload(global_time)
+            payload = HalfBlockPairPayload.from_half_blocks(block, linked_block)
             packet = self.community._ez_pack(self.community._prefix, MSG_MATCH_DONE, [dist, payload], False)
             self.community.endpoint.send(self.community.lookup_ip(match_payload.matchmaker_trader_id), packet)
 
@@ -523,13 +523,13 @@ class MarketCommunity(Community, BlockListener):
 
     def create_introduction_request(self, socket_address, extra_bytes=b''):
         extra_payload = InfoPayload(TraderId(self.mid), Timestamp.now(), self.is_matchmaker)
-        extra_bytes = self.serializer.pack_multiple(extra_payload.to_pack_list())[0]
+        extra_bytes = self.serializer.pack_serializable(extra_payload)
         return super(MarketCommunity, self).create_introduction_request(socket_address, extra_bytes)
 
     def create_introduction_response(self, lan_socket_address, socket_address, identifier,
                                      introduction=None, extra_bytes=b''):
         extra_payload = InfoPayload(TraderId(self.mid), Timestamp.now(), self.is_matchmaker)
-        extra_bytes = self.serializer.pack_multiple(extra_payload.to_pack_list())[0]
+        extra_bytes = self.serializer.pack_serializable(extra_payload)
         return super(MarketCommunity, self).create_introduction_response(lan_socket_address, socket_address,
                                                                          identifier, introduction, extra_bytes)
 
@@ -537,7 +537,7 @@ class MarketCommunity(Community, BlockListener):
         if not extra_bytes:
             return False
 
-        payload = self.serializer.unpack_to_serializables([InfoPayload], extra_bytes)[0]
+        payload = self.serializer.unpack_serializable(InfoPayload, extra_bytes)[0]
         self.update_ip(payload.trader_id, peer.address)
 
         if payload.is_matchmaker:
@@ -559,8 +559,8 @@ class MarketCommunity(Community, BlockListener):
         """
         self.logger.debug("Sending orderbook sync to peer %s", peer)
         bloomfilter = self.get_orders_bloomfilter()
-        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin()).to_pack_list()
-        payload = OrderbookSyncPayload(TraderId(self.mid), Timestamp.now(), bloomfilter).to_pack_list()
+        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin())
+        payload = OrderbookSyncPayload(TraderId(self.mid), Timestamp.now(), bloomfilter)
 
         packet = self._ez_pack(self._prefix, MSG_BOOK_SYNC, [auth, payload])
         self.endpoint.send(peer.address, packet)
@@ -801,8 +801,8 @@ class MarketCommunity(Community, BlockListener):
         """
         Send a ping message with an identifier to a specific peer.
         """
-        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin()).to_pack_list()
-        payload = PingPongPayload(TraderId(self.mid), Timestamp.now(), identifier).to_pack_list()
+        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin())
+        payload = PingPongPayload(TraderId(self.mid), Timestamp.now(), identifier)
 
         packet = self._ez_pack(self._prefix, MSG_PING, [auth, payload])
         self.endpoint.send(peer.address, packet)
@@ -815,8 +815,8 @@ class MarketCommunity(Community, BlockListener):
         """
         Send a pong message with an identifier to a specific peer.
         """
-        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin()).to_pack_list()
-        payload = PingPongPayload(TraderId(self.mid), Timestamp.now(), identifier).to_pack_list()
+        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin())
+        payload = PingPongPayload(TraderId(self.mid), Timestamp.now(), identifier)
 
         packet = self._ez_pack(self._prefix, MSG_PONG, [auth, payload])
         self.endpoint.send(peer.address, packet)
@@ -930,8 +930,8 @@ class MarketCommunity(Community, BlockListener):
         :return The peers this block was sent to.
         """
         global_time = self.claim_global_time()
-        dist = GlobalTimeDistributionPayload(global_time).to_pack_list()
-        payload = HalfBlockBroadcastPayload.from_half_block(block, self.settings.ttl).to_pack_list()
+        dist = GlobalTimeDistributionPayload(global_time)
+        payload = HalfBlockBroadcastPayload.from_half_block(block, self.settings.ttl)
         packet = self._ez_pack(self.trustchain._prefix, 5, [dist, payload], False)
         if self.fixed_broadcast_set:
             broadcast_peers = self.fixed_broadcast_set
@@ -952,8 +952,8 @@ class MarketCommunity(Community, BlockListener):
         :return The peers this block was sent to.
         """
         global_time = self.claim_global_time()
-        dist = GlobalTimeDistributionPayload(global_time).to_pack_list()
-        payload = HalfBlockPairBroadcastPayload.from_half_blocks(block1, block2, self.settings.ttl).to_pack_list()
+        dist = GlobalTimeDistributionPayload(global_time)
+        payload = HalfBlockPairBroadcastPayload.from_half_blocks(block1, block2, self.settings.ttl)
         packet = self._ez_pack(self.trustchain._prefix, 6, [dist, payload], False)
         if self.fixed_broadcast_set:
             broadcast_peers = self.fixed_broadcast_set
@@ -1171,8 +1171,8 @@ class MarketCommunity(Community, BlockListener):
             self.logger.info("Sending match message for order id %s and tick order id %s to trader %s",
                              str(recipient_order_id), str(tick.order_id), recipient_order_id.trader_id.as_hex())
 
-            auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin()).to_pack_list()
-            payload = MatchPayload(*payload_tup).to_pack_list()
+            auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin())
+            payload = MatchPayload(*payload_tup)
 
             packet = self._ez_pack(self._prefix, MSG_MATCH, [auth, payload])
             self.endpoint.send(address, packet)
@@ -1303,9 +1303,9 @@ class MarketCommunity(Community, BlockListener):
         self.logger.info("Sending decline match message for order %s to trader %s (ip: %s, port: %s)",
                          order.order_id, matchmaker_trader_id.as_hex(), *address)
 
-        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin()).to_pack_list()
+        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin())
         payload = (TraderId(self.mid), Timestamp.now(), order.order_id.order_number, other_order_id, decline_reason)
-        payload = DeclineMatchPayload(*payload).to_pack_list()
+        payload = DeclineMatchPayload(*payload)
 
         packet = self._ez_pack(self._prefix, MSG_MATCH_DECLINE, [auth, payload])
         self.endpoint.send(address, packet)
@@ -1365,8 +1365,8 @@ class MarketCommunity(Community, BlockListener):
 
         self.request_cache.add(ProposedTradeRequestCache(self, proposed_trade))
 
-        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin()).to_pack_list()
-        payload = TradePayload(*payload).to_pack_list()
+        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin())
+        payload = TradePayload(*payload)
 
         self.logger.debug("Sending proposed trade with own order id %s and other order id %s to trader "
                           "%s, asset pair %s", str(proposed_trade.order_id),
@@ -1494,8 +1494,8 @@ class MarketCommunity(Community, BlockListener):
     def send_decline_trade(self, declined_trade):
         payload = declined_trade.to_network()
 
-        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin()).to_pack_list()
-        payload = DeclineTradePayload(*payload).to_pack_list()
+        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin())
+        payload = DeclineTradePayload(*payload)
 
         packet = self._ez_pack(self._prefix, MSG_DECLINED_TRADE, [auth, payload])
         self.endpoint.send(self.lookup_ip(declined_trade.recipient_order_id.trader_id), packet)
@@ -1543,8 +1543,8 @@ class MarketCommunity(Community, BlockListener):
 
         self.request_cache.add(ProposedTradeRequestCache(self, counter_trade))
 
-        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin()).to_pack_list()
-        payload = TradePayload(*payload).to_pack_list()
+        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin())
+        payload = TradePayload(*payload)
 
         packet = self._ez_pack(self._prefix, MSG_COUNTER_TRADE, [auth, payload])
         self.endpoint.send(self.lookup_ip(counter_trade.recipient_order_id.trader_id), packet)
@@ -1605,8 +1605,8 @@ class MarketCommunity(Community, BlockListener):
         accepted_trade = Trade.accept(TraderId(self.mid), Timestamp.now(), proposed_trade)
         payload = accepted_trade.to_network()
 
-        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin()).to_pack_list()
-        payload = TradePayload(*payload).to_pack_list()
+        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin())
+        payload = TradePayload(*payload)
 
         packet = self._ez_pack(self._prefix, MSG_ACCEPT_TRADE, [auth, payload])
         self.endpoint.send(self.lookup_ip(proposed_trade.order_id.trader_id), packet)
@@ -1638,8 +1638,8 @@ class MarketCommunity(Community, BlockListener):
         request_future = Future()
         cache = self.request_cache.add(OrderStatusRequestCache(self, request_future))
 
-        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin()).to_pack_list()
-        payload = OrderStatusRequestPayload(TraderId(self.mid), Timestamp.now(), order_id, cache.number).to_pack_list()
+        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin())
+        payload = OrderStatusRequestPayload(TraderId(self.mid), Timestamp.now(), order_id, cache.number)
 
         packet = self._ez_pack(self._prefix, MSG_ORDER_QUERY, [auth, payload])
         self.endpoint.send(self.lookup_ip(order_id.trader_id), packet)
@@ -1650,11 +1650,11 @@ class MarketCommunity(Community, BlockListener):
     def received_order_status_request(self, peer, payload):
         order = self.order_manager.order_repository.find_by_id(payload.order_id)
 
-        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin()).to_pack_list()
+        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin())
 
         order_payload = list(order.to_network())
         order_payload.append(payload.identifier)
-        new_payload = OrderStatusResponsePayload(*order_payload).to_pack_list()
+        new_payload = OrderStatusResponsePayload(*order_payload)
 
         packet = self._ez_pack(self._prefix, MSG_ORDER_RESPONSE, [auth, new_payload])
         self.endpoint.send(peer.address, packet)
@@ -1684,9 +1684,9 @@ class MarketCommunity(Community, BlockListener):
                           transaction.partner_order_id.trader_id.as_hex(), incoming_address, outgoing_address)
 
         payload = (TraderId(self.mid), Timestamp.now(), transaction.transaction_id, incoming_address, outgoing_address)
-        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin()).to_pack_list()
+        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin())
 
-        new_payload = WalletInfoPayload(*payload).to_pack_list()
+        new_payload = WalletInfoPayload(*payload)
 
         packet = self._ez_pack(self._prefix, MSG_WALLET_INFO, [auth, new_payload])
         self.endpoint.send(self.lookup_ip(transaction.partner_order_id.trader_id), packet)
@@ -1808,8 +1808,8 @@ class MarketCommunity(Community, BlockListener):
         request_future = Future()
         cache = self.request_cache.add(PublicKeyRequestCache(self, trader_id, request_future))
 
-        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin()).to_pack_list()
-        payload = PublicKeyPayload(TraderId(self.mid), Timestamp.now(), cache.number).to_pack_list()
+        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin())
+        payload = PublicKeyPayload(TraderId(self.mid), Timestamp.now(), cache.number)
 
         packet = self._ez_pack(self._prefix, MSG_PK_QUERY, [auth, payload])
         self.endpoint.send(self.lookup_ip(trader_id), packet)
@@ -1818,8 +1818,8 @@ class MarketCommunity(Community, BlockListener):
 
     @lazy_wrapper(PublicKeyPayload)
     def received_trader_pk_request(self, peer, payload):
-        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin()).to_pack_list()
-        new_payload = PublicKeyPayload(TraderId(self.mid), Timestamp.now(), payload.identifier).to_pack_list()
+        auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin())
+        new_payload = PublicKeyPayload(TraderId(self.mid), Timestamp.now(), payload.identifier)
 
         packet = self._ez_pack(self._prefix, MSG_PK_RESPONSE, [auth, new_payload])
         self.endpoint.send(peer.address, packet)
