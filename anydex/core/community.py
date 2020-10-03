@@ -328,8 +328,7 @@ class MarketCommunity(Community, BlockListener):
     """
     Community for general asset trading.
     """
-    master_peer = Peer(unhexlify("4c69624e61434c504b3ab5bb7dc5a3a61de442585122b24c9f752469a212dc6d8ffa3d42bbf9c2f8d10"
-                                 "ba569b270f615ef78aeff0547f38745d22af268037ad64935ee7c054b7921b23b"))
+    community_id = unhexlify('98c1f6342f30528ada9647197f0503d48db9c2fb')
     PROTOCOL_VERSION = 4
     BLOCK_CLASS = MarketBlock
     DB_NAME = 'market'
@@ -1835,6 +1834,5 @@ class MarketTestnetCommunity(MarketCommunity):
     """
     This community defines a testnet for the market.
     """
-    master_peer = Peer(unhexlify("4c69624e61434c504b3a6cd2860aa07739ea53c02b6d40a6682e38a4610a76aeacc6c479022502231"
-                                 "424b88aac37f4ec1274e3f89fa8d324be08c11c10b63c1b8662be7d602ae0a26457"))
+    community_id = unhexlify('26679385c8aeba3cce644f9e4c6d24d322a771ea')
     DB_NAME = 'market_testnet'
