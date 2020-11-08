@@ -520,13 +520,13 @@ class MarketCommunity(Community, BlockListener):
         self.matching_engine = None
         self.is_matchmaker = False
 
-    def create_introduction_request(self, socket_address, extra_bytes=b''):
+    def create_introduction_request(self, socket_address, extra_bytes=b'', new_style=False):
         extra_payload = InfoPayload(TraderId(self.mid), Timestamp.now(), self.is_matchmaker)
         extra_bytes = self.serializer.pack_serializable(extra_payload)
         return super(MarketCommunity, self).create_introduction_request(socket_address, extra_bytes)
 
     def create_introduction_response(self, lan_socket_address, socket_address, identifier,
-                                     introduction=None, extra_bytes=b''):
+                                     introduction=None, extra_bytes=b'', new_style=False):
         extra_payload = InfoPayload(TraderId(self.mid), Timestamp.now(), self.is_matchmaker)
         extra_bytes = self.serializer.pack_serializable(extra_payload)
         return super(MarketCommunity, self).create_introduction_response(lan_socket_address, socket_address,
