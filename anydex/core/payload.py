@@ -7,8 +7,6 @@ from anydex.core.message import TraderId
 from anydex.core.order import OrderId, OrderNumber
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
-from anydex.core.transaction import TransactionId
-from anydex.core.wallet_address import WalletAddress
 
 
 class MessagePayload(Payload):
@@ -213,33 +211,6 @@ class TransactionPayload(MessagePayload):
         data = super(TransactionPayload, self).to_pack_list()
         data += [('32s', bytes(self.transaction_id))]
         return data
-
-
-class WalletInfoPayload(TransactionPayload):
-    """
-    This payload contains wallet information.
-    """
-
-    format_list = TransactionPayload.format_list + ['varlenI', 'varlenI']
-
-    def __init__(self, trader_id, timestamp, transaction_id, incoming_address, outgoing_address):
-        super(WalletInfoPayload, self).__init__(trader_id, timestamp, transaction_id)
-        self.incoming_address = incoming_address
-        self.outgoing_address = outgoing_address
-
-    def to_pack_list(self):
-        data = super(WalletInfoPayload, self).to_pack_list()
-        data += [('varlenI', self.incoming_address.address.encode('utf-8')),
-                 ('varlenI', self.outgoing_address.address.encode('utf-8'))]
-        return data
-
-    @classmethod
-    def from_unpack_list(cls, trader_id, timestamp, transaction_id,
-                         incoming_address, outgoing_address):
-        return WalletInfoPayload(TraderId(trader_id), Timestamp(timestamp),
-                                 TransactionId(transaction_id),
-                                 WalletAddress(incoming_address.decode('utf-8')),
-                                 WalletAddress(outgoing_address.decode('utf-8')))
 
 
 class OrderStatusRequestPayload(MessagePayload):

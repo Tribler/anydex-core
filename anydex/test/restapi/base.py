@@ -1,10 +1,10 @@
-from anydex.core.community import MarketCommunity
-from anydex.wallet.dummy_wallet import DummyWallet1, DummyWallet2
-from anydex.restapi.root_endpoint import RootEndpoint
-
-from ipv8.attestation.trustchain.community import TrustChainCommunity
-from ipv8.test.REST.rest_base import RESTTestBase, MockRestIPv8, partial_cls
 from ipv8.REST.rest_manager import RESTManager
+from ipv8.test.REST.rest_base import MockRestIPv8, RESTTestBase, partial_cls
+
+from anydex.core.community import MarketCommunity
+from anydex.restapi.root_endpoint import RootEndpoint
+from anydex.trustchain.community import TrustChainCommunity
+from anydex.wallet.dummy_wallet import DummyWallet1, DummyWallet2
 
 
 class MarketRESTTestBase(RESTTestBase):

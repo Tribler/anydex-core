@@ -50,7 +50,8 @@ class OrderBook(TaskManager):
             self._asks.insert_tick(ask)
             delay = int(ask.timestamp) + int(ask.timeout) * 1000 - int(time.time() * 1000)
             self.register_task("ask_%s_timeout" % ask.order_id, self.timeout_ask, ask.order_id, delay=delay)
-        self.on_invalid_tick_insert()
+        else:
+            self.on_invalid_tick_insert()
 
     def remove_ask(self, order_id):
         """
@@ -68,7 +69,8 @@ class OrderBook(TaskManager):
             self._bids.insert_tick(bid)
             delay = int(bid.timestamp) + int(bid.timeout) * 1000 - int(time.time() * 1000)
             self.register_task("bid_%s_timeout" % bid.order_id, self.timeout_bid, bid.order_id, delay=delay)
-        self.on_invalid_tick_insert()
+        else:
+            self.on_invalid_tick_insert()
 
     def remove_bid(self, order_id):
         """

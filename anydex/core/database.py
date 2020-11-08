@@ -3,7 +3,6 @@ This file contains everything related to persistence for the market community.
 """
 from os import path
 
-from ipv8.attestation.trustchain.database import TrustChainDB
 from ipv8.database import database_blob
 
 from anydex.core.message import TraderId
@@ -11,6 +10,7 @@ from anydex.core.order import Order, OrderId, OrderNumber
 from anydex.core.payment import Payment
 from anydex.core.tick import Tick
 from anydex.core.transaction import Transaction, TransactionId
+from anydex.trustchain.database import TrustChainDB
 
 
 DATABASE_DIRECTORY = path.join(u"sqlite")
@@ -52,8 +52,6 @@ CREATE TABLE IF NOT EXISTS orders(
   asset2_type              TEXT NOT NULL,
   asset2_transferred       BIGINT NOT NULL,
   transaction_timestamp    BIGINT NOT NULL,
-  sent_wallet_info         INTEGER NOT NULL,
-  received_wallet_info     INTEGER NOT NULL,
   incoming_address         TEXT NOT NULL,
   outgoing_address         TEXT NOT NULL,
   partner_incoming_address TEXT NOT NULL,
@@ -224,9 +222,9 @@ class MarketDB(TrustChainDB):
         self.execute(
             u"INSERT INTO transactions (trader_id, transaction_id, order_number,"
             u"partner_trader_id, partner_order_number, asset1_amount, asset1_type, asset1_transferred, asset2_amount,"
-            u"asset2_type, asset2_transferred, transaction_timestamp, sent_wallet_info, received_wallet_info,"
+            u"asset2_type, asset2_transferred, transaction_timestamp,"
             u"incoming_address, outgoing_address, partner_incoming_address, partner_outgoing_address) "
-            u"VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", transaction.to_database())
+            u"VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", transaction.to_database())
         self.commit()
 
         self.delete_payments(transaction.transaction_id)
@@ -241,9 +239,9 @@ class MarketDB(TrustChainDB):
         self.execute(
             u"INSERT OR IGNORE INTO transactions (trader_id, transaction_id, order_number,"
             u"partner_trader_id, partner_order_number, asset1_amount, asset1_type, asset1_transferred, asset2_amount,"
-            u"asset2_type, asset2_transferred, transaction_timestamp, sent_wallet_info, received_wallet_info,"
+            u"asset2_type, asset2_transferred, transaction_timestamp,"
             u"incoming_address, outgoing_address, partner_incoming_address, partner_outgoing_address) "
-            u"VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", transaction.to_database())
+            u"VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", transaction.to_database())
 
         self.execute(
             u"UPDATE transactions SET asset1_amount = ?, asset1_transferred = ?, asset2_amount = ?, "

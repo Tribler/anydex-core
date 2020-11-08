@@ -1,7 +1,6 @@
 import time
 from binascii import hexlify, unhexlify
 
-from ipv8.attestation.trustchain.block import GENESIS_HASH
 from ipv8.database import database_blob
 
 from anydex.core import MAX_ORDER_TIMEOUT
@@ -11,6 +10,7 @@ from anydex.core.message import TraderId
 from anydex.core.order import OrderId, OrderNumber
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
+from anydex.trustchain.block import GENESIS_HASH
 
 
 class Tick(object):

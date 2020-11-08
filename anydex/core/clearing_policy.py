@@ -30,18 +30,20 @@ class ClearingPolicy(metaclass=abc.ABCMeta):
 
 class SingleTradeClearingPolicy(ClearingPolicy):
     """
-    This policy limits a trading partner to a single outstanding trade at once.
+    This policy limits a trading partner to a maximum number of outstanding trades with risky counterparties at once.
     This is achieved by a crawl/inspection of the TrustChain records of a counterparty.
     """
 
-    def __init__(self, community):
+    def __init__(self, community, max_concurrent_trades):
         ClearingPolicy.__init__(self, community)
-        self.currently_crawling = set()
+        self.max_concurrent_trades = max_concurrent_trades
 
     async def should_trade(self, trader_id):
         """
-        We first crawl the chain of the counterparty and then determine whether we can trade with this party.
+        We first fetch the latest block of the counterparty and then determine whether we can trade with this party.
         """
+        self.logger.info("Triggering clearing policy for trade with trader %s", trader_id.as_hex())
+
         address = await self.community.get_address_for_trader(trader_id)
         if not address:
             self.logger.info("Clearing policy is unable to determine address of trader %s", trader_id.as_hex())
@@ -51,60 +53,21 @@ class SingleTradeClearingPolicy(ClearingPolicy):
         peer_pk = await self.community.send_trader_pk_request(trader_id)
         peer = Peer(peer_pk, address=address)
 
-        # If we are currently crawling this peer already, it means we got another propose trade for another of the
-        # traders orders. Refuse to trade for this one then.
-        if trader_id in self.currently_crawling:
-            self.logger.info("Clearing policy not accepting trade with trader %s - we are already crawling this peer",
-                             trader_id.as_hex())
+        blocks = await self.community.trustchain.send_crawl_request(peer, peer_pk.key_to_bin(), -1, -1)
+        if not blocks:
             return False
 
-        # Crawl the chain and validate the blocks
-        self.logger.info("Starting crawl of chain of trader %s" % trader_id.as_hex())
-        self.currently_crawling.add(trader_id)
-        await self.community.trustchain.crawl_chain(peer)
+        block = blocks[0]
+        if block.type not in [b"ask", b"bid", b"cancel_order", b"tx_init", b"tx_payment", b"tx_done"]:
+            self.logger.info("Unknown last block type %s, not trading with this counterparty", block.type)
+            return False
 
-        self.logger.debug("Crawl of trader %s done - validating trade status", trader_id.as_hex())
-        self.currently_crawling.remove(trader_id)
-
-        blocks = self.community.trustchain.persistence.get_latest_blocks(peer.public_key.key_to_bin(), limit=1000)
-        blocks.sort(key=lambda block: block.sequence_number)
-
-        tx_status = {}  # Keep track of the status of each transaction
-
-        for block in blocks:
-            if block.type == b'tx_init':
-                if block.link_sequence_number != 0:
-                    # Get the original block
-                    tx_init_block = self.community.trustchain.persistence.get_linked(block)
-                else:
-                    tx_init_block = block
-
-                if not tx_init_block:
-                    continue
-
-                txid = tx_init_block.hash
-                # We allow trading with this partner if it counter-signed the tx_init block, which means that
-                # it should not go first during asset exchange.
-                tx_status[txid] = block.link_sequence_number != 0
-            elif block.type == b'tx_payment':
-                txid = unhexlify(block.transaction["payment"]["transaction_id"])
-                if txid not in tx_status:
-                    self.logger.warning("Found payment block without having tx_init block for transaction %s!",
-                                        hexlify(txid))
-                    continue
-
-                if block.link_sequence_number != 0:
-                    tx_status[txid] = False
-                else:
-                    tx_status[txid] = True
-            elif block.type == b'tx_done':
-                txid = unhexlify(block.transaction["tx"]["transaction_id"])
-                if txid not in tx_status:
-                    self.logger.warning("Found tx_done block without having tx_init block for transaction %s!",
-                                        hexlify(txid))
-                    continue
-
-                tx_status[txid] = True
-
-        # If there is any transaction for which this party currently holds the token, do not trade
-        return all(tx_status.values())
+        # The block must contain a responsibilities array
+        do_trade = block.transaction["responsibilities"] < self.max_concurrent_trades
+        if do_trade:
+            self.logger.info("Will trade with trader %s (responsible trades: %d)",
+                             trader_id.as_hex(), block.transaction["responsibilities"])
+        else:
+            self.logger.info("Will NOT trade with trader %s (responsible trades: %d)",
+                             trader_id.as_hex(), block.transaction["responsibilities"])
+        return do_trade

@@ -46,8 +46,26 @@ class TransactionTestSuite(unittest.TestCase):
         """
         Test the process of determining the next payment details during a transaction
         """
-        self.assertEqual(self.transaction.next_payment(True), AssetAmount(100, 'BTC'))
-        self.assertEqual(self.transaction.next_payment(False), AssetAmount(100, 'MB'))
+        self.assertEqual(self.transaction.next_payment(True, transfers_per_trade=1), AssetAmount(100, 'BTC'))
+        self.assertEqual(self.transaction.next_payment(False, transfers_per_trade=1), AssetAmount(100, 'MB'))
+
+    def test_next_payment_incremental(self):
+        """
+        Test the process of determining the next payment details during a transaction with incremental settlement
+        """
+        self.assertEqual(self.transaction.next_payment(True, transfers_per_trade=2), AssetAmount(50, 'BTC'))
+        self.transaction._current_payment = 0
+        self.assertEqual(self.transaction.next_payment(False, transfers_per_trade=2), AssetAmount(50, 'MB'))
+        self.transaction._current_payment = 0
+
+        # Test the edge case
+        next_payment = self.transaction.next_payment(True, transfers_per_trade=3)
+        self.assertEqual(next_payment, AssetAmount(33, 'BTC'))
+        self.transaction.transferred_assets.first += next_payment
+        next_payment = self.transaction.next_payment(True, transfers_per_trade=3)
+        self.assertEqual(next_payment, AssetAmount(33, 'BTC'))
+        self.transaction.transferred_assets.first += next_payment
+        self.assertEqual(self.transaction.next_payment(True, transfers_per_trade=3), AssetAmount(34, 'BTC'))
 
     def test_is_payment_complete(self):
         """

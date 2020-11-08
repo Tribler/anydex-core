@@ -75,8 +75,6 @@ class Transaction(object):
         self._partner_order_id = partner_order_id
         self._timestamp = timestamp
 
-        self.sent_wallet_info = False
-        self.received_wallet_info = False
         self.incoming_address = None
         self.outgoing_address = None
         self.partner_incoming_address = None
@@ -93,7 +91,7 @@ class Transaction(object):
         """
         (trader_id, transaction_id, order_number, partner_trader_id, partner_order_number,
          asset1_amount, asset1_type, asset1_transferred, asset2_amount, asset2_type, asset2_transferred,
-         transaction_timestamp, sent_wallet_info, received_wallet_info, incoming_address, outgoing_address,
+         transaction_timestamp, incoming_address, outgoing_address,
          partner_incoming_address, partner_outgoing_address) = data
 
         transaction_id = TransactionId(bytes(transaction_id))
@@ -106,8 +104,6 @@ class Transaction(object):
 
         transaction._transferred_assets = AssetPair(AssetAmount(asset1_transferred, asset1_type.decode()),
                                                     AssetAmount(asset2_transferred, asset2_type.decode()))
-        transaction.sent_wallet_info = sent_wallet_info
-        transaction.received_wallet_info = received_wallet_info
         transaction.incoming_address = WalletAddress(str(incoming_address))
         transaction.outgoing_address = WalletAddress(str(outgoing_address))
         transaction.partner_incoming_address = WalletAddress(str(partner_incoming_address))
@@ -126,8 +122,8 @@ class Transaction(object):
                 database_blob(bytes(self.partner_order_id.trader_id)), int(self.partner_order_id.order_number),
                 self.assets.first.amount, str(self.assets.first.asset_id), self.transferred_assets.first.amount,
                 self.assets.second.amount, str(self.assets.second.asset_id),
-                self.transferred_assets.second.amount, int(self.timestamp), self.sent_wallet_info,
-                self.received_wallet_info, str(self.incoming_address), str(self.outgoing_address),
+                self.transferred_assets.second.amount, int(self.timestamp),
+                str(self.incoming_address), str(self.outgoing_address),
                 str(self.partner_incoming_address), str(self.partner_outgoing_address))
 
     @classmethod
@@ -230,14 +226,30 @@ class Transaction(object):
             self.transferred_assets.second += payment.transferred_assets
         self._payments.append(payment)
 
-    def next_payment(self, order_is_ask):
+    def next_payment(self, order_is_ask, transfers_per_trade):
         """
         Return the assets that this user has to send to the counterparty as a next step.
         :param order_is_ask: Whether the order is an ask or not.
         :return: An AssetAmount object, indicating how much we should send to the counterparty.
         """
-        assets_to_transfer = self.assets.first if order_is_ask else self.assets.second
-        self._logger.debug("Returning %s for the next payment (no incremental payments)", assets_to_transfer)
+        if order_is_ask:
+            div_amount_1 = AssetAmount(transfers_per_trade, self.assets.first.asset_id)
+            assets_to_transfer = (self.assets.first // div_amount_1)
+        else:
+            div_amount_2 = AssetAmount(transfers_per_trade, self.assets.second.asset_id)
+            assets_to_transfer = (self.assets.second // div_amount_2)
+
+        self._current_payment += 1
+
+        # Make sure the last (incremental) payment fully covers all transferred assets
+        if self._current_payment == transfers_per_trade and order_is_ask:
+            if self.transferred_assets.first + assets_to_transfer < self.assets.first:
+                assets_to_transfer += (self.assets.first - self.transferred_assets.first - assets_to_transfer)
+        elif self._current_payment == transfers_per_trade and not order_is_ask:
+            if self.transferred_assets.second + assets_to_transfer < self.assets.second:
+                assets_to_transfer += (self.assets.second - self.transferred_assets.second - assets_to_transfer)
+
+        self._logger.debug("Returning %s for the next payment", assets_to_transfer)
         return assets_to_transfer
 
     def is_payment_complete(self):

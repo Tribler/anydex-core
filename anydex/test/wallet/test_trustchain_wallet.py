@@ -1,10 +1,10 @@
 from binascii import hexlify
 
-from ipv8.attestation.trustchain.community import TrustChainCommunity
 from ipv8.test.base import TestBase
 from ipv8.test.mocking.ipv8 import MockIPv8
 
 from anydex.test.util import timeout
+from anydex.trustchain.community import TrustChainCommunity
 from anydex.wallet.tc_wallet import TrustchainWallet
 from anydex.wallet.wallet import InsufficientFunds
 
@@ -49,10 +49,10 @@ class TestTrustchainWallet(TestBase):
 
         his_pubkey = list(self.nodes[0].network.verified_peers)[0].public_key.key_to_bin()
         tx = {
-            b'up': 20 * 1024 * 1024,
-            b'down': 5 * 1024 * 1024,
-            b'total_up': 20 * 1024 * 1024,
-            b'total_down': 5 * 1024 * 1024
+            'up': 20 * 1024 * 1024,
+            'down': 5 * 1024 * 1024,
+            'total_up': 20 * 1024 * 1024,
+            'total_down': 5 * 1024 * 1024
         }
         self.nodes[0].overlay.sign_block(list(self.nodes[0].network.verified_peers)[0], public_key=his_pubkey,
                                          block_type=b'tribler_bandwidth', transaction=tx)
@@ -85,10 +85,10 @@ class TestTrustchainWallet(TestBase):
 
         # Now create the transaction
         transaction = {
-            b'up': 20 * 1024 * 1024,
-            b'down': 5 * 1024 * 1024,
-            b'total_up': 20 * 1024 * 1024,
-            b'total_down': 5 * 1024 * 1024
+            'up': 20 * 1024 * 1024,
+            'down': 5 * 1024 * 1024,
+            'total_up': 20 * 1024 * 1024,
+            'total_down': 5 * 1024 * 1024
         }
         await self.nodes[1].overlay.sign_block(list(self.nodes[1].network.verified_peers)[0], public_key=his_pubkey,
                                          block_type=b'tribler_bandwidth', transaction=transaction)
@@ -101,10 +101,10 @@ class TestTrustchainWallet(TestBase):
         Test monitoring a transaction that already exists
         """
         transaction = {
-            b'up': 20 * 1024 * 1024,
-            b'down': 5 * 1024 * 1024,
-            b'total_up': 20 * 1024 * 1024,
-            b'total_down': 5 * 1024 * 1024
+            'up': 20 * 1024 * 1024,
+            'down': 5 * 1024 * 1024,
+            'total_up': 20 * 1024 * 1024,
+            'total_down': 5 * 1024 * 1024
         }
         his_pubkey = self.nodes[0].overlay.my_peer.public_key.key_to_bin()
         await self.nodes[1].overlay.sign_block(list(self.nodes[1].network.verified_peers)[0], public_key=his_pubkey,
