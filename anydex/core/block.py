@@ -1,6 +1,5 @@
-from ipv8.attestation.trustchain.block import TrustChainBlock
-
 from anydex.core import MAX_ORDER_TIMEOUT
+from anydex.trustchain.block import TrustChainBlock
 
 
 class MarketBlock(TrustChainBlock):

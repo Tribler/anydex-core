@@ -17,6 +17,7 @@ from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
 from anydex.core.transaction import Transaction, TransactionId
 from anydex.test.util import MockObject, timeout
+from anydex.trustchain.community import TrustChainCommunity
 from anydex.wallet.dummy_wallet import DummyWallet1, DummyWallet2
 from anydex.wallet.tc_wallet import TrustchainWallet
 
@@ -45,10 +46,15 @@ class TestMarketCommunityBase(TestBase):
 
         wallets = {'DUM1': dum1_wallet, 'DUM2': dum2_wallet}
 
-        mock_ipv8 = MockIPv8(u"curve25519", MarketCommunity, create_trustchain=True, create_dht=True,
+        mock_ipv8 = MockIPv8("curve25519", MarketCommunity, create_dht=True,
                              is_matchmaker=True, wallets=wallets, use_database=self.use_database(),
                              working_directory=self.get_db_location())
-        tc_wallet = TrustchainWallet(mock_ipv8.trustchain)
+        trustchain = TrustChainCommunity(mock_ipv8.my_peer, mock_ipv8.endpoint, mock_ipv8.network,
+                                         working_directory=":memory:")
+        mock_ipv8.overlay.trustchain = trustchain
+        mock_ipv8.overlay.initialize_trustchain()
+
+        tc_wallet = TrustchainWallet(mock_ipv8.overlay.trustchain)
         mock_ipv8.overlay.wallets['MB'] = tc_wallet
 
         mock_ipv8.overlay.settings.single_trade = False

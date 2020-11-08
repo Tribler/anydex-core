@@ -3,7 +3,6 @@ This file contains everything related to persistence for the market community.
 """
 from os import path
 
-from ipv8.attestation.trustchain.database import TrustChainDB
 from ipv8.database import database_blob
 
 from anydex.core.message import TraderId
@@ -11,6 +10,7 @@ from anydex.core.order import Order, OrderId, OrderNumber
 from anydex.core.payment import Payment
 from anydex.core.tick import Tick
 from anydex.core.transaction import Transaction, TransactionId
+from anydex.trustchain.database import TrustChainDB
 
 
 DATABASE_DIRECTORY = path.join(u"sqlite")

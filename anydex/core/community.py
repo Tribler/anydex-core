@@ -4,9 +4,6 @@ from base64 import b64decode
 from binascii import hexlify, unhexlify
 from functools import wraps
 
-from ipv8.attestation.trustchain.listener import BlockListener
-from ipv8.attestation.trustchain.payload import HalfBlockBroadcastPayload, HalfBlockPairBroadcastPayload,\
-    HalfBlockPairPayload
 from ipv8.community import Community, lazy_wrapper
 from ipv8.dht import DHTError
 from ipv8.messaging.payload_headers import BinMemberAuthenticationPayload
@@ -42,6 +39,8 @@ from anydex.core.transaction_manager import TransactionManager
 from anydex.core.transaction_repository import DatabaseTransactionRepository,\
     MemoryTransactionRepository
 from anydex.core.wallet_address import WalletAddress
+from anydex.trustchain.listener import BlockListener
+from anydex.trustchain.payload import HalfBlockBroadcastPayload, HalfBlockPairBroadcastPayload, HalfBlockPairPayload
 from anydex.util.asyncio import call_later
 from anydex.wallet.tc_wallet import TrustchainWallet
 

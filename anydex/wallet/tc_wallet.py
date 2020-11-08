@@ -2,11 +2,11 @@ from asyncio import Future
 from base64 import b64encode
 from binascii import hexlify, unhexlify
 
-from ipv8.attestation.trustchain.listener import BlockListener
 from ipv8.keyvault.crypto import ECCrypto
 from ipv8.peer import Peer
 from ipv8.util import succeed
 
+from anydex.trustchain.listener import BlockListener
 from anydex.util.asyncio import add_default_callback
 from anydex.wallet.bandwidth_block import TriblerBandwidthBlock
 from anydex.wallet.wallet import InsufficientFunds, Wallet

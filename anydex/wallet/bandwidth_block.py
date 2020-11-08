@@ -1,5 +1,5 @@
-from ipv8.attestation.trustchain.block import EMPTY_SIG, GENESIS_HASH, GENESIS_SEQ, TrustChainBlock, \
-    ValidationResult
+from anydex.trustchain.block import EMPTY_SIG, GENESIS_HASH, GENESIS_SEQ, TrustChainBlock, ValidationResult
+
 from ipv8.messaging.deprecated.encoding import encode
 
 

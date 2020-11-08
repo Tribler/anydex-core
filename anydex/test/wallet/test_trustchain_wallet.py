@@ -1,10 +1,10 @@
 from binascii import hexlify
 
-from ipv8.attestation.trustchain.community import TrustChainCommunity
 from ipv8.test.base import TestBase
 from ipv8.test.mocking.ipv8 import MockIPv8
 
 from anydex.test.util import timeout
+from anydex.trustchain.community import TrustChainCommunity
 from anydex.wallet.tc_wallet import TrustchainWallet
 from anydex.wallet.wallet import InsufficientFunds
 
