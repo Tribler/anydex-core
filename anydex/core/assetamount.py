@@ -94,6 +94,24 @@ class AssetAmount(object):
         else:
             return NotImplemented
 
+    def __floordiv__(self, other):
+        if isinstance(other, AssetAmount) and self.asset_id == other.asset_id:
+            return self.__class__(self.amount // other.amount, self.asset_id)
+        else:
+            return NotImplemented
+
+    def __truediv__(self, other):
+        if isinstance(other, AssetAmount) and self.asset_id == other.asset_id:
+            return self.__class__(self.amount // other.amount, self.asset_id)
+        else:
+            return NotImplemented
+
+    def __mod__(self, other):
+        if isinstance(other, AssetAmount) and self.asset_id == other.asset_id:
+            return self.__class__(self.amount % other.amount, self.asset_id)
+        else:
+            return NotImplemented
+
     def __hash__(self):
         return hash((self.amount, self.asset_id))
 

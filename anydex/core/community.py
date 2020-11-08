@@ -1739,7 +1739,7 @@ class MarketCommunity(Community, BlockListener):
     async def send_payment(self, transaction):
         order = self.order_manager.order_repository.find_by_id(transaction.order_id)
 
-        transfer_amount = transaction.next_payment(order.is_ask())
+        transfer_amount = transaction.next_payment(order.is_ask(), self.settings.transfers_per_trade)
         asset_id = transfer_amount.asset_id
 
         wallet = self.wallets[asset_id]

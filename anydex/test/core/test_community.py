@@ -297,6 +297,46 @@ class TestMarketCommunity(TestMarketCommunityBase):
         self.assertTrue(list(self.nodes[0].overlay.transaction_manager.find_all()))
         self.assertTrue(list(self.nodes[1].overlay.transaction_manager.find_all()))
 
+    @timeout(3)
+    async def test_incremental_settlement(self):
+        """
+        Test trading dummy tokens against bandwidth tokens between two persons, with a matchmaker
+        """
+        self.nodes[0].overlay.settings.transfers_per_trade = 3
+        self.nodes[1].overlay.settings.transfers_per_trade = 3
+
+        await self.introduce_nodes()
+
+        await self.nodes[0].overlay.create_ask(AssetPair(AssetAmount(50, 'DUM1'), AssetAmount(50, 'DUM2')), 3600)
+        await self.nodes[1].overlay.create_bid(AssetPair(AssetAmount(50, 'DUM1'), AssetAmount(50, 'DUM2')), 3600)
+
+        await sleep(0.5)  # Give it some time to complete the trade
+
+        # Verify that the trade has been made
+        self.assertTrue(list(self.nodes[0].overlay.transaction_manager.find_all()))
+        self.assertTrue(list(self.nodes[1].overlay.transaction_manager.find_all()))
+
+        balance1 = await self.nodes[0].overlay.wallets['DUM1'].get_balance()
+        balance2 = await self.nodes[0].overlay.wallets['DUM2'].get_balance()
+        self.assertEqual(balance1['available'], 950)
+        self.assertEqual(balance2['available'], 10050)
+
+        balance1 = await self.nodes[1].overlay.wallets['DUM1'].get_balance()
+        balance2 = await self.nodes[1].overlay.wallets['DUM2'].get_balance()
+        self.assertEqual(balance1['available'], 1050)
+        self.assertEqual(balance2['available'], 9950)
+
+        # There should be multiple payment blocks
+        count = 0
+        my_blocks = self.nodes[0].overlay.trustchain.persistence.get_latest_blocks(
+            self.nodes[0].overlay.trustchain.my_peer.public_key.key_to_bin(), limit=1000)
+        my_blocks = sorted(my_blocks, key=lambda block: block.sequence_number)
+        for block in my_blocks:
+            if block.type == b'tx_payment':
+                count += 1
+
+        self.assertEqual(count, 6)
+
     async def test_cancel(self):
         """
         Test cancelling an order
