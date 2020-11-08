@@ -1,9 +1,9 @@
+from ipv8.keyvault.crypto import default_eccrypto
+from ipv8.test.base import TestBase
+
 from anydex.test.trustchain.test_block import TestBlock
 from anydex.trustchain.block import TrustChainBlock
 from anydex.trustchain.database import TrustChainDB
-
-from ipv8.keyvault.crypto import default_eccrypto
-from ipv8.test.base import TestBase
 
 
 class TestTrustChainMemoryDB(TestBase):

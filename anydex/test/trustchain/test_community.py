@@ -1,15 +1,15 @@
 from asyncio import sleep
 
+from ipv8.database import database_blob
+from ipv8.keyvault.crypto import default_eccrypto
+from ipv8.test.base import TestBase
+from ipv8.test.mocking.ipv8 import MockIPv8
+
 from anydex.test.trustchain.test_block import TestBlock
 from anydex.trustchain.block import TrustChainBlock
 from anydex.trustchain.caches import CrawlRequestCache
 from anydex.trustchain.community import TrustChainCommunity, UNKNOWN_SEQ
 from anydex.trustchain.listener import BlockListener
-
-from ipv8.test.base import TestBase
-from ipv8.test.mocking.ipv8 import MockIPv8
-from ipv8.database import database_blob
-from ipv8.keyvault.crypto import default_eccrypto
 
 
 class DummyBlock(TrustChainBlock):

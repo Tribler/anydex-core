@@ -4,13 +4,13 @@ from binascii import hexlify
 from collections import namedtuple
 from hashlib import sha256
 
-import orjson as json
-
-from anydex.trustchain.payload import HalfBlockPayload
-
 from ipv8.database import database_blob
 from ipv8.keyvault.crypto import default_eccrypto
 from ipv8.messaging.serialization import PackError, default_serializer
+
+import orjson as json
+
+from anydex.trustchain.payload import HalfBlockPayload
 
 
 GENESIS_HASH = b'0' * 32  # ID of the first block of the chain.

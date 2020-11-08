@@ -1,9 +1,9 @@
-from anydex.trustchain.block import EMPTY_SIG, GENESIS_HASH, GENESIS_SEQ, TrustChainBlock, ValidationResult
+from ipv8.keyvault.crypto import default_eccrypto
+from ipv8.test.base import TestBase
 
 import orjson as json
 
-from ipv8.test.base import TestBase
-from ipv8.keyvault.crypto import default_eccrypto
+from anydex.trustchain.block import EMPTY_SIG, GENESIS_HASH, GENESIS_SEQ, TrustChainBlock, ValidationResult
 
 
 class TestBlock(TrustChainBlock):

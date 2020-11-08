@@ -1,6 +1,6 @@
-from anydex.trustchain.block import EMPTY_SIG, GENESIS_HASH, GENESIS_SEQ, TrustChainBlock, ValidationResult
-
 import orjson as json
+
+from anydex.trustchain.block import EMPTY_SIG, GENESIS_HASH, GENESIS_SEQ, TrustChainBlock, ValidationResult
 
 
 class TriblerBandwidthBlock(TrustChainBlock):

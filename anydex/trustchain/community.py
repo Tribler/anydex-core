@@ -12,12 +12,6 @@ from collections import deque
 from functools import wraps
 from threading import RLock
 
-from anydex.trustchain.block import ANY_COUNTERPARTY_PK, EMPTY_PK, GENESIS_SEQ, TrustChainBlock, UNKNOWN_SEQ, ValidationResult
-from anydex.trustchain.caches import ChainCrawlCache, CrawlRequestCache, HalfBlockSignCache, IntroCrawlTimeout
-from anydex.trustchain.database import TrustChainDB
-from anydex.trustchain.payload import *
-from anydex.trustchain.settings import TrustChainSettings
-
 from ipv8.community import Community
 from ipv8.lazy_community import lazy_wrapper, lazy_wrapper_unsigned, lazy_wrapper_unsigned_wd
 from ipv8.messaging.payload_headers import BinMemberAuthenticationPayload, GlobalTimeDistributionPayload
@@ -25,6 +19,12 @@ from ipv8.peer import Peer
 from ipv8.requestcache import RandomNumberCache, RequestCache
 from ipv8.taskmanager import task
 from ipv8.util import fail, maybe_coroutine, succeed
+
+from anydex.trustchain.block import ANY_COUNTERPARTY_PK, EMPTY_PK, GENESIS_SEQ, TrustChainBlock, UNKNOWN_SEQ, ValidationResult
+from anydex.trustchain.caches import ChainCrawlCache, CrawlRequestCache, HalfBlockSignCache, IntroCrawlTimeout
+from anydex.trustchain.database import TrustChainDB
+from anydex.trustchain.payload import *
+from anydex.trustchain.settings import TrustChainSettings
 
 
 def synchronized(f):
