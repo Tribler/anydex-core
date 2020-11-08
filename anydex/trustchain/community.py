@@ -128,6 +128,31 @@ class TrustChainCommunity(Community):
 
         return False
 
+    def on_counter_signed(self, block):
+        """
+        We just counter signed a block. Inform the listeners.
+        """
+        if block.type in self.listeners_map:
+            for listener in self.listeners_map[block.type]:
+                listener.on_counter_signed_block(block)
+
+    def get_counter_tx(self, block):
+        """
+        Return some counter tx content.
+        """
+        if block.type not in self.listeners_map:
+            return block.transaction  # There are no listeners for this block
+
+        if len(self.listeners_map[block.type]) > 1:
+            self.logger.warning("There should only be one listener when returning a counter transaction!")
+            return block.transaction
+
+        listener = self.listeners_map[block.type][0]
+        if not hasattr(listener, "get_counter_tx"):
+            return block.transaction
+
+        return listener.get_counter_tx(block)
+
     def _add_broadcasted_blockid(self, block_id):
         self.relayed_broadcasts.add(block_id)
         self.relayed_broadcasts_order.append(block_id)
@@ -228,7 +253,7 @@ class TrustChainCommunity(Community):
         assert transaction is None and linked is not None or transaction is not None and linked is None, \
             "Either provide a linked block or a transaction, not both %s, %s" % (peer, self.my_peer)
         assert (additional_info is None or additional_info is not None and linked is not None
-                and transaction is None and peer == self.my_peer and public_key == linked.public_key), \
+                and transaction is None), \
             "Either no additional info is provided or one provides it for a linked block"
         assert (linked is None or linked.link_public_key == self.my_peer.public_key.key_to_bin()
                 or linked.link_public_key == ANY_COUNTERPARTY_PK), "Cannot counter sign block not addressed to self"
@@ -425,7 +450,9 @@ class TrustChainCommunity(Community):
                     return
                 return await self.process_half_block(blk, peer)
         else:
-            return await self.sign_block(peer, linked=blk)
+            blocks = self.sign_block(peer, linked=blk, additional_info=self.get_counter_tx(blk))
+            self.on_counter_signed(blk)
+            return blocks
 
     def crawl_chain(self, peer, latest_block_num=0):
         """

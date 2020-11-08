@@ -32,6 +32,9 @@ class TestBlockListener(BlockListener):
     def received_block(self, block):
         pass
 
+    def on_counter_signed_block(self, block):
+        pass
+
 
 class TestTrustChainCommunity(TestBase):
 
@@ -74,6 +77,22 @@ class TestTrustChainCommunity(TestBase):
         for node_nr in [0, 1]:
             self.assertIsNotNone(self.persistence(node_nr).get(self.key_bin(1), 1))
             self.assertEqual(self.persistence(node_nr).get(self.key_bin(1), 1).link_sequence_number, 1)
+
+    async def test_counter_tx(self):
+        """
+        Test whether the counterparty can update the transaction in the block.
+        """
+        self.nodes[1].overlay.get_counter_tx = lambda blk: {"a": "b"}
+
+        self.nodes[0].overlay.sign_block(self.peer(1), public_key=self.key_bin(1),
+                                         block_type=b'test', transaction={})
+
+        await self.deliver_messages()
+
+        # The counterparty block should contain our counter tx
+        for node_nr in [0, 1]:
+            self.assertDictEqual(
+                self.nodes[node_nr].overlay.persistence.get(self.key_bin(1), 1).transaction, {"a": "b"})
 
     async def test_get_linked(self):
         """

@@ -139,5 +139,4 @@ class MatchingEngine(object):
                                                      tick_entry.tick.is_ask())
 
         diff = time() - now
-        self._logger.debug("Matching engine completed in %.2f seconds", diff)
         return matched_ticks
