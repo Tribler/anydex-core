@@ -99,8 +99,8 @@ class TestTrustChainDB(TestBase):
         self.db.execute("UPDATE OPTION set value='7' WHERE key='database_version'")
 
         # Insert two blocks with the same public key and sequence number, bypassing the integrity violation.
-        self.db.execute("INSERT INTO blocks VALUES('test', 'a1d2bid2i42', '1', 3, 'test', 3, '', '', 12345, 0, '');")
-        self.db.execute("INSERT INTO blocks VALUES('test', 'a1d2bid2i42', X'31', 3, 'test', 3, '', '', 12345, 0, '');")
+        self.db.execute("INSERT INTO blocks VALUES('test', '{}', '1', 3, 'test', 3, '', '', 12345, 0, '');")
+        self.db.execute("INSERT INTO blocks VALUES('test', '{}', X'31', 3, 'test', 3, '', '', 12345, 0, '');")
 
         self.assertTrue(self.db.get_all_blocks())
         self.db.close()

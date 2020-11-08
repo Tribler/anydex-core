@@ -244,6 +244,7 @@ class TestTrustChainCommunity(TestBase):
         """
         Check if missing blocks are retrieved through a crawl request.
         """
+        self.overlay(1).settings.validation_range = 1
         self.endpoint(0).close()
         signed1 = self.overlay(0).sign_block(self.peer(1), public_key=self.key_bin(1), block_type=b'test',
                                              transaction={})
@@ -430,7 +431,7 @@ class TestTrustChainCommunity(TestBase):
         self.assertIsNotNone(block)
 
         # Create a Link Block
-        link_block, _ = await self.overlay(1).create_link(block, b'link', additional_info={b'a': 1, b'b': 2})
+        link_block, _ = await self.overlay(1).create_link(block, b'link', additional_info={'a': 1, 'b': 2})
         self.assertEqual(link_block.type, b'link')
         await self.deliver_messages()
 
@@ -441,8 +442,8 @@ class TestTrustChainCommunity(TestBase):
         self.assertIsNotNone(block_node_0)
         self.assertIsNotNone(block_node_1)
 
-        self.assertEqual(block_node_0.transaction, {b'a': 1, b'b': 2})
-        self.assertEqual(block_node_1.transaction, {b'a': 1, b'b': 2})
+        self.assertEqual(block_node_0.transaction, {'a': 1, 'b': 2})
+        self.assertEqual(block_node_1.transaction, {'a': 1, 'b': 2})
 
     async def test_link_block_multiple(self):
         """
@@ -453,8 +454,8 @@ class TestTrustChainCommunity(TestBase):
 
         block = self.persistence(1).get(self.key_bin(0), 1)
 
-        self.overlay(1).create_link(block, b'link', additional_info={b'a': 1, b'b': 2})
-        self.overlay(1).create_link(block, b'link', additional_info={b'a': 2, b'b': 3})
+        self.overlay(1).create_link(block, b'link', additional_info={'a': 1, 'b': 2})
+        self.overlay(1).create_link(block, b'link', additional_info={'a': 2, 'b': 3})
         await self.deliver_messages()
 
         self.assertEqual(len(self.persistence(0).get_all_linked(source_block)), 2)

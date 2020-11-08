@@ -4,11 +4,12 @@ from binascii import hexlify
 from collections import namedtuple
 from hashlib import sha256
 
+import orjson as json
+
 from anydex.trustchain.payload import HalfBlockPayload
 
 from ipv8.database import database_blob
 from ipv8.keyvault.crypto import default_eccrypto
-from ipv8.messaging.deprecated.encoding import decode, encode
 from ipv8.messaging.serialization import PackError, default_serializer
 
 
@@ -98,7 +99,7 @@ class TrustChainBlock(object):
             # data
             self.type = b'unknown'
             self.transaction = {}
-            self._transaction = encode({})
+            self._transaction = json.dumps({})
             # identity
             self.public_key = EMPTY_PK
             self.sequence_number = GENESIS_SEQ
@@ -113,7 +114,7 @@ class TrustChainBlock(object):
             self.insert_time = None
         else:
             self._transaction = data[1] if isinstance(data[1], bytes) else bytes(data[1])
-            _, self.transaction = decode(self._transaction)
+            self.transaction = json.loads(self._transaction)
             (self.type, self.public_key, self.sequence_number, self.link_public_key, self.link_sequence_number,
              self.previous_hash, self.signature, self.timestamp, self.insert_time) = (data[0], data[2], data[3],
                                                                                       data[4], data[5], data[6],
@@ -486,7 +487,7 @@ class TrustChainBlock(object):
             ret.sequence_number = blk.sequence_number + 1
             ret.previous_hash = blk.hash
 
-        ret._transaction = encode(ret.transaction)
+        ret._transaction = json.dumps(ret.transaction)
         ret.public_key = public_key
         ret.signature = EMPTY_SIG
         ret.hash = ret.calculate_hash()
@@ -511,7 +512,7 @@ class TrustChainBlock(object):
             if key in SKIP_ATTRIBUTES:
                 continue
             if key == 'transaction':
-                yield key, decode(self._transaction, cast_utf8=True)[1]
+                yield key, json.loads(self._transaction)
             elif isinstance(value, bytes) and key != "insert_time" and key != "type":
                 yield key, hexlify(value).decode('utf-8')
             else:

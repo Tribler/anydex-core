@@ -14,7 +14,7 @@ class TrustChainSettings(object):
         self.broadcast_history_size = 100000
 
         # How many prior blocks we require before signing a new incoming block
-        self.validation_range = 5
+        self.validation_range = 0
 
         # The maximum number of blocks we want to store in the database
         self.max_db_blocks = 1000000

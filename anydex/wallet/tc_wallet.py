@@ -38,7 +38,7 @@ class TrustchainWallet(Wallet, BlockListener):
         In our current design, only the person that should pay bytes to others initiates a signing request.
         This is true when considering payouts in the tunnels and when buying bytes on the market.
         """
-        return block.transaction[b"down"] >= MIN_TRANSACTION_SIZE
+        return block.transaction["down"] >= MIN_TRANSACTION_SIZE
 
     def received_block(self, block):
         pass
@@ -70,7 +70,7 @@ class TrustchainWallet(Wallet, BlockListener):
 
         block = self.trustchain.persistence.get_latest(peer.public_key.key_to_bin(), block_type=b'tribler_bandwidth')
         if block:
-            return block.transaction[b'total_up'] - block.transaction[b'total_down']
+            return block.transaction["total_up"] - block.transaction["total_down"]
 
         return 0
 
@@ -89,7 +89,7 @@ class TrustchainWallet(Wallet, BlockListener):
         return await self.create_transfer_block(peer, quantity)
 
     async def create_transfer_block(self, peer, quantity):
-        transaction = {b"up": 0, b"down": int(quantity * MEGA_DIV)}
+        transaction = {"up": 0, "down": int(quantity * MEGA_DIV)}
 
         add_default_callback(self.trustchain.sign_block(peer, peer.public_key.key_to_bin(),
                                                         block_type=b'tribler_bandwidth', transaction=transaction))
@@ -157,9 +157,9 @@ class TrustchainWallet(Wallet, BlockListener):
         peers_helped_you = set()
         for block in self.trustchain.persistence.get_latest_blocks(public_key, limit=-1,
                                                                    block_types=[b'tribler_bandwidth']):
-            if int(block.transaction[b"up"]) > 0:
+            if int(block.transaction["up"]) > 0:
                 peers_you_helped.add(block.link_public_key)
-            if int(block.transaction[b"down"]) > 0:
+            if int(block.transaction["down"]) > 0:
                 peers_helped_you.add(block.link_public_key)
         return len(peers_you_helped), len(peers_helped_you)
 
@@ -184,8 +184,8 @@ class TrustchainWallet(Wallet, BlockListener):
             statistics["total_blocks"] = 0
 
         if latest_bw_block:
-            statistics["total_up"] = latest_block.transaction[b"total_up"]
-            statistics["total_down"] = latest_block.transaction[b"total_down"]
+            statistics["total_up"] = latest_block.transaction["total_up"]
+            statistics["total_down"] = latest_block.transaction["total_down"]
         else:
             statistics["total_up"] = 0
             statistics["total_down"] = 0
