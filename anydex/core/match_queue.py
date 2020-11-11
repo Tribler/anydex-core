@@ -13,16 +13,16 @@ class MatchPriorityQueue(object):
         return ' '.join([str(i) for i in self.queue])
 
     def is_empty(self):
-        return len(self.queue) == []
+        return len(self.queue) == 0
 
     def contains_order(self, order_id):
-        for _, _, other_order_id in self.queue:
+        for _, _, other_order_id, _ in self.queue:
             if other_order_id == order_id:
                 return True
         return False
 
-    def insert(self, retries, price, order_id):
-        self.queue.append((retries, price, order_id))
+    def insert(self, retries, price, order_id, other_quantity):
+        self.queue.append((retries, price, order_id, other_quantity))
 
         def cmp_items(tup1, tup2):
             if tup1[0] < tup2[0]:

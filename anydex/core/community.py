@@ -34,6 +34,7 @@ from anydex.core.payload import DeclineMatchPayload, DeclineTradePayload, InfoPa
     TradePayload
 from anydex.core.payment import Payment
 from anydex.core.payment_id import PaymentId
+from anydex.core.price import Price
 from anydex.core.settings import MarketSettings
 from anydex.core.tick import Ask, Bid, Tick
 from anydex.core.tickentry import TickEntry
@@ -970,24 +971,27 @@ class MarketCommunity(Community, BlockListener):
         # Add the match to the cache and process it
         cache.add_match(payload)
 
-    async def accept_match_and_propose(self, order: Order, other_order_id: OrderId) -> None:
+    async def accept_match_and_propose(self, order: Order, other_order_id: OrderId, other_price: Price,
+                                       other_quantity: int, propose_quantity=None, should_reserve=True) -> None:
         """
         Accept an incoming match payload and propose a trade to the counterparty
         """
-        if order.available_quantity == 0:
-            self.logger.info("No available quantity for order %s - not sending outgoing proposal", order.order_id)
+        if should_reserve:
+            if order.available_quantity == 0:
+                self.logger.info("No available quantity for order %s - not sending outgoing proposal", order.order_id)
 
-            # Notify the match cache
-            cache = self.request_cache.get("match", int(order.order_id.order_number))
-            if cache:
-                cache.received_decline_trade(other_order_id, DeclinedTradeReason.NO_AVAILABLE_QUANTITY)
-            return
+                # Notify the match cache
+                cache = self.request_cache.get("match", int(order.order_id.order_number))
+                if cache:
+                    cache.received_decline_trade(other_order_id, DeclinedTradeReason.NO_AVAILABLE_QUANTITY)
+                return
 
-        # Pre-actively reserve the available quantity in the order
-        propose_quantity = order.available_quantity
-        order.reserve_quantity_for_tick(other_order_id, propose_quantity)
-        self.order_manager.order_repository.update(order)
+            # Pre-actively reserve the available quantity in the order
+            propose_quantity = min(order.available_quantity, other_quantity)
+            order.reserve_quantity_for_tick(other_order_id, propose_quantity)
+            self.order_manager.order_repository.update(order)
 
+        # Apply the clearing policies and check if we want to trade with this peer in the first place
         futures = [policy.should_trade(other_order_id.trader_id) for policy in self.clearing_policies]
         results = await gather(*futures, return_exceptions=True)
 
@@ -1015,10 +1019,10 @@ class MarketCommunity(Community, BlockListener):
             return
 
         # Otherwise, propose!
-        await self.propose_trade(order, other_order_id, propose_quantity)
+        await self.propose_trade(order, other_order_id, propose_quantity, other_price)
 
-    async def propose_trade(self, order: Order, other_order_id: OrderId, propose_quantity: int) -> None:
-        propose_quantity_scaled = order.assets.proportional_downscale(first=propose_quantity)
+    async def propose_trade(self, order: Order, other_order_id: OrderId, propose_quantity: int, other_price: Price) -> None:
+        propose_quantity_scaled = AssetPair.from_price(other_price, propose_quantity)
 
         propose_trade = Trade.propose(
             TraderId(self.mid),

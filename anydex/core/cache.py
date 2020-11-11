@@ -1,4 +1,5 @@
 import random
+from asyncio import ensure_future
 
 from ipv8.messaging.payload_headers import GlobalTimeDistributionPayload
 from ipv8.requestcache import NumberCache, RandomNumberCache
@@ -24,7 +25,7 @@ class MatchCache(NumberCache):
         self.schedule_propose = None
         self.schedule_task = None
         self.schedule_task_done = False
-        self.outstanding_request = None
+        self.outstanding_requests = []
         self.received_responses_ids = set()
         self.queue = MatchPriorityQueue(self.order)
 
@@ -58,17 +59,18 @@ class MatchCache(NumberCache):
         if not exists:
             self.matches[other_order_id].append(match_payload)
 
-        if not self.queue.contains_order(other_order_id) and not (self.outstanding_request and self.outstanding_request[2] == other_order_id):
+        if not self.queue.contains_order(other_order_id) and not self.has_outstanding_request_with_order_id(
+                other_order_id):
             self._logger.debug("Adding match payload with own order id %s and other id %s to queue",
                                self.order.order_id, other_order_id)
-            self.queue.insert(0, match_payload.assets.price, other_order_id)
+            self.queue.insert(0, match_payload.assets.price, other_order_id, match_payload.assets.first.amount)
 
         if not self.schedule_task:
             # Schedule a timer
             self._logger.info("Scheduling batch match of order %s" % str(self.order.order_id))
             self.schedule_task = call_later(self.community.settings.match_window,
                                             self.start_process_matches, ignore_errors=True)
-        elif self.schedule_task_done and not self.outstanding_request:
+        elif self.schedule_task_done and not self.outstanding_requests:
             # If we are currently not processing anything and the schedule task is done, process the matches
             self.process_match()
 
@@ -82,7 +84,7 @@ class MatchCache(NumberCache):
         # It could be that the order has already been completed while waiting - we should let the matchmaker know
         if self.order.status != "open":
             self._logger.info("Order %s is already fulfilled - notifying matchmakers", self.order.order_id)
-            for _, matches in self.matches.iteritems():
+            for _, matches in self.matches.items():
                 for match_payload in matches:
                     # Send a declined trade back
                     other_order_id = OrderId(match_payload.trader_id, match_payload.order_number)
@@ -98,24 +100,30 @@ class MatchCache(NumberCache):
         """
         Process the first eligible match. First, we sort the list based on price.
         """
-        if self.order.available_quantity == 0:
-            self._logger.debug("No available quantity for order when processing!")
-            return
-
-        item = self.queue.delete()
-        if not item:
-            self._logger.info("Done with processsing match queue for order %s!", self.order.order_id)
-        else:
-            retries, _, other_order_id = item
-            self.outstanding_request = item
+        items_processed = 0
+        while self.order.available_quantity > 0 and not self.queue.is_empty():
+            item = self.queue.delete()
+            retries, price, other_order_id, other_quantity = item
+            self.outstanding_requests.append(item)
             if retries == 0:
-                # To prevent all traders from proposing at the same time, we want a small delay
-                delay = random.uniform(0, 0)
+                propose_quantity = min(self.order.available_quantity, other_quantity)
+                self.order.reserve_quantity_for_tick(other_order_id, propose_quantity)
+                self.community.order_manager.order_repository.update(self.order)
+                ensure_future(self.community.accept_match_and_propose(self.order, other_order_id, price, other_quantity,
+                                                                      propose_quantity=propose_quantity,
+                                                                      should_reserve=False))
             else:
-                delay = random.uniform(1, 2)
-            self.schedule_propose = call_later(delay,
-                                               self.community.accept_match_and_propose,
-                                               self.order, other_order_id, ignore_errors=True)
+                task_id = "%s-%s" % (self.order.order_id, other_order_id)
+                if not self.community.is_pending_task_active(task_id):
+                    delay = random.uniform(1, 2)
+                    self.community.register_task(task_id, self.community.accept_match_and_propose, self.order,
+                                                 other_order_id, price, other_quantity, delay=delay)
+            items_processed += 1
+
+            if items_processed == self.community.settings.match_process_batch_size:  # Limit the number of outgoing items when processing
+                break
+
+        self._logger.debug("Processed %d items in this batch", items_processed)
 
     def received_decline_trade(self, other_order_id, decline_reason):
         """
@@ -144,18 +152,47 @@ class MatchCache(NumberCache):
                                                           match_payload.matchmaker_trader_id,
                                                           DeclineMatchReason.OTHER)
         elif decline_reason in [DeclinedTradeReason.ORDER_RESERVED, DeclinedTradeReason.ALREADY_TRADING] and \
-                self.outstanding_request:
+                self.has_outstanding_request_with_order_id(other_order_id):
             # Add it to the queue again
-            self._logger.debug("Adding entry (%d, %s, %s) to matching queue again", *self.outstanding_request)
-            self.queue.insert(self.outstanding_request[0] + 1, self.outstanding_request[1], self.outstanding_request[2])
-        elif decline_reason == DeclinedTradeReason.NO_AVAILABLE_QUANTITY and self.outstanding_request:
+            outstanding_request = self.get_outstanding_request_with_order_id(other_order_id)
+            self._logger.debug("Adding entry (%d, %s, %s, %d) to matching queue again", *outstanding_request)
+            self.queue.insert(outstanding_request[0] + 1, outstanding_request[1], outstanding_request[2], outstanding_request[3])
+        elif decline_reason == DeclinedTradeReason.NO_AVAILABLE_QUANTITY and \
+                self.has_outstanding_request_with_order_id(other_order_id):
             # Re-add the item to the queue, with the same priority
-            self.queue.insert(self.outstanding_request[0], self.outstanding_request[1], self.outstanding_request[2])
+            outstanding_request = self.get_outstanding_request_with_order_id(other_order_id)
+            self.queue.insert(outstanding_request[0], outstanding_request[1], outstanding_request[2], outstanding_request[3])
 
-        self.outstanding_request = None
+        self.remove_outstanding_requests_with_order_id(other_order_id)
 
         if self.order.status == "open":
             self.process_match()
+
+    def has_outstanding_request_with_order_id(self, order_id):
+        for _, _, item_order_id, _ in self.outstanding_requests:
+            if order_id == order_id:
+                return True
+
+        return False
+
+    def get_outstanding_request_with_order_id(self, order_id):
+        for item in self.outstanding_requests:
+            _, _, item_order_id, _ = item
+            if order_id == order_id:
+                return item
+
+        return None
+
+    def remove_outstanding_requests_with_order_id(self, order_id):
+        # Remove outstanding request entries with this order id
+        to_remove = []
+        for item in self.outstanding_requests:
+            _, _, item_order_id, _ = item
+            if item_order_id == order_id:
+                to_remove.append(item)
+
+        for item in to_remove:
+            self.outstanding_requests.remove(item)
 
     def remove_order(self, order_id):
         """
@@ -173,8 +210,8 @@ class MatchCache(NumberCache):
         """
         We just performed a trade with a counterparty.
         """
-        self.outstanding_request = None
         other_order_id = transaction.partner_order_id
+        self.remove_outstanding_requests_with_order_id(other_order_id)
         if other_order_id not in self.matches:
             return
 
