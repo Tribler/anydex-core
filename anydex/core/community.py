@@ -451,7 +451,7 @@ class MarketCommunity(Community, BlockListener):
                                 OrderNumber(tx_dict["tx"]["partner_order_number"]))
             self.match_order_ids([order_id1, order_id2])
 
-    def process_tx_payment_block(self, block):
+    async def process_tx_payment_block(self, block):
         """
         Process a TrustChain block containing a payment.
         :param block: The TrustChain block containing the payment info.
@@ -470,29 +470,18 @@ class MarketCommunity(Community, BlockListener):
             if transaction.is_payment_complete():
                 order = self.order_manager.order_repository.find_by_id(transaction.order_id)
 
-                def on_tx_done_signed(future):
-                    """
-                    We received the signed block from the counterparty, wrap everything up
-                    """
-                    block = future.result()
-                    self.send_matched_transaction_completed(transaction, block)
+                other_order_dict = await self.send_order_status_request(transaction.partner_order_id)
+                my_order_dict = order.to_status_dictionary()
 
-                def build_tx_done_block(future):
-                    other_order_dict = future.result()
-                    my_order_dict = order.to_status_dictionary()
+                if order.is_ask():
+                    ask_order_dict = my_order_dict
+                    bid_order_dict = other_order_dict
+                else:
+                    ask_order_dict = other_order_dict
+                    bid_order_dict = my_order_dict
 
-                    if order.is_ask():
-                        ask_order_dict = my_order_dict
-                        bid_order_dict = other_order_dict
-                    else:
-                        ask_order_dict = other_order_dict
-                        bid_order_dict = my_order_dict
-
-                    ensure_future(self.create_new_tx_done_block(transaction.trading_peer, ask_order_dict,
-                                                                bid_order_dict, transaction)).\
-                        add_done_callback(on_tx_done_signed)
-
-                self.send_order_status_request(transaction.partner_order_id).add_done_callback(build_tx_done_block)
+                tx_done_block = await self.create_new_tx_done_block(transaction.trading_peer, ask_order_dict, bid_order_dict, transaction)
+                self.send_matched_transaction_completed(transaction, tx_done_block)
 
     def process_tx_done_block(self, block):
         """
@@ -593,7 +582,7 @@ class MarketCommunity(Community, BlockListener):
             return
 
         cache = self.request_cache.pop("ping", payload.identifier)
-        get_event_loop().call_soon_threadsafe(cache.request_future.set_result, True)
+        cache.request_future.set_result(True)
 
     def verify_offer_creation(self, assets, timeout):
         """
@@ -648,6 +637,7 @@ class MarketCommunity(Community, BlockListener):
 
         blocks = await self.create_new_tick_block(tick)
         block, _ = blocks
+        self.logger.info("Ask created with asset pair %s", assets)
         order.broadcast_peers = self.broadcast_block(block)
         if self.is_matchmaker:
             tick.block_hash = block.hash
@@ -739,12 +729,12 @@ class MarketCommunity(Community, BlockListener):
         if block.transaction.get("version") != self.PROTOCOL_VERSION:
             return
 
-        if block.type in (b"ask", b"bid"):
+        if block.type in (b"ask", b"bid") and block.public_key != self.trustchain.my_peer.public_key.key_to_bin():
             self.process_tick_block(block)
         elif block.type == b"tx_init":
             self.process_tx_init_block(block)
         elif block.type == b"tx_payment":
-            self.process_tx_payment_block(block)
+            ensure_future(self.process_tx_payment_block(block))
         elif block.type == b"tx_done":
             self.process_tx_done_block(block)
         elif block.type == b"cancel_order":
@@ -1466,7 +1456,7 @@ class MarketCommunity(Community, BlockListener):
             "timestamp": int(payload.timestamp),
         }
 
-        get_event_loop().call_soon_threadsafe(request.request_future.set_result, order_dict)
+        request.request_future.set_result(order_dict)
 
     async def send_payment(self, transaction):
         order = self.order_manager.order_repository.find_by_id(transaction.order_id)
@@ -1610,33 +1600,33 @@ class MarketCommunity(Community, BlockListener):
                 # One of the blocks is yours.
                 if len(block_pair) == 1:
                     # This should be the source block created by peer_pk - this peer is not responsible anymore
-                    tx_status.remove(txid)
+                    tx_status.discard(txid)
                 elif len(block_pair) == 2:
                     if block_pair[0].public_key == peer_pk:
-                        tx_status.remove(txid)
+                        tx_status.discard(txid)
                     else:
                         tx_status.add(txid)
             elif block.type == b'tx_done':
                 txid = unhexlify(block.transaction["tx"]["transaction_id"])
                 if txid in tx_status:
-                    tx_status.remove(txid)
+                    tx_status.discard(txid)
 
         # Now we consider what happens when adding the new block
         if is_block_initiator:
             if new_block_type == b'tx_init':
                 tx_status.add("new_tx")  # We don't have the tx id so just use a bogus transaction id.
             elif new_block_type == b'tx_payment':
-                tx_status.remove(block_txid)
+                tx_status.discard(block_txid)
             elif new_block_type == b'tx_done':
                 if block_txid in tx_status:
-                    tx_status.remove(block_txid)
+                    tx_status.discard(block_txid)
         else:
             if counter_sign_block.type == b'tx_payment':
                 txid = unhexlify(counter_sign_block.transaction["payment"]["transaction_id"])
                 tx_status.add(txid)
             elif counter_sign_block.type == b'tx_done':
                 txid = unhexlify(counter_sign_block.transaction["tx"]["transaction_id"])
-                tx_status.remove(txid)
+                tx_status.discard(txid)
 
         return tx_status
 
