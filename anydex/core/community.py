@@ -789,7 +789,7 @@ class MarketCommunity(Community, BlockListener):
         return self.trustchain.create_source_block(block_type=b'cancel_order', transaction=tx_dict)
 
     @synchronized
-    def create_new_tx_init_block(self, peer, accepted_trade):
+    async def create_new_tx_init_block(self, peer: Peer, accepted_trade: AcceptedTrade) -> Transaction:
         """
         Create a block on TradeChain defining initiation of a transaction.
 
@@ -797,10 +797,6 @@ class MarketCommunity(Community, BlockListener):
         :param: ask_order_dict: A dictionary containing the status of the ask order
         :param: bid_order_dict: A dictionary containing the status of the bid order
         :param accepted_trade: Details on the accepted trade
-        :type peer: Peer
-        :type accepted_trade: AcceptedTrade
-        :return: A deferred that fires when the transaction counterparty has signed and returned the block.
-        :rtype: Deferred
         """
         order = self.order_manager.order_repository.find_by_id(accepted_trade.recipient_order_id)
         incoming_address, outgoing_address = self.get_order_addresses(order)
@@ -815,31 +811,20 @@ class MarketCommunity(Community, BlockListener):
                                                                 is_block_initiator=True)),
             "version": self.PROTOCOL_VERSION
         }
-        block_future = self.trustchain.sign_block(peer, peer.public_key.key_to_bin(),
+        blocks = await self.trustchain.sign_block(peer, peer.public_key.key_to_bin(),
                                                   block_type=b'tx_init', transaction=tx_dict)
-        transaction_future = Future()
 
-        def on_tx_init_signed(future):
-            try:
-                blocks = future.result()
-            except Exception as e:
-                self.logger.error("Future resulted in error: %s", e)
-                return
+        transaction_id = TransactionId(blocks[1].hash)
+        transaction = Transaction.from_accepted_trade(accepted_trade, transaction_id)
+        transaction.trading_peer = peer
 
-            transaction_id = TransactionId(blocks[1].hash)
-            transaction = Transaction.from_accepted_trade(accepted_trade, transaction_id)
-            transaction.trading_peer = peer
+        transaction.incoming_address = incoming_address
+        transaction.outgoing_address = outgoing_address
+        transaction.partner_incoming_address = WalletAddress(blocks[0].transaction["wallets"]["incoming"])
+        transaction.partner_outgoing_address = WalletAddress(blocks[0].transaction["wallets"]["outgoing"])
 
-            transaction.incoming_address = incoming_address
-            transaction.outgoing_address = outgoing_address
-            transaction.partner_incoming_address = WalletAddress(blocks[0].transaction["wallets"]["incoming"])
-            transaction.partner_outgoing_address = WalletAddress(blocks[0].transaction["wallets"]["outgoing"])
-
-            self.transaction_manager.transaction_repository.add(transaction)
-            transaction_future.set_result(transaction)
-
-        block_future.add_done_callback(on_tx_init_signed)
-        return transaction_future
+        self.transaction_manager.transaction_repository.add(transaction)
+        return transaction
 
     @synchronized
     async def create_new_tx_payment_block(self, peer, payment):
@@ -1458,7 +1443,7 @@ class MarketCommunity(Community, BlockListener):
 
         request.request_future.set_result(order_dict)
 
-    async def send_payment(self, transaction):
+    async def send_payment(self, transaction: Transaction):
         order = self.order_manager.order_repository.find_by_id(transaction.order_id)
 
         transfer_amount = transaction.next_payment(order.is_ask(), self.settings.transfers_per_trade)
