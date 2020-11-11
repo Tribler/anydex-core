@@ -10,3 +10,4 @@ class MarketSettings(object):
         self.num_order_sync = 10        # How many orders to sync at most
         self.max_concurrent_trades = 0  # How many concurrent trades with risky counterparties we allow, 0 = unlimited
         self.transfers_per_trade = 1    # How many transfers each side should do when trading, defaults to 1
+        self.match_process_batch_size = 20  # How many match items we process in one batch

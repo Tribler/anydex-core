@@ -28,9 +28,10 @@ class TestMatchQueue(unittest.TestCase):
         Test the priority mechanism of the queue
         """
         order_id = OrderId(TraderId(b'1' * 20), OrderNumber(1))
-        self.queue.insert(1, Price(1, 1, 'DUM1', 'DUM2'), order_id)
-        self.queue.insert(0, Price(1, 1, 'DUM1', 'DUM2'), order_id)
-        self.queue.insert(2, Price(1, 1, 'DUM1', 'DUM2'), order_id)
+        other_order_id = OrderId(TraderId(b'2' * 20), OrderNumber(1))
+        self.queue.insert(1, Price(1, 1, 'DUM1', 'DUM2'), order_id, other_order_id)
+        self.queue.insert(0, Price(1, 1, 'DUM1', 'DUM2'), order_id, other_order_id)
+        self.queue.insert(2, Price(1, 1, 'DUM1', 'DUM2'), order_id, other_order_id)
 
         item1 = self.queue.delete()
         item2 = self.queue.delete()
@@ -40,9 +41,9 @@ class TestMatchQueue(unittest.TestCase):
         self.assertEqual(item3[0], 2)
 
         # Same retries, different prices
-        self.queue.insert(1, Price(1, 1, 'DUM1', 'DUM2'), order_id)
-        self.queue.insert(1, Price(1, 2, 'DUM1', 'DUM2'), order_id)
-        self.queue.insert(1, Price(1, 3, 'DUM1', 'DUM2'), order_id)
+        self.queue.insert(1, Price(1, 1, 'DUM1', 'DUM2'), order_id, other_order_id)
+        self.queue.insert(1, Price(1, 2, 'DUM1', 'DUM2'), order_id, other_order_id)
+        self.queue.insert(1, Price(1, 3, 'DUM1', 'DUM2'), order_id, other_order_id)
 
         item1 = self.queue.delete()
         item2 = self.queue.delete()
@@ -53,9 +54,9 @@ class TestMatchQueue(unittest.TestCase):
 
         # Test with bid order
         self.queue = MatchPriorityQueue(self.bid_order)
-        self.queue.insert(1, Price(1, 1, 'DUM1', 'DUM2'), order_id)
-        self.queue.insert(1, Price(1, 2, 'DUM1', 'DUM2'), order_id)
-        self.queue.insert(1, Price(1, 3, 'DUM1', 'DUM2'), order_id)
+        self.queue.insert(1, Price(1, 1, 'DUM1', 'DUM2'), order_id, other_order_id)
+        self.queue.insert(1, Price(1, 2, 'DUM1', 'DUM2'), order_id, other_order_id)
+        self.queue.insert(1, Price(1, 3, 'DUM1', 'DUM2'), order_id, other_order_id)
 
         item1 = self.queue.delete()
         item2 = self.queue.delete()
