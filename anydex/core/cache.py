@@ -32,6 +32,9 @@ class MatchCache(NumberCache):
     def timeout_delay(self):
         return 7200.0
 
+    def on_timeout(self):
+        pass
+
     def add_match(self, match_payload):
         """
         Add a match to the queue.
