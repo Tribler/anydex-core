@@ -1,11 +1,13 @@
 import random
-from asyncio import Future, ensure_future, gather, get_event_loop
+from asyncio import Future, ensure_future, gather
 from base64 import b64decode
 from binascii import hexlify, unhexlify
 from functools import wraps
+from typing import Dict, List, Optional, Tuple
 
 from ipv8.community import Community, lazy_wrapper
 from ipv8.dht import DHTError
+from ipv8.messaging.payload import IntroductionRequestPayload, IntroductionResponsePayload
 from ipv8.messaging.payload_headers import BinMemberAuthenticationPayload
 from ipv8.messaging.payload_headers import GlobalTimeDistributionPayload
 from ipv8.peer import Peer
@@ -13,6 +15,7 @@ from ipv8.requestcache import RequestCache
 from ipv8.util import succeed
 
 from anydex.core import DeclineMatchReason, DeclinedTradeReason, MAX_ORDER_TIMEOUT
+from anydex.core.assetpair import AssetPair
 from anydex.core.block import MarketBlock
 from anydex.core.bloomfilter import BloomFilter
 from anydex.core.cache import MatchCache, OrderStatusRequestCache, PingRequestCache, ProposedTradeRequestCache,\
@@ -22,7 +25,7 @@ from anydex.core.database import MarketDB
 from anydex.core.defs import *
 from anydex.core.matching_engine import MatchingEngine, PriceTimeStrategy
 from anydex.core.message import TraderId
-from anydex.core.order import OrderId, OrderNumber
+from anydex.core.order import Order, OrderId, OrderNumber
 from anydex.core.order_manager import OrderManager
 from anydex.core.order_repository import DatabaseOrderRepository, MemoryOrderRepository
 from anydex.core.orderbook import DatabaseOrderBook, OrderBook
@@ -33,6 +36,7 @@ from anydex.core.payment import Payment
 from anydex.core.payment_id import PaymentId
 from anydex.core.settings import MarketSettings
 from anydex.core.tick import Ask, Bid, Tick
+from anydex.core.tickentry import TickEntry
 from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
 from anydex.core.trade import AcceptedTrade, CounterTrade, DeclinedTrade, ProposedTrade, Trade
@@ -131,17 +135,16 @@ class MarketCommunity(Community, BlockListener):
 
         self.logger.info("Market community initialized with mid %s", hexlify(self.mid).decode())
 
-    def initialize_trustchain(self):
+    def initialize_trustchain(self) -> None:
         market_block_types = [b'ask', b'bid', b'cancel_order', b'tx_init', b'tx_payment', b'tx_done']
         self.trustchain.settings.block_types_bc_disabled |= set(market_block_types)
         self.trustchain.add_listener(self, market_block_types)
 
-    async def get_address_for_trader(self, trader_id):
+    async def get_address_for_trader(self, trader_id: TraderId) -> Optional[Tuple]:
         """
         Fetch the address for a trader.
         If not available in the local storage, perform a DHT request to fetch the address of the peer with a
         specified trader ID.
-        Return a Deferred that fires either with the address or None if the peer could not be found in the DHT.
         """
         if bytes(trader_id) == self.mid:
             return self.get_ipv8_address()
@@ -164,7 +167,7 @@ class MarketCommunity(Community, BlockListener):
             self.update_ip(trader_id, peers[0].address)
             return peers[0].address
 
-    def get_peer_from_mid(self, peer_mid):
+    def get_peer_from_mid(self, peer_mid: bytes) -> Optional[Peer]:
         """
         Find a peer by mid.
         """
@@ -172,7 +175,7 @@ class MarketCommunity(Community, BlockListener):
         matches = [p for p in peers if p.mid == peer_mid]
         return matches[0] if matches else None
 
-    async def should_sign(self, block):
+    async def should_sign(self, block: MarketBlock) -> bool:
         """
         Check whether we should sign the incoming block.
         """
@@ -213,7 +216,7 @@ class MarketCommunity(Community, BlockListener):
 
         return False  # Unknown block type
 
-    def on_counter_signed_block(self, block):
+    def on_counter_signed_block(self, block: MarketBlock) -> None:
         if block.type == b"tx_payment":
             # Send the next payment, if we are not done yet
             txid = TransactionId(unhexlify(block.transaction["payment"]["transaction_id"]))
@@ -245,7 +248,7 @@ class MarketCommunity(Community, BlockListener):
                                                 address=self.lookup_ip(transaction.partner_order_id.trader_id))
                 self.transaction_manager.transaction_repository.add(transaction)
 
-    def get_counter_tx(self, block):
+    def get_counter_tx(self, block: MarketBlock) -> Dict:
         """
         Return the counter tx, with information on the number of ongoing trades.
         """
@@ -265,7 +268,7 @@ class MarketCommunity(Community, BlockListener):
 
         return tx
 
-    def enable_matchmaker(self):
+    def enable_matchmaker(self) -> None:
         """
         Enable this node to be a matchmaker
         """
@@ -277,7 +280,7 @@ class MarketCommunity(Community, BlockListener):
         self.matching_engine = MatchingEngine(PriceTimeStrategy(self.order_book))
         self.is_matchmaker = True
 
-    def disable_matchmaker(self):
+    def disable_matchmaker(self) -> None:
         """
         Disable the matchmaker status of this node
         """
@@ -285,21 +288,21 @@ class MarketCommunity(Community, BlockListener):
         self.matching_engine = None
         self.is_matchmaker = False
 
-    def create_introduction_request(self, socket_address, extra_bytes=b'', new_style=False):
+    def create_introduction_request(self, socket_address: Tuple, extra_bytes: bytes = b'', new_style: bool = False):
         extra_payload = InfoPayload(TraderId(self.mid), Timestamp.now(), self.is_matchmaker)
         extra_bytes = self.serializer.pack_serializable(extra_payload)
         return super(MarketCommunity, self).create_introduction_request(socket_address, extra_bytes)
 
-    def create_introduction_response(self, lan_socket_address, socket_address, identifier,
-                                     introduction=None, extra_bytes=b'', new_style=False):
+    def create_introduction_response(self, lan_socket_address: Tuple, socket_address: Tuple, identifier: bytes,
+                                     introduction=None, extra_bytes: bytes = b'', new_style: bool = False):
         extra_payload = InfoPayload(TraderId(self.mid), Timestamp.now(), self.is_matchmaker)
         extra_bytes = self.serializer.pack_serializable(extra_payload)
         return super(MarketCommunity, self).create_introduction_response(lan_socket_address, socket_address,
                                                                          identifier, introduction, extra_bytes)
 
-    def parse_extra_bytes(self, extra_bytes, peer):
+    def parse_extra_bytes(self, extra_bytes: bytes, peer: Peer) -> None:
         if not extra_bytes:
-            return False
+            return
 
         payload = self.serializer.unpack_serializable(InfoPayload, extra_bytes)[0]
         self.update_ip(payload.trader_id, peer.address)
@@ -307,17 +310,17 @@ class MarketCommunity(Community, BlockListener):
         if payload.is_matchmaker:
             self.add_matchmaker(peer)
 
-    def introduction_request_callback(self, peer, dist, payload):
+    def introduction_request_callback(self, peer: Peer, _, payload: IntroductionRequestPayload) -> None:
         if self.is_matchmaker and peer.address not in self.network.blacklist:
             self.send_orderbook_sync(peer)
         self.parse_extra_bytes(payload.extra_bytes, peer)
 
-    def introduction_response_callback(self, peer, dist, payload):
+    def introduction_response_callback(self, peer, dist, payload: IntroductionResponsePayload) -> None:
         if self.is_matchmaker and peer.address not in self.network.blacklist:
             self.send_orderbook_sync(peer)
         self.parse_extra_bytes(payload.extra_bytes, peer)
 
-    def send_orderbook_sync(self, peer):
+    def send_orderbook_sync(self, peer: Peer) -> None:
         """
         Send an orderbook sync message to a specific peer.
         """
@@ -329,14 +332,14 @@ class MarketCommunity(Community, BlockListener):
         packet = self._ez_pack(self._prefix, MSG_BOOK_SYNC, [auth, payload])
         self.endpoint.send(peer.address, packet)
 
-    def get_orders_bloomfilter(self):
+    def get_orders_bloomfilter(self) -> BloomFilter:
         order_ids = [bytes(order_id) for order_id in self.order_book.get_order_ids()]
         orders_bloom_filter = BloomFilter(0.005, max(len(order_ids), 1), prefix=b' ')
         if order_ids:
             orders_bloom_filter.add_keys(order_ids)
         return orders_bloom_filter
 
-    async def unload(self):
+    async def unload(self) -> None:
         # Clear match caches
         for match_cache in self.get_match_caches():
             if match_cache.schedule_task:
@@ -354,14 +357,14 @@ class MarketCommunity(Community, BlockListener):
         self.market_database.close()
         await super(MarketCommunity, self).unload()
 
-    def get_ipv8_address(self):
+    def get_ipv8_address(self) -> Tuple:
         """
         Returns the address of the IPV8 instance. This method is here to make the experiments on the DAS5 succeed;
         direct messaging is not possible there with a wan address so we are using the local address instead.
         """
         return self.my_estimated_lan if self.use_local_address else self.my_estimated_wan
 
-    def get_order_addresses(self, order):
+    def get_order_addresses(self, order: Order) -> Tuple[WalletAddress, WalletAddress]:
         """
         Return a tuple of incoming and outgoing payment address of an order.
         """
@@ -372,7 +375,7 @@ class MarketCommunity(Community, BlockListener):
             return (WalletAddress(self.wallets[order.assets.first.asset_id].get_address()),
                     WalletAddress(self.wallets[order.assets.second.asset_id].get_address()))
 
-    def match_order_ids(self, order_ids):
+    def match_order_ids(self, order_ids: List[OrderId]) -> None:
         """
         Attempt to match the ticks with the provided order ids
         :param order_ids: The order ids to match
@@ -381,7 +384,7 @@ class MarketCommunity(Community, BlockListener):
             if self.order_book.tick_exists(order_id):
                 self.match(self.order_book.get_tick(order_id))
 
-    def match(self, tick):
+    def match(self, tick: Tick) -> int:
         """
         Try to find a match for a specific tick and send proposed trade messages if there is a match
         :param tick: The tick to find matches for
@@ -399,30 +402,26 @@ class MarketCommunity(Community, BlockListener):
         self.send_match_messages(matched_ticks, tick.order_id)
         return len(matched_ticks)
 
-    def lookup_ip(self, trader_id):
+    def lookup_ip(self, trader_id: TraderId) -> Optional[Tuple]:
         """
         Lookup the ip for the public key to send a message to a specific node
 
         :param trader_id: The public key of the node to send to
-        :type trader_id: TraderId
         :return: The ip and port tuple: (<ip>, <port>)
-        :rtype: tuple
         """
         return self.mid_register.get(trader_id)
 
-    def update_ip(self, trader_id, ip):
+    def update_ip(self, trader_id: TraderId, ip: Tuple) -> None:
         """
         Update the public key to ip mapping
 
         :param trader_id: The public key of the node
         :param ip: The ip and port of the node
-        :type trader_id: TraderId
-        :type ip: tuple
         """
         self.logger.debug("Updating ip of trader %s to (%s, %s)", trader_id.as_hex(), ip[0], ip[1])
         self.mid_register[trader_id] = ip
 
-    def process_tick_block(self, block):
+    def process_tick_block(self, block: MarketBlock) -> None:
         """
         Process a TradeChain block containing a tick, only if we have a verified order.
         :param block: The TradeChain block containing the tick
@@ -434,7 +433,7 @@ class MarketCommunity(Community, BlockListener):
         tick = Ask.from_block(block) if block.type == b'ask' else Bid.from_block(block)
         ensure_future(self.on_tick(tick))
 
-    def process_tx_init_block(self, block):
+    def process_tx_init_block(self, block: MarketBlock) -> None:
         """
         Process a TrustChain block containing a transaction initialisation
         :param block: The TrustChain block containing the transaction initialisation
@@ -451,7 +450,7 @@ class MarketCommunity(Community, BlockListener):
                                 OrderNumber(tx_dict["tx"]["partner_order_number"]))
             self.match_order_ids([order_id1, order_id2])
 
-    async def process_tx_payment_block(self, block):
+    async def process_tx_payment_block(self, block: MarketBlock) -> None:
         """
         Process a TrustChain block containing a payment.
         :param block: The TrustChain block containing the payment info.
@@ -483,7 +482,7 @@ class MarketCommunity(Community, BlockListener):
                 tx_done_block = await self.create_new_tx_done_block(transaction.trading_peer, ask_order_dict, bid_order_dict, transaction)
                 self.send_matched_transaction_completed(transaction, tx_done_block)
 
-    def process_tx_done_block(self, block):
+    def process_tx_done_block(self, block: MarketBlock) -> None:
         """
         Process a TrustChain block containing a transaction completion
         :param block: The TradeChain block containing the transaction completion
@@ -508,7 +507,7 @@ class MarketCommunity(Community, BlockListener):
                                    OrderNumber(tx_dict["bid"]["order_number"]))
             self.match_order_ids([ask_order_id, bid_order_id])
 
-    def process_cancel_order_block(self, block):
+    def process_cancel_order_block(self, block: MarketBlock) -> None:
         """
         Process a TradeChain block containing a order cancellation
         :param block: The TradeChain block containing the order cancellation
@@ -524,7 +523,7 @@ class MarketCommunity(Community, BlockListener):
             self.cancelled_orders.add(order_id)
 
     @lazy_wrapper(OrderbookSyncPayload)
-    def received_orderbook_sync(self, peer, payload):
+    def received_orderbook_sync(self, peer: Peer, payload: OrderbookSyncPayload) -> None:
         if not self.is_matchmaker:
             return
 
@@ -541,7 +540,7 @@ class MarketCommunity(Community, BlockListener):
             if tick_block:
                 self.trustchain.send_block(tick_block, address=peer.address)
 
-    def ping_peer(self, peer):
+    def ping_peer(self, peer: Peer) -> Future:
         """
         Ping a specific peer. Return a deferred that fires with a boolean value whether the peer responded within time.
         """
@@ -551,7 +550,7 @@ class MarketCommunity(Community, BlockListener):
         self.send_ping(peer, cache.number)
         return future
 
-    def send_ping(self, peer, identifier):
+    def send_ping(self, peer: Peer, identifier: int) -> None:
         """
         Send a ping message with an identifier to a specific peer.
         """
@@ -562,10 +561,10 @@ class MarketCommunity(Community, BlockListener):
         self.endpoint.send(peer.address, packet)
 
     @lazy_wrapper(PingPongPayload)
-    def received_ping(self, peer, payload):
+    def received_ping(self, peer: Peer, payload: PingPongPayload) -> None:
         self.send_pong(peer, payload.identifier)
 
-    def send_pong(self, peer, identifier):
+    def send_pong(self, peer: Peer, identifier: int) -> None:
         """
         Send a pong message with an identifier to a specific peer.
         """
@@ -576,7 +575,7 @@ class MarketCommunity(Community, BlockListener):
         self.endpoint.send(peer.address, packet)
 
     @lazy_wrapper(PingPongPayload)
-    def received_pong(self, _, payload):
+    def received_pong(self, _, payload: PingPongPayload) -> None:
         if not self.request_cache.has("ping", payload.identifier):
             self.logger.warning("ping cache with id %s not found", payload.identifier)
             return
@@ -584,7 +583,7 @@ class MarketCommunity(Community, BlockListener):
         cache = self.request_cache.pop("ping", payload.identifier)
         cache.request_future.set_result(True)
 
-    def verify_offer_creation(self, assets, timeout):
+    def verify_offer_creation(self, assets: AssetPair, timeout: int) -> None:
         """
         Verify whether we are creating a valid order.
         This method raises a RuntimeError if the created order is not valid.
@@ -614,16 +613,13 @@ class MarketCommunity(Community, BlockListener):
         if timeout > MAX_ORDER_TIMEOUT:
             raise RuntimeError("The timeout for this order should be less than a day")
 
-    async def create_ask(self, assets, timeout):
+    async def create_ask(self, assets: AssetPair, timeout: int) -> Order:
         """
         Create an ask order (sell order)
 
         :param assets: The assets to exchange
         :param timeout: The timeout of the order, when does the order need to be timed out
-        :type assets: AssetPair
-        :type timeout: int
         :return: The created order
-        :rtype: Order
         """
         self.verify_offer_creation(assets, timeout)
 
@@ -635,8 +631,7 @@ class MarketCommunity(Community, BlockListener):
         # Create the tick
         tick = Tick.from_order(order)
 
-        blocks = await self.create_new_tick_block(tick)
-        block, _ = blocks
+        block = await self.create_new_tick_block(tick)
         self.logger.info("Ask created with asset pair %s", assets)
         order.broadcast_peers = self.broadcast_block(block)
         if self.is_matchmaker:
@@ -646,16 +641,13 @@ class MarketCommunity(Community, BlockListener):
             self.match(tick)
         return order
 
-    async def create_bid(self, assets, timeout):
+    async def create_bid(self, assets: AssetPair, timeout: int) -> Order:
         """
         Create an ask order (sell order)
 
         :param assets: The assets to exchange
         :param timeout: The timeout of the order, when does the order need to be timed out
-        :type assets: AssetPair
-        :type timeout: int
         :return: The created order
-        :rtype: Order
         """
         self.verify_offer_creation(assets, timeout)
 
@@ -667,8 +659,7 @@ class MarketCommunity(Community, BlockListener):
         # Create the tick
         tick = Tick.from_order(order)
 
-        blocks = await self.create_new_tick_block(tick)
-        block, _ = blocks
+        block = await self.create_new_tick_block(tick)
         self.logger.info("Bid created with asset pair %s", assets)
         order.broadcast_peers = self.broadcast_block(block)
         if self.is_matchmaker:
@@ -678,7 +669,7 @@ class MarketCommunity(Community, BlockListener):
             self.match(tick)
         return order
 
-    def broadcast_block(self, block):
+    def broadcast_block(self, block: MarketBlock) -> List[Peer]:
         """
         Broadcast a block with market information to matchmakers.
         :param block: The block to broadcast.
@@ -699,7 +690,7 @@ class MarketCommunity(Community, BlockListener):
 
         return broadcast_peers
 
-    def broadcast_block_pair(self, block1, block2):
+    def broadcast_block_pair(self, block1: MarketBlock, block2: MarketBlock) -> List[Peer]:
         """
         Broadcast a block with market information to matchmakers.
         :param block1: The first part of the block pair to broadcast.
@@ -721,7 +712,7 @@ class MarketCommunity(Community, BlockListener):
 
         return broadcast_peers
 
-    def received_block(self, block):
+    def received_block(self, block: MarketBlock) -> None:
         """
         We received a block for the market community.
         Process it accordingly, after checking the version number first.
@@ -740,7 +731,7 @@ class MarketCommunity(Community, BlockListener):
         elif block.type == b"cancel_order":
             self.process_cancel_order_block(block)
 
-    def add_matchmaker(self, matchmaker):
+    def add_matchmaker(self, matchmaker: Peer) -> None:
         """
         Add a matchmaker to the set of known matchmakers. Also check whether there are pending deferreds.
         """
@@ -750,14 +741,12 @@ class MarketCommunity(Community, BlockListener):
         self.matchmakers.add(matchmaker)
 
     @synchronized
-    def create_new_tick_block(self, tick):
+    async def create_new_tick_block(self, tick: Tick) -> MarketBlock:
         """
         Create a block on TradeChain defining a new tick (either ask or bid).
 
         :param tick: The tick we want to persist to the TradeChain.
-        :type tick: Tick
         :return: A MarketBlock with the order details.
-        :rtype: MarketBlock
         """
         block_type = b'ask' if tick.is_ask() else b'bid'
         tx_dict = {
@@ -766,17 +755,14 @@ class MarketCommunity(Community, BlockListener):
                                                                 new_block_type=block_type, is_block_initiator=True)),
             "version": self.PROTOCOL_VERSION
         }
-        return self.trustchain.create_source_block(block_type=block_type, transaction=tx_dict)
+        blocks = await self.trustchain.create_source_block(block_type=block_type, transaction=tx_dict)
+        return blocks[0]
 
     @synchronized
-    def create_new_cancel_order_block(self, order):
+    async def create_new_cancel_order_block(self, order: Order) -> MarketBlock:
         """
         Create a block on TradeChain defining a cancellation of an order.
-
         :param order: The tick order to cancel
-        :type order: Order
-        :return: A MarketBlock with the cancellation details.
-        :rtype: MarketBlock
         """
         tx_dict = {
             "trader_id": order.order_id.trader_id.as_hex(),
@@ -786,10 +772,11 @@ class MarketCommunity(Community, BlockListener):
                                                                 is_block_initiator=True)),
             "version": self.PROTOCOL_VERSION
         }
-        return self.trustchain.create_source_block(block_type=b'cancel_order', transaction=tx_dict)
+        blocks = await self.trustchain.create_source_block(block_type=b'cancel_order', transaction=tx_dict)
+        return blocks[0]
 
     @synchronized
-    def create_new_tx_init_block(self, peer, accepted_trade):
+    async def create_new_tx_init_block(self, peer: Peer, accepted_trade: AcceptedTrade) -> Transaction:
         """
         Create a block on TradeChain defining initiation of a transaction.
 
@@ -797,10 +784,6 @@ class MarketCommunity(Community, BlockListener):
         :param: ask_order_dict: A dictionary containing the status of the ask order
         :param: bid_order_dict: A dictionary containing the status of the bid order
         :param accepted_trade: Details on the accepted trade
-        :type peer: Peer
-        :type accepted_trade: AcceptedTrade
-        :return: A deferred that fires when the transaction counterparty has signed and returned the block.
-        :rtype: Deferred
         """
         order = self.order_manager.order_repository.find_by_id(accepted_trade.recipient_order_id)
         incoming_address, outgoing_address = self.get_order_addresses(order)
@@ -815,43 +798,29 @@ class MarketCommunity(Community, BlockListener):
                                                                 is_block_initiator=True)),
             "version": self.PROTOCOL_VERSION
         }
-        block_future = self.trustchain.sign_block(peer, peer.public_key.key_to_bin(),
+        blocks = await self.trustchain.sign_block(peer, peer.public_key.key_to_bin(),
                                                   block_type=b'tx_init', transaction=tx_dict)
-        transaction_future = Future()
 
-        def on_tx_init_signed(future):
-            try:
-                blocks = future.result()
-            except Exception as e:
-                self.logger.error("Future resulted in error: %s", e)
-                return
+        transaction_id = TransactionId(blocks[1].hash)
+        transaction = Transaction.from_accepted_trade(accepted_trade, transaction_id)
+        transaction.trading_peer = peer
 
-            transaction_id = TransactionId(blocks[1].hash)
-            transaction = Transaction.from_accepted_trade(accepted_trade, transaction_id)
-            transaction.trading_peer = peer
+        transaction.incoming_address = incoming_address
+        transaction.outgoing_address = outgoing_address
+        transaction.partner_incoming_address = WalletAddress(blocks[0].transaction["wallets"]["incoming"])
+        transaction.partner_outgoing_address = WalletAddress(blocks[0].transaction["wallets"]["outgoing"])
 
-            transaction.incoming_address = incoming_address
-            transaction.outgoing_address = outgoing_address
-            transaction.partner_incoming_address = WalletAddress(blocks[0].transaction["wallets"]["incoming"])
-            transaction.partner_outgoing_address = WalletAddress(blocks[0].transaction["wallets"]["outgoing"])
-
-            self.transaction_manager.transaction_repository.add(transaction)
-            transaction_future.set_result(transaction)
-
-        block_future.add_done_callback(on_tx_init_signed)
-        return transaction_future
+        self.transaction_manager.transaction_repository.add(transaction)
+        return transaction
 
     @synchronized
-    async def create_new_tx_payment_block(self, peer, payment):
+    async def create_new_tx_payment_block(self, peer: Peer, payment: Payment) -> MarketBlock:
         """
         Create a block on TrustChain with information about a specific payment.
 
         :param peer: The peer that we did this transaction with
         :param payment: The payment to record
-        :type peer: Peer
-        :type payment: Payment
         :return: A deferred that fires when the transaction counterparty has signed and returned the block.
-        :rtype: Deferred
         """
         tx_dict = {
             "payment": payment.to_dictionary(),
@@ -866,20 +835,16 @@ class MarketCommunity(Community, BlockListener):
         return blocks[0]
 
     @synchronized
-    async def create_new_tx_done_block(self, peer, ask_order_dict, bid_order_dict, transaction):
+    async def create_new_tx_done_block(self, peer: Peer, ask_order_dict: Dict, bid_order_dict: Dict,
+                                       transaction: Transaction) -> MarketBlock:
         """
-        Create a block on TradeChain defining completion of a transaction.
+        Create a block on TrustChain defining completion of a transaction.
 
         :param: peer: The peer to send the block to
         :param: ask_order_dict: A dictionary containing the status of the ask order
         :param: bid_order_dict: A dictionary containing the status of the bid order
         :param transaction: The transaction that has been completed
-        :type peer: Peer
-        :type transaction: Transaction
-        :type ask_order_dict: dict
-        :type bid_order_dict: dict
         :return: A deferred that fires when the transaction counterparty has signed and returned the block.
-        :rtype: Deferred
         """
         tx_dict = {
             "ask": ask_order_dict,
@@ -895,7 +860,7 @@ class MarketCommunity(Community, BlockListener):
                                                   block_type=b'tx_done', transaction=tx_dict)
         return blocks[0]
 
-    async def on_tick(self, tick):
+    async def on_tick(self, tick: Tick) -> None:
         """
         Process an incoming tick.
         :param tick: the received tick to process
@@ -922,11 +887,11 @@ class MarketCommunity(Community, BlockListener):
                     # Only after we have matched our own orders, do the matching with other ticks if necessary
                     self.match(tick)
 
-    def send_match_messages(self, matching_ticks, order_id):
+    def send_match_messages(self, matching_ticks: List[TickEntry], order_id: OrderId) -> None:
         for tick_entry in matching_ticks:
             self.send_match_message(tick_entry.tick, order_id)
 
-    def send_match_message(self, tick, recipient_order_id):
+    def send_match_message(self, tick: Tick, recipient_order_id: OrderId) -> None:
         """
         Send a match message to a specific node
         :param tick: The matched tick
@@ -964,7 +929,7 @@ class MarketCommunity(Community, BlockListener):
                            delay=random.uniform(0, self.settings.match_send_interval))
 
     @lazy_wrapper(MatchPayload)
-    def received_match(self, peer, payload):
+    def received_match(self, peer: Peer, payload: MatchPayload) -> None:
         """
         We received a match message from a matchmaker.
         """
@@ -978,7 +943,7 @@ class MarketCommunity(Community, BlockListener):
 
         self.process_match_payload(payload)
 
-    def process_match_payload(self, payload):
+    def process_match_payload(self, payload: MatchPayload) -> None:
         """
         Process a match payload.
         """
@@ -1005,7 +970,7 @@ class MarketCommunity(Community, BlockListener):
         # Add the match to the cache and process it
         cache.add_match(payload)
 
-    async def accept_match_and_propose(self, order, other_order_id):
+    async def accept_match_and_propose(self, order: Order, other_order_id: OrderId) -> None:
         """
         Accept an incoming match payload and propose a trade to the counterparty
         """
@@ -1052,7 +1017,7 @@ class MarketCommunity(Community, BlockListener):
         # Otherwise, propose!
         await self.propose_trade(order, other_order_id, propose_quantity)
 
-    async def propose_trade(self, order, other_order_id, propose_quantity):
+    async def propose_trade(self, order: Order, other_order_id: OrderId, propose_quantity: int) -> None:
         propose_quantity_scaled = order.assets.proportional_downscale(first=propose_quantity)
 
         propose_trade = Trade.propose(
@@ -1080,7 +1045,8 @@ class MarketCommunity(Community, BlockListener):
             if cache:
                 cache.received_decline_trade(other_order_id, DeclinedTradeReason.ADDRESS_LOOKUP_FAIL)
 
-    def send_decline_match_message(self, order, other_order_id, matchmaker_trader_id, decline_reason):
+    def send_decline_match_message(self, order: Order, other_order_id: OrderId,
+                                   matchmaker_trader_id: TraderId, decline_reason: DeclineMatchReason) -> None:
         address = self.lookup_ip(matchmaker_trader_id)
 
         self.logger.info("Sending decline match message for order %s to trader %s (ip: %s, port: %s)",
@@ -1094,7 +1060,7 @@ class MarketCommunity(Community, BlockListener):
         self.endpoint.send(address, packet)
 
     @lazy_wrapper(DeclineMatchPayload)
-    def received_decline_match(self, _, payload):
+    def received_decline_match(self, _, payload: DeclineMatchPayload) -> None:
         order_id = OrderId(payload.trader_id, payload.order_number)
         matched_order_id = payload.other_order_id
         self.logger.info("Received decline-match message for tick %s matched with %s, reason %s", order_id,
@@ -1122,7 +1088,7 @@ class MarketCommunity(Community, BlockListener):
             # Search for a new match
             self.match(tick_entry.tick)
 
-    async def cancel_order(self, order_id, broadcast=True):
+    async def cancel_order(self, order_id: OrderId, broadcast: bool = True) -> None:
         order = self.order_manager.order_repository.find_by_id(order_id)
         if order and (order.status == "open" or order.status == "unverified"):
             self.order_manager.cancel_order(order_id)
@@ -1131,11 +1097,11 @@ class MarketCommunity(Community, BlockListener):
                 self.order_book.remove_tick(order_id)
 
             if order.verified:
-                blocks = await self.create_new_cancel_order_block(order)
+                block = await self.create_new_cancel_order_block(order)
                 if broadcast:
-                    self.broadcast_block(blocks[0])
+                    self.broadcast_block(block)
 
-    def on_order_completed(self, order_id):
+    def on_order_completed(self, order_id: OrderId) -> None:
         """
         An order has been completed. Update the match caches accordingly
         """
@@ -1143,7 +1109,7 @@ class MarketCommunity(Community, BlockListener):
             cache.remove_order(order_id)
 
     # Proposed trade
-    def send_proposed_trade(self, proposed_trade, address):
+    def send_proposed_trade(self, proposed_trade: ProposedTrade, address: Tuple) -> None:
         payload = proposed_trade.to_network()
 
         self.request_cache.add(ProposedTradeRequestCache(self, proposed_trade))
@@ -1159,29 +1125,29 @@ class MarketCommunity(Community, BlockListener):
         packet = self._ez_pack(self._prefix, MSG_PROPOSED_TRADE, [auth, payload])
         self.endpoint.send(address, packet)
 
-    def check_trade_payload_validity(self, payload):
+    def check_trade_payload_validity(self, payload: TradePayload) -> Tuple[bool, str]:
         if bytes(payload.recipient_order_id.trader_id) != self.mid:
             return False, "this payload is not meant for this node"
 
         if not self.order_manager.order_repository.find_by_id(payload.recipient_order_id):
             return False, "order does not exist"
 
-        return True, ''
+        return True, ""
 
-    def get_outstanding_proposals(self, order_id, partner_order_id):
+    def get_outstanding_proposals(self, order_id: OrderId, partner_order_id: OrderId) -> List[Tuple[int, RequestCache]]:
         return [(proposal_id, cache) for proposal_id, cache in self.request_cache._identifiers.items()
                 if isinstance(cache, ProposedTradeRequestCache)
                 and cache.proposed_trade.order_id == order_id
                 and cache.proposed_trade.recipient_order_id == partner_order_id]
 
-    def get_match_caches(self):
+    def get_match_caches(self) -> List[MatchCache]:
         """
         Return all match caches.
         """
         return [cache for cache in self.request_cache._identifiers.values() if isinstance(cache, MatchCache)]
 
     @lazy_wrapper(TradePayload)
-    async def received_proposed_trade(self, peer, payload):
+    async def received_proposed_trade(self, peer: Peer, payload: TradePayload) -> None:
         validation = self.check_trade_payload_validity(payload)
         if not validation[0]:
             self.logger.warning("Validation of proposed trade payload failed: %s", validation[1])
@@ -1247,7 +1213,7 @@ class MarketCommunity(Community, BlockListener):
                 self.logger.debug("Counter trade made with asset pair %s for proposed trade", counter_trade.assets)
                 self.send_counter_trade(counter_trade)
 
-    async def should_accept_propose_trade(self, proposed_trade, my_order):
+    async def should_accept_propose_trade(self, proposed_trade: ProposedTrade, my_order: Order) -> Tuple[bool, DeclinedTradeReason]:
         # First, check some basic conditions
         should_trade = False
         decline_reason = DeclinedTradeReason.OTHER
@@ -1274,7 +1240,7 @@ class MarketCommunity(Community, BlockListener):
         decline_reason = None if should_trade else DeclinedTradeReason.ALREADY_TRADING
         return should_trade, decline_reason
 
-    def send_decline_trade(self, declined_trade):
+    def send_decline_trade(self, declined_trade: DeclinedTrade) -> None:
         payload = declined_trade.to_network()
 
         auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin())
@@ -1284,7 +1250,7 @@ class MarketCommunity(Community, BlockListener):
         self.endpoint.send(self.lookup_ip(declined_trade.recipient_order_id.trader_id), packet)
 
     @lazy_wrapper(DeclineTradePayload)
-    def received_decline_trade(self, _, payload):
+    def received_decline_trade(self, _, payload: DeclineTradePayload) -> None:
         validation = self.check_trade_payload_validity(payload)
         if not validation[0]:
             self.logger.warning("Validation of decline trade payload failed: %s", validation[1])
@@ -1321,7 +1287,7 @@ class MarketCommunity(Community, BlockListener):
                 cache.remove_order(other_order_id)
 
     # Counter trade
-    def send_counter_trade(self, counter_trade):
+    def send_counter_trade(self, counter_trade: CounterTrade) -> None:
         payload = counter_trade.to_network()
 
         self.request_cache.add(ProposedTradeRequestCache(self, counter_trade))
@@ -1333,7 +1299,7 @@ class MarketCommunity(Community, BlockListener):
         self.endpoint.send(self.lookup_ip(counter_trade.recipient_order_id.trader_id), packet)
 
     @lazy_wrapper(TradePayload)
-    def received_counter_trade(self, _, payload):
+    def received_counter_trade(self, _, payload: TradePayload) -> None:
         validation = self.check_trade_payload_validity(payload)
         if not validation[0]:
             self.logger.warning("Validation of counter trade payload failed: %s", validation[1])
@@ -1384,7 +1350,7 @@ class MarketCommunity(Community, BlockListener):
             self.order_manager.order_repository.update(order)
             self.accept_proposed_trade(counter_trade)
 
-    def accept_proposed_trade(self, proposed_trade):
+    def accept_proposed_trade(self, proposed_trade: ProposedTrade) -> None:
         accepted_trade = Trade.accept(TraderId(self.mid), Timestamp.now(), proposed_trade)
         payload = accepted_trade.to_network()
 
@@ -1395,7 +1361,7 @@ class MarketCommunity(Community, BlockListener):
         self.endpoint.send(self.lookup_ip(proposed_trade.order_id.trader_id), packet)
 
     @lazy_wrapper(TradePayload)
-    async def received_accept_trade(self, peer, payload):
+    async def received_accept_trade(self, peer: Peer, payload: TradePayload) -> None:
         accepted_trade = AcceptedTrade.from_network(payload)
 
         if not self.request_cache.has("proposed-trade", accepted_trade.proposal_id):
@@ -1414,7 +1380,7 @@ class MarketCommunity(Community, BlockListener):
         self.register_anonymous_task('send_payment_%s' % id(transaction), self.send_payment, transaction)
         self.transaction_manager.transaction_repository.update(transaction)
 
-    def send_order_status_request(self, order_id):
+    def send_order_status_request(self, order_id: OrderId) -> Future:
         self.logger.debug("Sending order status request to trader %s (number: %d)",
                           order_id.trader_id.as_hex(), order_id.order_number)
 
@@ -1430,7 +1396,7 @@ class MarketCommunity(Community, BlockListener):
         return request_future
 
     @lazy_wrapper(OrderStatusRequestPayload)
-    def received_order_status_request(self, peer, payload):
+    def received_order_status_request(self, peer: Peer, payload: OrderStatusRequestPayload) -> None:
         order = self.order_manager.order_repository.find_by_id(payload.order_id)
 
         auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin())
@@ -1443,7 +1409,7 @@ class MarketCommunity(Community, BlockListener):
         self.endpoint.send(peer.address, packet)
 
     @lazy_wrapper(OrderStatusResponsePayload)
-    def received_order_status(self, _, payload):
+    def received_order_status(self, _, payload: OrderStatusResponsePayload) -> None:
         request = self.request_cache.pop("order-status-request", payload.identifier)
 
         # Convert the order status to a dictionary that is saved on TradeChain
@@ -1458,7 +1424,7 @@ class MarketCommunity(Community, BlockListener):
 
         request.request_future.set_result(order_dict)
 
-    async def send_payment(self, transaction):
+    async def send_payment(self, transaction: Transaction) -> None:
         order = self.order_manager.order_repository.find_by_id(transaction.order_id)
 
         transfer_amount = transaction.next_payment(order.is_ask(), self.settings.transfers_per_trade)
@@ -1499,7 +1465,7 @@ class MarketCommunity(Community, BlockListener):
         await self.create_new_tx_payment_block(transaction.trading_peer, payment)
         self.logger.info("Payment with id %s acknowledged by counterparty!", payment.payment_id)
 
-    def send_matched_transaction_completed(self, transaction, block):
+    def send_matched_transaction_completed(self, transaction: Transaction, block: MarketBlock) -> None:
         """
         Let the matchmaker know that the transaction has been completed.
         :param transaction: The completed transaction.
@@ -1512,7 +1478,7 @@ class MarketCommunity(Community, BlockListener):
         elif cache:
             cache.did_trade(transaction, block)
 
-    def received_matched_tx_complete(self, _, data):
+    def received_matched_tx_complete(self, _, data: bytes) -> None:
         self.logger.debug("Received transaction-completed message as a matchmaker")
         if not self.is_matchmaker:
             return
@@ -1540,7 +1506,7 @@ class MarketCommunity(Community, BlockListener):
         if tick_entry_sender:
             self.match(tick_entry_sender.tick)
 
-    def send_trader_pk_request(self, trader_id):
+    def send_trader_pk_request(self, trader_id: TraderId) -> Future:
         if trader_id in self.pk_register:
             return succeed(self.pk_register[trader_id])
 
@@ -1558,7 +1524,7 @@ class MarketCommunity(Community, BlockListener):
         return request_future
 
     @lazy_wrapper(PublicKeyPayload)
-    def received_trader_pk_request(self, peer, payload):
+    def received_trader_pk_request(self, peer: Peer, payload: PublicKeyPayload) -> None:
         auth = BinMemberAuthenticationPayload(self.my_peer.public_key.key_to_bin())
         new_payload = PublicKeyPayload(TraderId(self.mid), Timestamp.now(), payload.identifier)
 
@@ -1566,13 +1532,13 @@ class MarketCommunity(Community, BlockListener):
         self.endpoint.send(peer.address, packet)
 
     @lazy_wrapper(PublicKeyPayload)
-    def received_trader_pk_response(self, peer, payload):
+    def received_trader_pk_response(self, peer: Peer, payload: PublicKeyPayload) -> None:
         request = self.request_cache.pop("pk-request", payload.identifier)
         self.pk_register[request.trader_id] = peer.public_key
         request.request_future.set_result(peer.public_key)
 
-    def get_responsible_trades(self, peer_pk, is_block_initiator, new_block_type=None, block_txid=None,
-                               counter_sign_block=None):
+    def get_responsible_trades(self, peer_pk: bytes, is_block_initiator: bool, new_block_type: bytes = None,
+                               block_txid: bytes = None, counter_sign_block: MarketBlock=None):
         """
         Return the set of trades where peer_pk holds responsibility.
         :param peer_pk: The public key in binary format of the peer that we are verifying.
