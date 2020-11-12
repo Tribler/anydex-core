@@ -407,10 +407,7 @@ class TrustChainCommunity(Community):
         link_block_id_int = int(hexlify(blk.linked_block_id), 16) % 100000000
         if self.request_cache.has('sign', link_block_id_int):
             cache = self.request_cache.pop('sign', link_block_id_int)
-
-            # We cannot guarantee that we're on the event loop thread.
-            get_event_loop().call_soon_threadsafe(cache.sign_future.set_result,
-                                                  (blk, self.persistence.get_linked(blk)))
+            cache.sign_future.set_result((blk, self.persistence.get_linked(blk)))
 
         # Is this a request, addressed to us, and have we not signed it already?
         if (blk.link_sequence_number != UNKNOWN_SEQ
@@ -466,7 +463,7 @@ class TrustChainCommunity(Community):
         crawl_future = Future()
         cache = ChainCrawlCache(self, peer, crawl_future, known_chain_length=latest_block_num)
         self.request_cache.add(cache)
-        get_event_loop().call_soon_threadsafe(ensure_future, self.send_next_partial_chain_crawl_request(cache))
+        ensure_future(self.send_next_partial_chain_crawl_request(cache))
         return crawl_future
 
     def crawl_lowest_unknown(self, peer, latest_block_num=None):
