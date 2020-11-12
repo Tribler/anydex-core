@@ -494,6 +494,29 @@ class TestMarketCommunity(TestMarketCommunityBase):
         self.assertFalse(list(self.nodes[2].overlay.transaction_manager.find_all()))
 
     @timeout(4)
+    async def test_e2e_trade_with_policies(self):
+        """
+        Test an e2e trade with clearing policies.
+        """
+        clearing_policy = SingleTradeClearingPolicy(self.nodes[0].overlay, max_concurrent_trades=1)
+        self.nodes[0].overlay.clearing_policies.append(clearing_policy)
+        clearing_policy = SingleTradeClearingPolicy(self.nodes[1].overlay, max_concurrent_trades=1)
+        self.nodes[1].overlay.clearing_policies.append(clearing_policy)
+
+        await self.introduce_nodes()
+
+        order1 = await self.nodes[0].overlay.create_bid(
+            AssetPair(AssetAmount(15, 'DUM1'), AssetAmount(15, 'DUM2')), 3600)
+        order2 = await self.nodes[1].overlay.create_ask(
+            AssetPair(AssetAmount(15, 'DUM1'), AssetAmount(15, 'DUM2')), 3600)
+
+        await sleep(0.5)
+
+        # Verify that the trade has been made
+        self.assertEqual(order1.status, "completed")
+        self.assertEqual(order2.status, "completed")
+
+    @timeout(4)
     async def test_clearing_policy_pending_trade_accept(self):
         """
         Test whether we accept trade with a counterparty who is currently involved in another trade

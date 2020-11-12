@@ -55,6 +55,7 @@ class SingleTradeClearingPolicy(ClearingPolicy):
 
         blocks = await self.community.trustchain.send_crawl_request(peer, peer_pk.key_to_bin(), -1, -1)
         if not blocks:
+            self.logger.info("Counterparty did not send blocks, failing clearing policy")
             return False
 
         block = blocks[0]
