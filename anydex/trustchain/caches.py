@@ -135,14 +135,14 @@ class CrawlRequestCache(NumberCache):
 
         if self.total_half_blocks_expected == 0:
             self.community.request_cache.pop(u"crawl", self.number)
-            get_event_loop().call_soon_threadsafe(self.crawl_future.set_result, [])
+            self.crawl_future.set_result([])
         elif len(self.received_half_blocks) >= self.total_half_blocks_expected:
             self.community.request_cache.pop(u"crawl", self.number)
-            get_event_loop().call_soon_threadsafe(self.crawl_future.set_result, self.received_half_blocks)
+            self.crawl_future.set_result(self.received_half_blocks)
 
     def received_empty_response(self):
         self.community.request_cache.pop(u"crawl", self.number)
-        get_event_loop().call_soon_threadsafe(self.crawl_future.set_result, self.received_half_blocks)
+        self.crawl_future.set_result(self.received_half_blocks)
 
     def on_timeout(self):
         self._logger.info("Timeout for crawl with id %d", self.number)
