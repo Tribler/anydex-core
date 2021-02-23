@@ -2,7 +2,7 @@ import datetime
 import time
 
 
-class Timestamp(object):
+class Timestamp:
     """Used for having a validated instance of a timestamp that we can easily compare."""
 
     def __init__(self, timestamp):
@@ -11,8 +11,6 @@ class Timestamp(object):
         :type timestamp: int
         :raises ValueError: Thrown when one of the arguments are invalid
         """
-        super(Timestamp, self).__init__()
-
         if not isinstance(timestamp, int):
             raise ValueError("Timestamp must be an integer")
 

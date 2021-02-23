@@ -1,7 +1,7 @@
 from binascii import hexlify
 
 
-class TraderId(object):
+class TraderId:
     """Immutable class for representing the id of a trader."""
 
     def __init__(self, trader_id):
@@ -10,8 +10,6 @@ class TraderId(object):
         :type trader_id: bytes
         :raises ValueError: Thrown when one of the arguments are invalid
         """
-        super(TraderId, self).__init__()
-
         trader_id = trader_id if isinstance(trader_id, bytes) else bytes(trader_id)
 
         if len(trader_id) != 20:
@@ -38,7 +36,7 @@ class TraderId(object):
         return hash(self.trader_id)
 
 
-class Message(object):
+class Message:
     """Abstract class for representing a message."""
 
     def __init__(self, trader_id, timestamp):
@@ -50,8 +48,6 @@ class Message(object):
         :type trader_id: TraderId
         :type timestamp: Timestamp
         """
-        super(Message, self).__init__()
-
         self._trader_id = trader_id
         self._timestamp = timestamp
 

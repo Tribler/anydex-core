@@ -17,7 +17,7 @@ class MessagePayload(Payload):
     format_list = ['varlenI', 'Q']
 
     def __init__(self, trader_id, timestamp):
-        super(MessagePayload, self).__init__()
+        super().__init__()
         self.trader_id = trader_id
         self.timestamp = timestamp
 
@@ -36,7 +36,7 @@ class InfoPayload(MessagePayload):
     format_list = MessagePayload.format_list + ['?']
 
     def __init__(self, trader_id, timestamp, is_matchmaker):
-        super(InfoPayload, self).__init__(trader_id, timestamp)
+        super().__init__(trader_id, timestamp)
         self.is_matchmaker = is_matchmaker
 
     def to_pack_list(self):
@@ -57,7 +57,7 @@ class OrderPayload(MessagePayload):
     format_list = MessagePayload.format_list + ['I', 'Q', 'varlenI', 'Q', 'varlenI', 'I', 'Q']
 
     def __init__(self, trader_id, timestamp, order_number, assets, timeout, traded):
-        super(OrderPayload, self).__init__(trader_id, timestamp)
+        super().__init__(trader_id, timestamp)
         self.order_number = order_number
         self.assets = assets
         self.timeout = timeout
@@ -84,7 +84,7 @@ class MatchPayload(OrderPayload):
 
     def __init__(self, trader_id, timestamp, order_number, assets, timeout, traded, recipient_order_number,
                  match_trader_id, matchmaker_trader_id):
-        super(MatchPayload, self).__init__(trader_id, timestamp, order_number, assets, timeout, traded)
+        super().__init__(trader_id, timestamp, order_number, assets, timeout, traded)
         self.recipient_order_number = recipient_order_number
         self.match_trader_id = match_trader_id
         self.matchmaker_trader_id = matchmaker_trader_id
@@ -114,7 +114,7 @@ class DeclineMatchPayload(MessagePayload):
     format_list = MessagePayload.format_list + ['I', 'varlenI', 'I', 'I']
 
     def __init__(self, trader_id, timestamp, order_number, other_order_id, decline_reason):
-        super(DeclineMatchPayload, self).__init__(trader_id, timestamp)
+        super().__init__(trader_id, timestamp)
         self.order_number = order_number
         self.other_order_id = other_order_id
         self.decline_reason = decline_reason
@@ -141,7 +141,7 @@ class TradePayload(MessagePayload):
     format_list = MessagePayload.format_list + ['I', 'varlenI', 'I', 'I', 'Q', 'varlenI', 'Q', 'varlenI']
 
     def __init__(self, trader_id, timestamp, order_number, recipient_order_id, proposal_id, assets):
-        super(TradePayload, self).__init__(trader_id, timestamp)
+        super().__init__(trader_id, timestamp)
         self.order_number = order_number
         self.recipient_order_id = recipient_order_id
         self.proposal_id = proposal_id
@@ -173,7 +173,7 @@ class DeclineTradePayload(MessagePayload):
     format_list = MessagePayload.format_list + ['I', 'varlenI', 'I', 'I', 'I']
 
     def __init__(self, trader_id, timestamp, order_number, recipient_order_id, proposal_id, decline_reason):
-        super(DeclineTradePayload, self).__init__(trader_id, timestamp)
+        super().__init__(trader_id, timestamp)
         self.order_number = order_number
         self.recipient_order_id = recipient_order_id
         self.proposal_id = proposal_id
@@ -204,7 +204,7 @@ class TransactionPayload(MessagePayload):
     format_list = MessagePayload.format_list + ['32s']
 
     def __init__(self, trader_id, timestamp, transaction_id):
-        super(TransactionPayload, self).__init__(trader_id, timestamp)
+        super().__init__(trader_id, timestamp)
         self.transaction_id = transaction_id
 
     def to_pack_list(self):
@@ -221,7 +221,7 @@ class OrderStatusRequestPayload(MessagePayload):
     format_list = MessagePayload.format_list + ['varlenI', 'I', 'I']
 
     def __init__(self, trader_id, timestamp, order_id, identifier):
-        super(OrderStatusRequestPayload, self).__init__(trader_id, timestamp)
+        super().__init__(trader_id, timestamp)
         self.order_id = order_id
         self.identifier = identifier
 
@@ -246,7 +246,7 @@ class OrderStatusResponsePayload(OrderPayload):
     format_list = OrderPayload.format_list + ['I']
 
     def __init__(self, trader_id, timestamp, order_number, assets, timeout, traded, identifier):
-        super(OrderStatusResponsePayload, self).__init__(trader_id, timestamp, order_number, assets, timeout, traded)
+        super().__init__(trader_id, timestamp, order_number, assets, timeout, traded)
         self.identifier = identifier
 
     def to_pack_list(self):
@@ -271,7 +271,7 @@ class OrderbookSyncPayload(MessagePayload):
     format_list = MessagePayload.format_list + ['B', 'c', 'varlenI']
 
     def __init__(self, trader_id, timestamp, bloomfilter):
-        super(OrderbookSyncPayload, self).__init__(trader_id, timestamp)
+        super().__init__(trader_id, timestamp)
         self.bloomfilter = bloomfilter
 
     def to_pack_list(self):
@@ -295,7 +295,7 @@ class PingPongPayload(MessagePayload):
     format_list = MessagePayload.format_list + ['I']
 
     def __init__(self, trader_id, timestamp, identifier):
-        super(PingPongPayload, self).__init__(trader_id, timestamp)
+        super().__init__(trader_id, timestamp)
         self.identifier = identifier
 
     def to_pack_list(self):
@@ -316,7 +316,7 @@ class PublicKeyPayload(MessagePayload):
     format_list = MessagePayload.format_list + ['I']
 
     def __init__(self, trader_id, timestamp, identifier):
-        super(PublicKeyPayload, self).__init__(trader_id, timestamp)
+        super().__init__(trader_id, timestamp)
         self.identifier = identifier
 
     def to_pack_list(self):

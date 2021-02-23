@@ -5,7 +5,7 @@ from anydex.core.message import TraderId
 from anydex.core.order import OrderId, OrderNumber
 
 
-class OrderRepository(object):
+class OrderRepository:
     """A repository interface for orders in the order manager"""
     __metaclass__ = ABCMeta
 
@@ -15,7 +15,6 @@ class OrderRepository(object):
 
         Make a subclass of this class with a specific implementation for a storage backend
         """
-        super(OrderRepository, self).__init__()
         self._logger = logging.getLogger(self.__class__.__name__)
 
     @abstractmethod
@@ -51,7 +50,7 @@ class MemoryOrderRepository(OrderRepository):
         :param mid: Hex encoded version of the member id of this node
         :type mid: str
         """
-        super(MemoryOrderRepository, self).__init__()
+        super().__init__()
 
         self._logger.info("Memory order repository used")
 
@@ -115,7 +114,7 @@ class DatabaseOrderRepository(OrderRepository):
         :param mid: Hex encoded version of the member id of this node
         :type mid: str
         """
-        super(DatabaseOrderRepository, self).__init__()
+        super().__init__()
 
         self._logger.info("Memory order repository used")
 

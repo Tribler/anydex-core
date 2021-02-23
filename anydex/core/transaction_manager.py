@@ -6,15 +6,13 @@ from anydex.core.transaction import Transaction
 from anydex.core.transaction_repository import TransactionRepository
 
 
-class TransactionManager(object):
+class TransactionManager:
     """Manager for retrieving and creating transactions"""
 
     def __init__(self, transaction_repository):
         """
         :type transaction_repository: TransactionRepository
         """
-        super(TransactionManager, self).__init__()
-
         self._logger = logging.getLogger(self.__class__.__name__)
         self._logger.info("Transaction manager initialized")
 

@@ -1,5 +1,5 @@
 
-class WalletAddress(object):
+class WalletAddress:
     """Used for having a validated instance of a wallet address that we can easily check if it still valid."""
 
     def __init__(self, wallet_address):
@@ -8,8 +8,6 @@ class WalletAddress(object):
         :type wallet_address: str or unicode
         :raises ValueError: Thrown when one of the arguments are invalid
         """
-        super(WalletAddress, self).__init__()
-
         if not isinstance(wallet_address, str):
             raise ValueError("Wallet address must be a string, found %s instead" % type(wallet_address))
 
@@ -23,4 +21,4 @@ class WalletAddress(object):
         return self._wallet_address
 
     def __str__(self):
-        return "%s" % self._wallet_address
+        return self._wallet_address

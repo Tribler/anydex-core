@@ -11,7 +11,7 @@ from anydex.core.timestamp import Timestamp
 from anydex.core.wallet_address import WalletAddress
 
 
-class TransactionId(object):
+class TransactionId:
     """Immutable class for representing the id of a transaction."""
 
     def __init__(self, transaction_id):
@@ -20,8 +20,6 @@ class TransactionId(object):
         :type transaction_id: bytes
         :raises ValueError: Thrown when one of the arguments are invalid
         """
-        super(TransactionId, self).__init__()
-
         transaction_id = transaction_id if isinstance(transaction_id, bytes) else bytes(transaction_id)
 
         if len(transaction_id) != 32:
@@ -48,7 +46,7 @@ class TransactionId(object):
         return hash(self.transaction_id)
 
 
-class Transaction(object):
+class Transaction:
     """Class for representing a transaction between two nodes"""
 
     def __init__(self, transaction_id, assets, order_id, partner_order_id, timestamp):
@@ -64,7 +62,6 @@ class Transaction(object):
         :type partner_order_id: OrderId
         :type timestamp: Timestamp
         """
-        super(Transaction, self).__init__()
         self._logger = logging.getLogger(self.__class__.__name__)
 
         self._transaction_id = transaction_id

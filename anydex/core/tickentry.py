@@ -13,7 +13,7 @@ class TickEntry(TaskManager):
         :type tick: Tick
         :type price_level: PriceLevel
         """
-        super(TickEntry, self).__init__()
+        super().__init__()
 
         self._logger = logging.getLogger(self.__class__.__name__)
 
@@ -79,7 +79,7 @@ class TickEntry(TaskManager):
 
         self._logger.debug("Blocking %s for tick %s", order_id, self.order_id)
         self._blocked_for_matching.add(order_id)
-        self.register_task("unblock_%s" % order_id, unblock_order_id, order_id, delay=10)
+        self.register_task(f"unblock_{order_id}", unblock_order_id, order_id, delay=10)
 
     def is_blocked_for_matching(self, order_id):
         """
@@ -141,5 +141,8 @@ class TickEntry(TaskManager):
         format: <quantity>\t@\t<price>
         :rtype: str
         """
-        return "%s\t@\t%g %s" % (self._tick.assets.first, self._tick.price.amount,
-                                         self._tick.assets.second.asset_id)
+        return "{}\t@\t{:g} {}".format(
+                        self._tick.assets.first,
+                        self._tick.price.amount,
+                        self._tick.assets.second.asset_id,
+                )

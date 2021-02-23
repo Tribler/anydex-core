@@ -1,7 +1,7 @@
 import time
 
 
-class Timeout(object):
+class Timeout:
     """Used for having a validated instance of a timeout that we can easily check if it still valid."""
 
     def __init__(self, timeout):
@@ -10,8 +10,6 @@ class Timeout(object):
         :type timeout: int
         :raises ValueError: Thrown when one of the arguments are invalid
         """
-        super(Timeout, self).__init__()
-
         if not isinstance(timeout, int):
             raise ValueError("Timeout must be an integer")
 

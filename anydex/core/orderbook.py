@@ -22,7 +22,7 @@ class OrderBook(TaskManager):
     """
 
     def __init__(self):
-        super(OrderBook, self).__init__()
+        super().__init__()
 
         self._logger = logging.getLogger(self.__class__.__name__)
         self._bids = Side()

@@ -5,7 +5,7 @@ from anydex.core.message import TraderId
 from anydex.core.transaction import TransactionId
 
 
-class TransactionRepository(object):
+class TransactionRepository:
     """A repository interface for transactions in the transaction manager"""
     __metaclass__ = ABCMeta
 
@@ -15,7 +15,6 @@ class TransactionRepository(object):
 
         Make a subclass of this class with a specific implementation for a storage backend
         """
-        super(TransactionRepository, self).__init__()
         self._logger = logging.getLogger(self.__class__.__name__)
 
     @abstractmethod
@@ -47,7 +46,7 @@ class MemoryTransactionRepository(TransactionRepository):
         :param mid: Hex encoded version of the member id of this node
         :type mid: str
         """
-        super(MemoryTransactionRepository, self).__init__()
+        super().__init__()
 
         self._logger.info("Memory transaction repository used")
 
@@ -107,7 +106,7 @@ class DatabaseTransactionRepository(TransactionRepository):
         :param mid: Hex encoded version of the member id of this node
         :type mid: str
         """
-        super(DatabaseTransactionRepository, self).__init__()
+        super().__init__()
 
         self._logger.info("Database transaction repository used")
 

@@ -5,14 +5,13 @@ from anydex.core.order_repository import OrderRepository
 from anydex.core.timestamp import Timestamp
 
 
-class OrderManager(object):
+class OrderManager:
     """Provides an interface to the user to manage the users orders"""
 
     def __init__(self, order_repository):
         """
         :type order_repository: OrderRepository
         """
-        super(OrderManager, self).__init__()
         self._logger = logging.getLogger(self.__class__.__name__)
         self._logger.info("Market order manager initialized")
 

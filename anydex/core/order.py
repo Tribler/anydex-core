@@ -14,7 +14,7 @@ class TickWasNotReserved(Exception):
     pass
 
 
-class OrderNumber(object):
+class OrderNumber:
     """Immutable class for representing the number of an order."""
 
     def __init__(self, order_number):
@@ -23,8 +23,6 @@ class OrderNumber(object):
         :type order_number: int
         :raises ValueError: Thrown when one of the arguments are invalid
         """
-        super(OrderNumber, self).__init__()
-
         if not isinstance(order_number, int):
             raise ValueError("Order number must be an integer")
 
@@ -34,7 +32,7 @@ class OrderNumber(object):
         return self.order_number
 
     def __str__(self):
-        return "%s" % self.order_number
+        return str(self.order_number)
 
     def __eq__(self, other):
         return self.order_number == other.order_number
@@ -46,7 +44,7 @@ class OrderNumber(object):
         return hash(self.order_number)
 
 
-class OrderId(object):
+class OrderId:
     """Immutable class for representing the id of an order."""
 
     def __init__(self, trader_id, order_number):
@@ -56,8 +54,6 @@ class OrderId(object):
         :type trader_id: TraderId
         :type order_number: OrderNumber
         """
-        super(OrderId, self).__init__()
-
         self.trader_id = trader_id
         self.order_number = order_number
         self._hash = hash((self.trader_id, self.order_number))
@@ -81,7 +77,7 @@ class OrderId(object):
         return self._hash
 
 
-class Order(object):
+class Order:
     """Class for representing an ask or a bid created by the user"""
 
     def __init__(self, order_id, assets, timeout, timestamp, is_ask):
@@ -97,7 +93,6 @@ class Order(object):
         :type timestamp: Timestamp
         :type is_ask: bool
         """
-        super(Order, self).__init__()
         self._logger = logging.getLogger(self.__class__.__name__)
 
         self._order_id = order_id

@@ -3,7 +3,7 @@ from abc import ABCMeta, abstractmethod
 from time import time
 
 
-class MatchingStrategy(object):
+class MatchingStrategy:
     """Matching strategy base class"""
     __metaclass__ = ABCMeta
 
@@ -12,7 +12,6 @@ class MatchingStrategy(object):
         :param order_book: The order book to search in
         :type order_book: OrderBook
         """
-        super(MatchingStrategy, self).__init__()
         self._logger = logging.getLogger(self.__class__.__name__)
 
         self.order_book = order_book
@@ -111,7 +110,7 @@ class PriceTimeStrategy(MatchingStrategy):
         return matched_ticks
 
 
-class MatchingEngine(object):
+class MatchingEngine:
     """Matches ticks and orders to the order book"""
 
     def __init__(self, matching_strategy):
@@ -119,7 +118,6 @@ class MatchingEngine(object):
         :param matching_strategy: The strategy to use
         :type matching_strategy: MatchingStrategy
         """
-        super(MatchingEngine, self).__init__()
         self._logger = logging.getLogger(self.__class__.__name__)
 
         self.matching_strategy = matching_strategy

@@ -1,20 +1,19 @@
-from typing import Any, Dict, List  # pylint: disable=unused-import
+from typing import Any, Dict, List, Tuple  # pylint: disable=unused-import
 
 from anydex.core.price import Price  # pylint: disable=unused-import
 from anydex.core.pricelevel import PriceLevel
 
 
-class PriceLevelList(object):
+class PriceLevelList:
     """
     Sorted doubly linked dictionary implementation.
     """
 
     def __init__(self):
-        super(PriceLevelList, self).__init__()
-        self._price_list = []  # type: List[float]
-        self._price_level_dictionary = {}  # type: Dict[float, PriceLevel]
+        self._price_list: List[float] = []  # type: List[float]
+        self._price_level_dictionary: Dict[float, PriceLevel] = {}  # type: Dict[float, PriceLevel]
 
-    def insert(self, price_level):  # type: (PriceLevel) -> None
+    def insert(self, price_level: PriceLevel) -> None:  # type: (PriceLevel) -> None
         """
         :type price_level: PriceLevel
         """
@@ -22,14 +21,14 @@ class PriceLevelList(object):
         self._price_list.sort()
         self._price_level_dictionary[price_level.price] = price_level
 
-    def remove(self, price):  # type: (Price) -> None
+    def remove(self, price: Price) -> None:  # type: (Price) -> None
         """
         :type price: Price
         """
         self._price_list.remove(price)
         del self._price_level_dictionary[price]
 
-    def succ_item(self, price):  # type: (Price) -> PriceLevel
+    def succ_item(self, price: Price) -> PriceLevel:  # type: (Price) -> PriceLevel
         """
         Returns the price level where price_level.price is successor to given price
 
@@ -42,7 +41,7 @@ class PriceLevelList(object):
         succ_price = self._price_list[index]
         return self._price_level_dictionary[succ_price]
 
-    def prev_item(self, price):  # type: (Price) -> PriceLevel
+    def prev_item(self, price: Price) -> PriceLevel:  # type: (Price) -> PriceLevel
         """
         Returns the price level where price_level.price is predecessor to given price
 
@@ -55,7 +54,7 @@ class PriceLevelList(object):
         prev_price = self._price_list[index]
         return self._price_level_dictionary[prev_price]
 
-    def min_key(self):  # type: () -> Price
+    def min_key(self) -> Price:  # type: () -> Price
         """
         Return the lowest price in the price level list
 
@@ -63,7 +62,7 @@ class PriceLevelList(object):
         """
         return self._price_list[0]
 
-    def max_key(self):  # type: () -> Price
+    def max_key(self) -> Price:  # type: () -> Price
         """
         Return the highest price in the price level list
 
@@ -71,7 +70,7 @@ class PriceLevelList(object):
         """
         return self._price_list[-1]
 
-    def items(self, reverse=False):  # type: (bool) -> List[(Price, PriceLevel)]
+    def items(self, reverse: bool=False) -> List[Tuple[Price, PriceLevel]]:  # type: (bool) -> List[Tuple[Price, PriceLevel]]
         """
         Returns a sorted list (on price) of price_levels
 
@@ -87,7 +86,7 @@ class PriceLevelList(object):
                 items.append(self._price_level_dictionary[price])
         return items
 
-    def get_ticks_list(self):  # type: () -> List[Any]
+    def get_ticks_list(self) -> List[Any]:  # type: () -> List[Any]
         """
         Returns a list describing all ticks.
         :return: list
