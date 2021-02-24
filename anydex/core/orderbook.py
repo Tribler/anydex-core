@@ -1,6 +1,8 @@
 import logging
 import time
 from binascii import unhexlify
+from itertools import chain
+from typing import Generator
 
 from ipv8.taskmanager import TaskManager
 from ipv8.util import fail
@@ -49,7 +51,8 @@ class OrderBook(TaskManager):
         if not self._asks.tick_exists(ask.order_id) and ask.order_id not in self.completed_orders and ask.is_valid():
             self._asks.insert_tick(ask)
             delay = int(ask.timestamp) + int(ask.timeout) * 1000 - int(time.time() * 1000)
-            self.register_task("ask_%s_timeout" % ask.order_id, self.timeout_ask, ask.order_id, delay=delay)
+            order_id = ask.order_id
+            self.register_task(f"ask_{order_id}_timeout", self.timeout_ask, order_id, delay=delay)
         else:
             self.on_invalid_tick_insert()
 
@@ -58,7 +61,7 @@ class OrderBook(TaskManager):
         :type order_id: OrderId
         """
         if self._asks.tick_exists(order_id):
-            self.cancel_pending_task("ask_%s_timeout" % order_id)
+            self.cancel_pending_task(f"ask_{order_id}_timeout")
             self._asks.remove_tick(order_id)
 
     def insert_bid(self, bid):
@@ -68,7 +71,8 @@ class OrderBook(TaskManager):
         if not self._bids.tick_exists(bid.order_id) and bid.order_id not in self.completed_orders and bid.is_valid():
             self._bids.insert_tick(bid)
             delay = int(bid.timestamp) + int(bid.timeout) * 1000 - int(time.time() * 1000)
-            self.register_task("bid_%s_timeout" % bid.order_id, self.timeout_bid, bid.order_id, delay=delay)
+            order_id = bid.order_id
+            self.register_task(f"bid_{order_id}_timeout", self.timeout_bid, order_id, delay=delay)
         else:
             self.on_invalid_tick_insert()
 
@@ -77,7 +81,7 @@ class OrderBook(TaskManager):
         :type order_id: OrderId
         """
         if self._bids.tick_exists(order_id):
-            self.cancel_pending_task("bid_%s_timeout" % order_id)
+            self.cancel_pending_task(f"bid_{order_id}_timeout")
             self._bids.remove_tick(order_id)
 
     def update_ticks(self, ask_order_dict, bid_order_dict, traded_quantity):
@@ -262,10 +266,8 @@ class OrderBook(TaskManager):
         :return: The depth profile
         :rtype: list
         """
-        profile = []
-        for price_level in self._bids.get_price_level_list(price_wallet_id, quantity_wallet_id).items():
-            profile.append((price_level.price, price_level.depth))
-        return profile
+        price_level_list = self._bids.get_price_level_list(price_wallet_id, quantity_wallet_id).items()
+        return [(price_level.price, price_level.depth) for price_level in price_level_list]
 
     def get_ask_side_depth_profile(self, price_wallet_id, quantity_wallet_id):
         """
@@ -274,10 +276,8 @@ class OrderBook(TaskManager):
         :return: The depth profile
         :rtype: list
         """
-        profile = []
-        for price_level in self._asks.get_price_level_list(price_wallet_id, quantity_wallet_id).items():
-            profile.append((price_level.price, price_level.depth))
-        return profile
+        price_level_list = self._asks.get_price_level_list(price_wallet_id, quantity_wallet_id).items()
+        return [(price_level.price, price_level.depth) for price_level in price_level_list]
 
     def get_bid_price_level(self, price_wallet_id, quantity_wallet_id):
         """
@@ -301,41 +301,33 @@ class OrderBook(TaskManager):
         """
         return self.get_bid_ids() + self.get_ask_ids()
 
+    def _get_order_ids(self, side: Side) -> Generator[OrderId, None, None]:
+        price_level_lists = (side.get_price_level_list(price_wallet_id, quantity_wallet_id).items()
+                            for price_wallet_id, quantity_wallet_id
+                            in side.get_price_level_list_wallets())
+        for tick in chain.from_iterable(chain.from_iterable(price_level_lists)):
+            yield tick.order_id
+
     def get_ask_ids(self):
-        ids = []
-
-        for price_wallet_id, quantity_wallet_id in self.asks.get_price_level_list_wallets():
-            for price_level in self.asks.get_price_level_list(price_wallet_id, quantity_wallet_id).items():
-                for ask in price_level:
-                    ids.append(ask.tick.order_id)
-
-        return ids
+        return [order_id for order_id in self._get_order_ids(self.asks)]
 
     def get_bid_ids(self):
-        ids = []
-
-        for price_wallet_id, quantity_wallet_id in self.bids.get_price_level_list_wallets():
-            for price_level in self.bids.get_price_level_list(price_wallet_id, quantity_wallet_id).items():
-                for bid in price_level:
-                    ids.append(bid.tick.order_id)
-
-        return ids
+        return [order_id for order_id in self._get_order_ids(self.bids)]
 
     def __str__(self):
-        res_str = ''
-        res_str += "------ Bids -------\n"
+        res_str_list = ["------ Bids -------\n"]
         for price_wallet_id, quantity_wallet_id in self.bids.get_price_level_list_wallets():
-            for price_level in self._bids.get_price_level_list(price_wallet_id, quantity_wallet_id).items(reverse=True):
-                res_str += '%s' % price_level
-        res_str += "\n------ Asks -------\n"
+            price_level_list = self._bids.get_price_level_list(price_wallet_id, quantity_wallet_id).items(reverse=True)
+            res_str_list.extend(map(str, price_level_list))
+        res_str_list.append("\n------ Asks -------\n")
         for price_wallet_id, quantity_wallet_id in self.asks.get_price_level_list_wallets():
-            for price_level in self._asks.get_price_level_list(price_wallet_id, quantity_wallet_id).items():
-                res_str += '%s' % price_level
-        res_str += "\n"
-        return res_str
+            price_level_list = self._asks.get_price_level_list(price_wallet_id, quantity_wallet_id).items()
+            res_str_list.extend(map(str, price_level_list))
+        res_str_list.append("\n")
+        return "".join(res_str_list)
 
     def cancel_all_pending_tasks(self):
-        tasks = super(OrderBook, self).cancel_all_pending_tasks()
+        tasks = super().cancel_all_pending_tasks()
         for order_id in self.get_order_ids():
             tasks.extend(self.get_tick(order_id).cancel_all_pending_tasks())
         return tasks
