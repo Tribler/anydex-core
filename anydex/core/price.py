@@ -17,7 +17,7 @@ class Price(object):
         self.amount = float(self.frac)
 
     def __str__(self):
-        return "%g %s/%s" % (self.amount, self.num_type, self.denom_type)
+        return "{:g} {}/{}".format(self.amount, self.num_type, self.denom_type)
 
     def __lt__(self, other):
         if isinstance(other, Price) and self.num_type == other.num_type and self.denom_type == other.denom_type:

@@ -152,9 +152,9 @@ def check_random_port(port, socket_type="all"):
     @param port: The port to try with.
     @return: True or False indicating if port is available.
     """
-    assert socket_type in ("all", "tcp", "udp"), "Invalid socket type %s" % type(socket_type)
-    assert isinstance(port, int), "Invalid port type %s" % type(port)
-    assert 0 < port <= 65535, "Invalid port value %s" % port
+    assert socket_type in ("all", "tcp", "udp"), f"Invalid socket type {type(socket_type)}"
+    assert isinstance(port, int), "Invalid port type {type(port)}"
+    assert 0 < port <= 65535, "Invalid port value {port}"
 
     # only support IPv4 for now
     _family = socket.AF_INET
@@ -211,9 +211,8 @@ def autodetect_socket_style():
         return 1
     else:
         try:
-            f = open('/proc/sys/net/ipv6/bindv6only', 'r')
-            dual_socket_style = int(f.read())
-            f.close()
+            with open('/proc/sys/net/ipv6/bindv6only', 'r') as f:
+                dual_socket_style = int(f.read())
             return int(not dual_socket_style)
         except (IOError, ValueError):
             return 0

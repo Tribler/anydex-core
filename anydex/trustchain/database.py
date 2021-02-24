@@ -29,7 +29,7 @@ class TrustChainDB(Database):
         :param my_pk: The public key of this user, used for caching purposes
         """
         if working_directory != u":memory:":
-            db_path = os.path.join(working_directory, os.path.join(DATABASE_DIRECTORY, u"%s.db" % db_name))
+            db_path = os.path.join(working_directory, os.path.join(DATABASE_DIRECTORY, f"{db_name}.db"))
         else:
             db_path = working_directory
         super(TrustChainDB, self).__init__(db_path)

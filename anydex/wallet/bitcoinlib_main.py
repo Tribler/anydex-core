@@ -113,7 +113,7 @@ def script_type_default(witness_type=None, multisig=False, locking_script=False)
     elif witness_type == 'p2sh-segwit' and multisig:
         return 'p2sh' if locking_script else 'p2sh_p2wsh'
     else:
-        raise ValueError("Wallet and key type combination not supported: %s / %s" % (witness_type, multisig))
+        raise ValueError(f"Wallet and key type combination not supported: {witness_type} / {multisig}")
 
 
 def get_encoding_from_witness(witness_type=None):
@@ -131,7 +131,7 @@ def get_encoding_from_witness(witness_type=None):
     elif witness_type in [None, 'legacy', 'p2sh-segwit']:
         return 'base58'
     else:
-        raise ValueError("Unknown witness type %s" % witness_type)
+        raise ValueError(f"Unknown witness type {witness_type}")
 
 
 def deprecated(func):

@@ -209,8 +209,9 @@ class Tick:
         """
         Return the string representation of this tick.
         """
-        return "<%s P: %f, Q: %s, O: %s>" % \
-               (self.__class__.__name__, float(self.price.amount), self.assets.first, str(self.order_id))
+        class_name = self.__class__.__name__
+        price_amount = float(self.price.amount)
+        return f"<{class_name} P: {price_amount}, Q: {self.assets.first}, O: {self.order_id}>"
 
 
 class Ask(Tick):

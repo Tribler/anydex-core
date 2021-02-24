@@ -251,7 +251,7 @@ class TrustChainCommunity(Community):
             "Peer, linked block should not be provided when creating a no counterparty source block. Public key " \
             "should be that reserved for any counterpary."
         assert transaction is None and linked is not None or transaction is not None and linked is None, \
-            "Either provide a linked block or a transaction, not both %s, %s" % (peer, self.my_peer)
+            f"Either provide a linked block or a transaction, not both {peer}, {self.my_peer}"
         assert (additional_info is None or additional_info is not None and linked is not None
                 and transaction is None), \
             "Either no additional info is provided or one provides it for a linked block"

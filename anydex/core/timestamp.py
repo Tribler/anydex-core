@@ -33,7 +33,7 @@ class Timestamp:
         return self._timestamp
 
     def __str__(self):
-        return "%s" % datetime.datetime.fromtimestamp(self._timestamp // 1000)
+        return str(datetime.datetime.fromtimestamp(self._timestamp // 1000))
 
     def __lt__(self, other):
         if isinstance(other, Timestamp):

@@ -62,7 +62,7 @@ class AnyDexService(object):
             await self.restapi.start(options.apiport)
 
         async def signal_handler(sig):
-            print("Received shut down signal %s" % sig)
+            print("Received shut down signal", sig)
             if not self._stopping:
                 self._stopping = True
                 if self.restapi:

@@ -866,7 +866,7 @@ class TestMarketCommunityWithDatabase(TestMarketCommunityBase):
 
     def get_db_location(self):
         self.total_dbs += 1
-        return os.path.join(self.temp_dir, "db_%d" % self.total_dbs)
+        return os.path.join(self.temp_dir, f"db_{self.total_dbs}")
 
     def use_database(self):
         return True

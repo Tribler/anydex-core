@@ -18,7 +18,7 @@ class TraderId:
         self.trader_id = trader_id  # type: bytes
 
     def __str__(self):
-        return "%s" % self.trader_id
+        return str(self.trader_id)
 
     def __bytes__(self):  # type: () -> bytes
         return self.trader_id

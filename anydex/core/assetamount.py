@@ -32,7 +32,7 @@ class AssetAmount:
         return self._amount
 
     def __str__(self) -> str:
-        return "%d %s" % (self.amount, self.asset_id)
+        return f"{self.amount} {self.asset_id}"
 
     def __add__(self, other: AssetAmount) -> AssetAmount:
         if isinstance(other, AssetAmount) and self.asset_id == other.asset_id:

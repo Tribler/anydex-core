@@ -91,7 +91,7 @@ class BloomFilter(object):
             f_error_rate = args[1]
             prefix = kargs.get("prefix", args[2] if len(args) >= 3 else b"")
             assert 0 < m_size, m_size
-            assert m_size % 8 == 0, "size must be a multiple of eight (%d)" % m_size
+            assert m_size % 8 == 0, f"size must be a multiple of eight ({m_size})"
             assert 0.0 < f_error_rate < 1.0, f_error_rate
             logger.debug("constructing bloom filter based on m_size %d bits and f_error_rate %f", m_size, f_error_rate)
             k_functions = cls._get_k_functions(m_size, cls._get_n_capacity(m_size, f_error_rate))
@@ -111,7 +111,7 @@ class BloomFilter(object):
             filter_ = 0
 
         else:
-            raise RuntimeError("Unknown combination of argument types %s" % str([type(arg) for arg in args]))
+            raise RuntimeError(f"Unknown combination of argument types {list(map(type, args))}")
 
         return m_size, k_functions, prefix, filter_
 
@@ -123,7 +123,7 @@ class BloomFilter(object):
 
         assert isinstance(self._m_size, int), type(self._m_size)
         assert 0 < self._m_size, self._m_size
-        assert self._m_size % 8 == 0, "size must be a multiple of eight (%d)" % self._m_size
+        assert self._m_size % 8 == 0, f"size must be a multiple of eight ({self._m_size})"
         assert isinstance(self._k_functions, int), type(self._k_functions)
         assert 0 < self._k_functions <= self._m_size, [self._k_functions, self._m_size]
         assert isinstance(self._prefix, bytes), type(self._prefix)
@@ -141,7 +141,7 @@ class BloomFilter(object):
         # we need at most chunk_size * k bits from our hash function
         bits_required = chunk_size * self._k_functions * 8
         assert bits_required <= 512, \
-            "Combining multiple hashfunctions is not implemented, cannot create a hash for %d bits" % bits_required
+            f"Combining multiple hashfunctions is not implemented, cannot create a hash for {bits_required} bits"
 
         if bits_required > 384:
             hashfn = sha512

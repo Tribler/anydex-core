@@ -67,7 +67,7 @@ class MatchCache(NumberCache):
 
         if not self.schedule_task:
             # Schedule a timer
-            self._logger.info("Scheduling batch match of order %s" % str(self.order.order_id))
+            self._logger.info("Scheduling batch match of order %s", self.order.order_id)
             self.schedule_task = call_later(self.community.settings.match_window,
                                             self.start_process_matches, ignore_errors=True)
         elif self.schedule_task_done and not self.outstanding_requests:
@@ -113,7 +113,7 @@ class MatchCache(NumberCache):
                                                                       propose_quantity=propose_quantity,
                                                                       should_reserve=False))
             else:
-                task_id = "%s-%s" % (self.order.order_id, other_order_id)
+                task_id = "{self.order.order_id}-{other_order_id}"
                 if not self.community.is_pending_task_active(task_id):
                     delay = random.uniform(1, 2)
                     self.community.register_task(task_id, self.community.accept_match_and_propose, self.order,

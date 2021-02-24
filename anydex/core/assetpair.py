@@ -14,7 +14,7 @@ class AssetPair:
 
     def __init__(self, first: AssetAmount, second: AssetAmount) -> None:
         if first.asset_id > second.asset_id:
-            raise ValueError("Asset %s must be smaller than %s" % (first, second))
+            raise ValueError(f"Asset {first} must be smaller than {second}")
 
         self.first = first
         self.second = second
@@ -66,4 +66,4 @@ class AssetPair:
             raise ValueError("No first/second provided in proportional downscale!")
 
     def __str__(self) -> str:
-        return "%s %s" % (self.first, self.second)
+        return f"{self.first} {self.second}"

@@ -593,10 +593,10 @@ class MarketCommunity(Community, BlockListener):
             raise RuntimeError("You cannot trade between the same wallet")
 
         if assets.first.asset_id not in self.wallets or not self.wallets[assets.first.asset_id].created:
-            raise RuntimeError("Please create a %s wallet first" % assets.first.asset_id)
+            raise RuntimeError(f"Please create a {assets.first.asset_id} wallet first")
 
         if assets.second.asset_id not in self.wallets or not self.wallets[assets.second.asset_id].created:
-            raise RuntimeError("Please create a %s wallet first" % assets.second.asset_id)
+            raise RuntimeError(f"Please create a {assets.second.asset_id} wallet first")
 
         asset1_min_unit = self.wallets[assets.first.asset_id].min_unit()
         if assets.first.amount < asset1_min_unit:
@@ -1436,7 +1436,7 @@ class MarketCommunity(Community, BlockListener):
 
         wallet = self.wallets[asset_id]
         if not wallet or not wallet.created:
-            raise RuntimeError("No %s wallet present" % asset_id)
+            raise RuntimeError(f"No {asset_id} wallet present")
 
         # While this conditional is not very pretty, the alternative is to move all this logic to the wallet which
         # requires the wallet to know about transactions, the market community and IPv8.

@@ -28,7 +28,7 @@ class TransactionId:
         self.transaction_id = transaction_id  # type: bytes
 
     def __str__(self):
-        return "%s" % self.transaction_id
+        return str(self.transaction_id)
 
     def __bytes__(self):  # type: () -> bytes
         return self.transaction_id

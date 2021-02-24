@@ -9,7 +9,7 @@ class WalletAddress:
         :raises ValueError: Thrown when one of the arguments are invalid
         """
         if not isinstance(wallet_address, str):
-            raise ValueError("Wallet address must be a string, found %s instead" % type(wallet_address))
+            raise ValueError(f"Wallet address must be a string, found {type(wallet_address)} instead")
 
         self._wallet_address = wallet_address
 

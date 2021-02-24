@@ -26,11 +26,12 @@ class BlockCache(object):
         missing = self.get_missing_in_range(start_seq_num, end_seq_num)
         if missing:
             # We are missing some blocks in our own chain, fetch them from the database
-            missing_str = ','.join(["%d" % seq_num for seq_num in missing])
-            query = u"SELECT * FROM (%s WHERE sequence_number IN (%s) AND public_key = ?) " \
-                    u"UNION SELECT * FROM (%s WHERE link_sequence_number IN (%s) AND " \
-                    u"link_sequence_number != 0 AND link_public_key = ?)" % \
-                    (self.database.get_sql_header(), missing_str, self.database.get_sql_header(), missing_str)
+            missing_str = ','.join(map(str, missing))
+            query = f"SELECT * FROM ({self.database.get_sql_header()} " \
+                    f"WHERE sequence_number IN ({missing_str}) AND public_key = ?) " \
+                    f"UNION SELECT * FROM ({self.database.get_sql_header()} " \
+                    f"WHERE link_sequence_number IN ({missing_str}) AND " \
+                    "link_sequence_number != 0 AND link_public_key = ?)"
             db_result = list(self.database.execute(query,
                                                    (database_blob(self.public_key), database_blob(self.public_key)),
                                                    fetch_all=True))

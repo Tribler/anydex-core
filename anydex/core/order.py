@@ -62,7 +62,7 @@ class OrderId:
         """
         format: <trader_id>.<order_number>
         """
-        return "%s.%d" % (self.trader_id.as_hex(), self.order_number)
+        return f"{self.trader_id.as_hex()}.{self.order_number}"
 
     def __bytes__(self):
         return b"%s.%d" % (self.trader_id.as_hex().encode('utf-8'), self.order_number)
@@ -336,7 +336,7 @@ class Order:
             if self._reserved_ticks[order_id] <= 0:  # Remove the quantity if it's zero
                 del self._reserved_ticks[order_id]
         else:
-            raise ValueError("Not enough reserved quantity for order id %s" % order_id)
+            raise ValueError(f"Not enough reserved quantity for order id {order_id}")
 
         self._logger.debug("Released quantity for order id %s (own order id: %s),"
                            "total quantity: %d, traded quantity: %d, reserved quantity: %d",
