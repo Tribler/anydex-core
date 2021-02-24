@@ -10,7 +10,7 @@ class CrawlRequestPayload(Payload):
     format_list = ['74s', 'l', 'l', 'I']
 
     def __init__(self, public_key, start_seq_num, end_seq_num, crawl_id):
-        super(CrawlRequestPayload, self).__init__()
+        super().__init__()
         self.public_key = public_key
         self.start_seq_num = start_seq_num
         self.end_seq_num = end_seq_num
@@ -38,7 +38,7 @@ class EmptyCrawlResponsePayload(Payload):
     format_list = ['I']
 
     def __init__(self, crawl_id):
-        super(EmptyCrawlResponsePayload, self).__init__()
+        super().__init__()
         self.crawl_id = crawl_id
 
     def to_pack_list(self):
@@ -60,7 +60,7 @@ class HalfBlockPayload(Payload):
 
     def __init__(self, public_key, sequence_number, link_public_key, link_sequence_number, previous_hash,
                  signature, block_type, transaction, timestamp):
-        super(HalfBlockPayload, self).__init__()
+        super().__init__()
         self.public_key = public_key
         self.sequence_number = sequence_number
         self.link_public_key = link_public_key
@@ -113,9 +113,9 @@ class HalfBlockBroadcastPayload(HalfBlockPayload):
 
     def __init__(self, public_key, sequence_number, link_public_key, link_sequence_number, previous_hash,
                  signature, block_type, transaction, timestamp, ttl):
-        super(HalfBlockBroadcastPayload, self).__init__(public_key, sequence_number, link_public_key,
-                                                        link_sequence_number, previous_hash, signature,
-                                                        block_type, transaction, timestamp)
+        super().__init__(public_key, sequence_number, link_public_key,
+                        link_sequence_number, previous_hash, signature,
+                        block_type, transaction, timestamp)
         self.ttl = ttl
 
     @classmethod
@@ -134,7 +134,7 @@ class HalfBlockBroadcastPayload(HalfBlockPayload):
         )
 
     def to_pack_list(self):
-        data = super(HalfBlockBroadcastPayload, self).to_pack_list()
+        data = super().to_pack_list()
         data.append(('I', self.ttl))
         return data
 
@@ -153,7 +153,7 @@ class CrawlResponsePayload(Payload):
 
     def __init__(self, public_key, sequence_number, link_public_key, link_sequence_number, previous_hash, signature,
                  block_type, transaction, timestamp, crawl_id, cur_count, total_count):
-        super(CrawlResponsePayload, self).__init__()
+        super().__init__()
         self.public_key = public_key
         self.sequence_number = sequence_number
         self.link_public_key = link_public_key
@@ -216,7 +216,7 @@ class HalfBlockPairPayload(Payload):
     def __init__(self, public_key1, sequence_number1, link_public_key1, link_sequence_number1, previous_hash1,
                  signature1, block_type1, transaction1, timestamp1, public_key2, sequence_number2, link_public_key2,
                  link_sequence_number2, previous_hash2, signature2, block_type2, transaction2, timestamp2):
-        super(HalfBlockPairPayload, self).__init__()
+        super().__init__()
         self.public_key1 = public_key1
         self.sequence_number1 = sequence_number1
         self.link_public_key1 = link_public_key1
@@ -298,12 +298,12 @@ class HalfBlockPairBroadcastPayload(HalfBlockPairPayload):
     def __init__(self, public_key1, sequence_number1, link_public_key1, link_sequence_number1, previous_hash1,
                  signature1, block_type1, transaction1, timestamp1, public_key2, sequence_number2, link_public_key2,
                  link_sequence_number2, previous_hash2, signature2, block_type2, transaction2, timestamp2, ttl):
-        super(HalfBlockPairBroadcastPayload, self).__init__(public_key1, sequence_number1, link_public_key1,
-                                                            link_sequence_number1, previous_hash1, signature1,
-                                                            block_type1, transaction1, timestamp1, public_key2,
-                                                            sequence_number2, link_public_key2, link_sequence_number2,
-                                                            previous_hash2, signature2, block_type2, transaction2,
-                                                            timestamp2)
+        super().__init__(public_key1, sequence_number1, link_public_key1,
+                        link_sequence_number1, previous_hash1, signature1,
+                        block_type1, transaction1, timestamp1, public_key2,
+                        sequence_number2, link_public_key2, link_sequence_number2,
+                        previous_hash2, signature2, block_type2, transaction2,
+                        timestamp2)
         self.ttl = ttl
 
     @classmethod
@@ -331,7 +331,7 @@ class HalfBlockPairBroadcastPayload(HalfBlockPairPayload):
         )
 
     def to_pack_list(self):
-        data = super(HalfBlockPairBroadcastPayload, self).to_pack_list()
+        data = super().to_pack_list()
         data.append(('I', self.ttl))
         return data
 

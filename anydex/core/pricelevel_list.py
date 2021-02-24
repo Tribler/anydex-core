@@ -1,4 +1,6 @@
-from typing import Any, Dict, List, Tuple  # pylint: disable=unused-import
+import bisect
+from itertools import chain
+from typing import Any, Dict, Generator, List, Tuple # pylint: disable=unused-import
 
 from anydex.core.price import Price  # pylint: disable=unused-import
 from anydex.core.pricelevel import PriceLevel
@@ -17,8 +19,7 @@ class PriceLevelList:
         """
         :type price_level: PriceLevel
         """
-        self._price_list.append(price_level.price)
-        self._price_list.sort()
+        bisect.insort(self._price_list, price_level.price)
         self._price_level_dictionary[price_level.price] = price_level
 
     def remove(self, price: Price) -> None:  # type: (Price) -> None
@@ -76,24 +77,26 @@ class PriceLevelList:
 
         :param reverse: When true returns the reversed sorted list of price, price_level tuples
         :type reverse: bool
-        :rtype: List[(Price, PriceLevel)]
+        :rtype: List[Tuple[Price, PriceLevel]]
         """
-        items = []
-        for price in self._price_list:
-            if reverse:
-                items.insert(0, self._price_level_dictionary[price])
-            else:
-                items.append(self._price_level_dictionary[price])
-        return items
+        price_list = self._price_list if not reverse else reversed(self._price_list)
+        return [self._price_level_dictionary[price] for price in price_list]
+
+    def items_iter(self, reverse: bool=False) -> Generator[Tuple[Price, PriceLevel], None, None]: # type: (bool) -> Generator[Tuple[Price, PriceLevel], None, None]
+        """
+        An iterator version of @PriceLevelList.items()
+        
+        :param reverse: When true returns the reversed sorted list of price, price_level tuples
+        :type reverse: bool
+        :rtype Generator[Tuple[Price, PriceLevel], None, None]
+        """
+        price_list = self._price_list if not reverse else reversed(self._price_list)
+        for price in price_list:
+            yield self._price_level_dictionary[price]
 
     def get_ticks_list(self) -> List[Any]:  # type: () -> List[Any]
         """
         Returns a list describing all ticks.
         :return: list
         """
-        ticks_list = []
-        for price_level in self.items():
-            for tick in price_level:
-                ticks_list.append(tick.tick.to_dictionary())
-
-        return ticks_list
+        return list(tick.tick.to_dictionary() for tick in chain.from_iterable(self.items_iter()))

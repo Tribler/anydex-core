@@ -229,12 +229,10 @@ class Transaction:
         :param order_is_ask: Whether the order is an ask or not.
         :return: An AssetAmount object, indicating how much we should send to the counterparty.
         """
-        if order_is_ask:
-            div_amount_1 = AssetAmount(transfers_per_trade, self.assets.first.asset_id)
-            assets_to_transfer = (self.assets.first // div_amount_1)
-        else:
-            div_amount_2 = AssetAmount(transfers_per_trade, self.assets.second.asset_id)
-            assets_to_transfer = (self.assets.second // div_amount_2)
+        asset = self.assets.first if order_is_ask else self.assets.second
+        asset_id = asset.asset_id
+        div_amount = AssetAmount(transfers_per_trade, asset_id)
+        assets_to_transfer = asset // div_amount
 
         self._current_payment += 1
 

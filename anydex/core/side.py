@@ -3,7 +3,7 @@ from anydex.core.pricelevel_list import PriceLevelList
 from anydex.core.tickentry import TickEntry
 
 
-class Side(object):
+class Side:
     """Class for representing a side of the order book"""
 
     def __init__(self):
@@ -165,8 +165,7 @@ class Side(object):
         Return a list describing all ticks in this side.
         :rtype: list
         """
-        rlist = []
-        for asset1, asset2 in self._price_level_list_map.keys():
-            rlist.append({'asset1': asset2, 'asset2': asset1,
-                          'ticks': self._price_level_list_map[(asset1, asset2)].get_ticks_list()})
-        return rlist
+        return [
+            {'asset1': asset2, 'asset2': asset1, 'ticks': self._price_level_list_map[(asset1, asset2)].get_ticks_list()}
+            for asset1, asset2 in self._price_level_list_map
+        ]

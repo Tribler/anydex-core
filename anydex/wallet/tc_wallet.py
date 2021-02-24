@@ -23,7 +23,7 @@ class TrustchainWallet(Wallet, BlockListener):
     BLOCK_CLASS = TriblerBandwidthBlock
 
     def __init__(self, trustchain):
-        super(TrustchainWallet, self).__init__()
+        super().__init__()
 
         self.trustchain = trustchain
         self.trustchain.add_listener(self, [b'tribler_bandwidth'])
@@ -89,15 +89,16 @@ class TrustchainWallet(Wallet, BlockListener):
         return await self.create_transfer_block(peer, quantity)
 
     async def create_transfer_block(self, peer, quantity):
-        transaction = {"up": 0, "down": int(quantity * MEGA_DIV)}
+        down = int(quantity * MEGA_DIV)
+        transaction = {"up": 0, "down": down}
 
         add_default_callback(self.trustchain.sign_block(peer, peer.public_key.key_to_bin(),
                                                         block_type=b'tribler_bandwidth', transaction=transaction))
 
         latest_block = self.trustchain.persistence.get_latest(self.trustchain.my_peer.public_key.key_to_bin(),
                                                               block_type=b'tribler_bandwidth')
-        txid = "%s.%s.%d.%d" % (hexlify(latest_block.public_key).decode('utf-8'),
-                                latest_block.sequence_number, 0, int(quantity * MEGA_DIV))
+        hexlified_public_key = hexlify(latest_block.public_key).decode('utf-8')
+        txid = f"{hexlified_public_key}.{latest_block.sequence_number}.0.{down}"
 
         self.transaction_history.append({
             'id': txid,
@@ -135,7 +136,7 @@ class TrustchainWallet(Wallet, BlockListener):
         if block:
             return succeed(block)
 
-        monitor_task = self.register_task("poll_%s" % payment_id, check_has_block, interval=self.MONITOR_DELAY)
+        monitor_task = self.register_task(f"poll_{payment_id}", check_has_block, interval=self.MONITOR_DELAY)
         return monitor_future
 
     def get_address(self):

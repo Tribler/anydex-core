@@ -13,12 +13,12 @@ class BaseDummyWallet(Wallet):
     MONITOR_DELAY = 1
 
     def __init__(self):
-        super(BaseDummyWallet, self).__init__()
+        super().__init__()
 
         self.balance = 1000
         self.created = True
         self.unlocked = True
-        self.address = ''.join([choice(string.ascii_lowercase) for _ in range(10)])
+        self.address = ''.join(choice(string.ascii_lowercase) for _ in range(10))
         self.transaction_history = []
 
     def get_name(self):
@@ -107,7 +107,7 @@ class DummyWallet1(BaseDummyWallet):
 class DummyWallet2(BaseDummyWallet):
 
     def __init__(self):
-        super(DummyWallet2, self).__init__()
+        super().__init__()
         self.balance = 10000
 
     def get_name(self):

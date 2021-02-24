@@ -13,7 +13,7 @@ from anydex.core.timestamp import Timestamp
 from anydex.trustchain.block import GENESIS_HASH
 
 
-class Tick(object):
+class Tick:
     """
     Abstract tick class for representing a order on another node. This tick is replicating the order sitting on
     the node it belongs to.
@@ -271,7 +271,7 @@ class Bid(Tick):
         :type traded: int
         :type block_hash: str
         """
-        super(Bid, self).__init__(order_id, assets, timeout, timestamp, False, traded=traded, block_hash=block_hash)
+        super().__init__(order_id, assets, timeout, timestamp, False, traded=traded, block_hash=block_hash)
 
     @classmethod
     def from_block(cls, block):

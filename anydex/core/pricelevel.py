@@ -117,7 +117,5 @@ class PriceLevel(object):
             self._tail_tick = prev_tick
 
     def __str__(self):
-        res_str = ''
-        for tick in self:
-            res_str += "%s\n" % str(tick)
-        return res_str
+        return ''.join(f"{tick}\n" for tick in self)
+

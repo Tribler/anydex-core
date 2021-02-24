@@ -10,3 +10,4 @@ anydex/test/temp/**
 cover/**
 build/**
 dist/**
+anydex/anydex.egg-info

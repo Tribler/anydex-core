@@ -47,7 +47,7 @@ class WatchDog(Thread):
     """
 
     def __init__(self):
-        super(WatchDog, self).__init__()
+        super().__init__()
         self.setDaemon(True)
         self.setName(self.__class__.__name__)
         self.debug = False

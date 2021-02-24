@@ -21,7 +21,7 @@ class BitcoinWallet(Wallet):
     TESTNET = False
 
     def __init__(self, wallet_dir):
-        super(BitcoinWallet, self).__init__()
+        super().__init__()
 
         bitcoinlib_main.initialize_lib(wallet_dir)
         from bitcoinlib.wallets import wallet_exists, HDWallet

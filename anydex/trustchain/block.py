@@ -22,7 +22,7 @@ ANY_COUNTERPARTY_PK = EMPTY_PK
 SKIP_ATTRIBUTES = {'key', 'serializer', 'crypto', '_transaction', '_logger'}
 
 
-class TrustChainBlock(object):
+class TrustChainBlock:
     """
     Container for TrustChain block information
     """
@@ -93,7 +93,6 @@ class TrustChainBlock(object):
         :param serializer: An optional custom serializer to use for this block.
         :type serializer: Serializer
         """
-        super(TrustChainBlock, self).__init__()
         self.serializer = serializer
         if data is None:
             # data

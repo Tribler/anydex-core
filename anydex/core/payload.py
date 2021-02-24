@@ -22,10 +22,7 @@ class MessagePayload(Payload):
         self.timestamp = timestamp
 
     def to_pack_list(self):
-        data = [('varlenI', bytes(self.trader_id)),
-                ('Q', int(self.timestamp))]
-
-        return data
+        return [('varlenI', bytes(self.trader_id)), ('Q', int(self.timestamp))]
 
 
 class InfoPayload(MessagePayload):
@@ -65,13 +62,13 @@ class OrderPayload(MessagePayload):
 
     def to_pack_list(self):
         data = super(OrderPayload, self).to_pack_list()
-        data += [('I', int(self.order_number)),
+        data.extend([('I', int(self.order_number)),
                  ('Q', self.assets.first.amount),
                  ('varlenI', self.assets.first.asset_id.encode('utf-8')),
                  ('Q', self.assets.second.amount),
                  ('varlenI', self.assets.second.asset_id.encode('utf-8')),
                  ('I', int(self.timeout)),
-                 ('Q', self.traded)]
+                 ('Q', self.traded)])
         return data
 
 
@@ -91,9 +88,9 @@ class MatchPayload(OrderPayload):
 
     def to_pack_list(self):
         data = super(MatchPayload, self).to_pack_list()
-        data += [('I', int(self.recipient_order_number)),
+        data.extend([('I', int(self.recipient_order_number)),
                  ('varlenI', bytes(self.match_trader_id)),
-                 ('varlenI', bytes(self.matchmaker_trader_id))]
+                 ('varlenI', bytes(self.matchmaker_trader_id))])
         return data
 
     @classmethod
@@ -121,10 +118,10 @@ class DeclineMatchPayload(MessagePayload):
 
     def to_pack_list(self):
         data = super(DeclineMatchPayload, self).to_pack_list()
-        data += [('I', int(self.order_number)),
+        data.extend([('I', int(self.order_number)),
                  ('varlenI', bytes(self.other_order_id.trader_id)),
                  ('I', int(self.other_order_id.order_number)),
-                 ('I', self.decline_reason)]
+                 ('I', self.decline_reason)])
         return data
 
     @classmethod
@@ -149,14 +146,14 @@ class TradePayload(MessagePayload):
 
     def to_pack_list(self):
         data = super(TradePayload, self).to_pack_list()
-        data += [('I', int(self.order_number)),
+        data.extend([('I', int(self.order_number)),
                  ('varlenI', bytes(self.recipient_order_id.trader_id)),
                  ('I', int(self.recipient_order_id.order_number)),
                  ('I', self.proposal_id),
                  ('Q', self.assets.first.amount),
                  ('varlenI', self.assets.first.asset_id.encode('utf-8')),
                  ('Q', self.assets.second.amount),
-                 ('varlenI', self.assets.second.asset_id.encode('utf-8'))]
+                 ('varlenI', self.assets.second.asset_id.encode('utf-8'))])
         return data
 
     @classmethod
@@ -181,11 +178,11 @@ class DeclineTradePayload(MessagePayload):
 
     def to_pack_list(self):
         data = super(DeclineTradePayload, self).to_pack_list()
-        data += [('I', int(self.order_number)),
+        data.extend([('I', int(self.order_number)),
                  ('varlenI', bytes(self.recipient_order_id.trader_id)),
                  ('I', int(self.recipient_order_id.order_number)),
                  ('I', self.proposal_id),
-                 ('I', self.decline_reason)]
+                 ('I', self.decline_reason)])
         return data
 
     @classmethod
@@ -209,7 +206,7 @@ class TransactionPayload(MessagePayload):
 
     def to_pack_list(self):
         data = super(TransactionPayload, self).to_pack_list()
-        data += [('32s', bytes(self.transaction_id))]
+        data.append(('32s', bytes(self.transaction_id)))
         return data
 
 
@@ -227,9 +224,9 @@ class OrderStatusRequestPayload(MessagePayload):
 
     def to_pack_list(self):
         data = super(OrderStatusRequestPayload, self).to_pack_list()
-        data += [('varlenI', bytes(self.order_id.trader_id)),
+        data.extend([('varlenI', bytes(self.order_id.trader_id)),
                  ('I', int(self.order_id.order_number)),
-                 ('I', self.identifier)]
+                 ('I', self.identifier)])
         return data
 
     @classmethod
@@ -276,9 +273,9 @@ class OrderbookSyncPayload(MessagePayload):
 
     def to_pack_list(self):
         data = super(OrderbookSyncPayload, self).to_pack_list()
-        data += [('B', self.bloomfilter.functions),
+        data.extend([('B', self.bloomfilter.functions),
                  ('c', self.bloomfilter.prefix),
-                 ('varlenI', self.bloomfilter.bytes)]
+                 ('varlenI', self.bloomfilter.bytes)])
         return data
 
     @classmethod
@@ -300,7 +297,7 @@ class PingPongPayload(MessagePayload):
 
     def to_pack_list(self):
         data = super(PingPongPayload, self).to_pack_list()
-        data += [('I', self.identifier)]
+        data.append(('I', self.identifier))
         return data
 
     @classmethod

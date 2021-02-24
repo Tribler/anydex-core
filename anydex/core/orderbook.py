@@ -2,7 +2,7 @@ import logging
 import time
 from binascii import unhexlify
 from itertools import chain
-from typing import Generator
+from typing import Any, Callable, Generator, List
 
 from ipv8.taskmanager import TaskManager
 from ipv8.util import fail
@@ -11,6 +11,8 @@ from anydex.core.assetpair import AssetPair
 from anydex.core.message import TraderId
 from anydex.core.order import OrderId, OrderNumber
 from anydex.core.price import Price
+from anydex.core.pricelevel import PriceLevel # pylint: disable=unused-import
+from anydex.core.pricelevel_list import PriceLevelList
 from anydex.core.side import Side
 from anydex.core.tick import Ask, Bid
 from anydex.core.timeout import Timeout
@@ -293,36 +295,52 @@ class OrderBook(TaskManager):
         """
         return self._asks.get_min_price_list(price_wallet_id, quantity_wallet_id)
 
-    def get_order_ids(self):
+    def get_order_ids(self) -> List[OrderId]:
         """
         Return all IDs of the orders in the orderbook, both asks and bids.
 
         :rtype: [OrderId]
         """
-        return self.get_bid_ids() + self.get_ask_ids()
+        return list(chain(self._get_bid_ids_iter(), self._get_ask_ids_iter()))
 
-    def _get_order_ids(self, side: Side) -> Generator[OrderId, None, None]:
-        price_level_lists = (side.get_price_level_list(price_wallet_id, quantity_wallet_id).items()
+    @staticmethod
+    def _get_order_ids(side: Side, reverse=False) -> Generator[OrderId, None, None]:
+        price_level_lists = (side.get_price_level_list(price_wallet_id, quantity_wallet_id).items(reverse)
                             for price_wallet_id, quantity_wallet_id
                             in side.get_price_level_list_wallets())
         for tick in chain.from_iterable(chain.from_iterable(price_level_lists)):
             yield tick.order_id
 
+    def _get_ask_ids_iter(self) -> Generator[OrderId, None, None]:
+        for order_id in OrderBook._get_order_ids(self.asks):
+            yield order_id
+
     def get_ask_ids(self):
-        return [order_id for order_id in self._get_order_ids(self.asks)]
+        return list(OrderBook._get_order_ids(self.asks))
+
+    def _get_bid_ids_iter(self) -> Generator[OrderId, None, None]:
+        for order_id in OrderBook._get_order_ids(self.bids):
+            yield order_id
 
     def get_bid_ids(self):
-        return [order_id for order_id in self._get_order_ids(self.bids)]
+        return list(OrderBook._get_order_ids(self.bids))
+
+    @staticmethod
+    def _get_price_level_lists_iter(
+        side: Side,
+        list_func: Callable[[Any, Any], PriceLevelList],
+        reverse: bool=False,
+    ) -> Generator[List[PriceLevel], None, None]:
+        for price_wallet_id, quantity_wallet_id in side.get_price_level_list_wallets():
+            yield list_func(price_wallet_id, quantity_wallet_id).items_iter(reverse)
 
     def __str__(self):
         res_str_list = ["------ Bids -------\n"]
-        for price_wallet_id, quantity_wallet_id in self.bids.get_price_level_list_wallets():
-            price_level_list = self._bids.get_price_level_list(price_wallet_id, quantity_wallet_id).items(reverse=True)
-            res_str_list.extend(map(str, price_level_list))
+        price_level_lists = OrderBook._get_price_level_lists_iter(self.bids, self._bids.get_price_level_list, True)
+        res_str_list.extend(map(str, chain.from_iterable(price_level_lists)))
         res_str_list.append("\n------ Asks -------\n")
-        for price_wallet_id, quantity_wallet_id in self.asks.get_price_level_list_wallets():
-            price_level_list = self._asks.get_price_level_list(price_wallet_id, quantity_wallet_id).items()
-            res_str_list.extend(map(str, price_level_list))
+        price_level_lists = OrderBook._get_price_level_lists_iter(self.asks, self._asks.get_price_level_list)
+        res_str_list.extend(map(str, chain.from_iterable(price_level_lists)))
         res_str_list.append("\n")
         return "".join(res_str_list)
 

@@ -19,7 +19,7 @@ class Wallet(TaskManager, metaclass=abc.ABCMeta):
     To create your own wallet, subclass this class and implement the required methods.
     """
     def __init__(self):
-        super(Wallet, self).__init__()
+        super().__init__()
         self._logger = logging.getLogger(self.__class__.__name__)
         self.created = False
         self.unlocked = False

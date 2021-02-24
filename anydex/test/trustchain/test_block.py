@@ -47,13 +47,12 @@ class TestBlock(TrustChainBlock):
         return self.transaction_validation_result
 
 
-class MockDatabase(object):
+class MockDatabase:
     """
     This mocked database is only used during the tests.
     """
 
     def __init__(self):
-        super(MockDatabase, self).__init__()
         self.data = dict()
         self.double_spends = []
 
