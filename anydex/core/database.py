@@ -13,13 +13,13 @@ from anydex.core.transaction import Transaction, TransactionId
 from anydex.trustchain.database import TrustChainDB
 
 
-DATABASE_DIRECTORY = path.join(u"sqlite")
+DATABASE_DIRECTORY = path.join("sqlite")
 # Path to the database location + dispersy._workingdirectory
-DATABASE_PATH = path.join(DATABASE_DIRECTORY, u"market.db")
+DATABASE_PATH = path.join(DATABASE_DIRECTORY, "market.db")
 # Version to keep track if the db schema needs to be updated.
 LATEST_DB_VERSION = 5
 # Schema for the Market DB.
-schema = u"""
+schema = """
 CREATE TABLE IF NOT EXISTS orders(
  trader_id            TEXT NOT NULL,
  order_number         INTEGER NOT NULL,
@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS orders(
  );
 
 CREATE TABLE IF NOT EXISTS option(key TEXT PRIMARY KEY, value BLOB);
-INSERT OR REPLACE INTO option(key, value) VALUES('database_version', '""" + str(LATEST_DB_VERSION) + u"""');
+INSERT OR REPLACE INTO option(key, value) VALUES('database_version', '""" + str(LATEST_DB_VERSION) + """');
 """
 
 
@@ -121,7 +121,7 @@ class MarketDB(TrustChainDB):
         """
         Return all orders in the database.
         """
-        db_result = self.execute(u"SELECT * FROM orders")
+        db_result = self.execute("SELECT * FROM orders")
         return [Order.from_database(db_item, self.get_reserved_ticks(
             OrderId(TraderId(bytes(db_item[0])), OrderNumber(db_item[1])))) for db_item in db_result]
 
@@ -129,22 +129,23 @@ class MarketDB(TrustChainDB):
         """
         Return an order with a specific id.
         """
-        try:
-            db_result = next(self.execute(u"SELECT * FROM orders WHERE trader_id = ? AND order_number = ?",
-                                          (database_blob(bytes(order_id.trader_id)),
-                                           str(order_id.order_number))))
-        except StopIteration:
-            return None
-        return Order.from_database(db_result, self.get_reserved_ticks(order_id))
+        db_result = next(
+            self.execute(
+                "SELECT * FROM orders WHERE trader_id = ? AND order_number = ?",
+                (database_blob(bytes(order_id.trader_id)),
+                str(order_id.order_number))),
+            None
+        )
+        return None if db_result is None else Order.from_database(db_result, self.get_reserved_ticks(order_id))
 
     def add_order(self, order):
         """
         Add a specific order to the database
         """
         self.execute(
-            u"INSERT INTO orders (trader_id, order_number, asset1_amount, asset1_type, asset2_amount, asset2_type,"
-            u"traded_quantity, received_quantity, timeout, order_timestamp, completed_timestamp, is_ask, cancelled,"
-            u"verified) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO orders (trader_id, order_number, asset1_amount, asset1_type, asset2_amount, asset2_type,"
+            "traded_quantity, received_quantity, timeout, order_timestamp, completed_timestamp, is_ask, cancelled,"
+            "verified) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             order.to_database())
         self.commit()
 
@@ -156,7 +157,7 @@ class MarketDB(TrustChainDB):
         """
         Delete a specific order from the database
         """
-        self.execute(u"DELETE FROM orders WHERE trader_id = ? AND order_number = ?",
+        self.execute("DELETE FROM orders WHERE trader_id = ? AND order_number = ?",
                      (database_blob(bytes(order_id.trader_id)), str(order_id.order_number)))
         self.delete_reserved_ticks(order_id)
 
@@ -164,7 +165,7 @@ class MarketDB(TrustChainDB):
         """
         Return the next order number from the database
         """
-        highest_order_number = next(self.execute(u"SELECT MAX(order_number) FROM orders"))
+        highest_order_number = next(self.execute("SELECT MAX(order_number) FROM orders"))
         if not highest_order_number[0]:
             return 1
         return highest_order_number[0] + 1
@@ -173,7 +174,7 @@ class MarketDB(TrustChainDB):
         """
         Delete all reserved ticks from a specific order
         """
-        self.execute(u"DELETE FROM orders_reserved_ticks WHERE trader_id = ? AND order_number = ?",
+        self.execute("DELETE FROM orders_reserved_ticks WHERE trader_id = ? AND order_number = ?",
                      (database_blob(bytes(order_id.trader_id)), str(order_id.order_number)))
 
     def add_reserved_tick(self, order_id, reserved_order_id, amount):
@@ -181,8 +182,8 @@ class MarketDB(TrustChainDB):
         Add a reserved tick to the database
         """
         self.execute(
-            u"INSERT INTO orders_reserved_ticks (trader_id, order_number, reserved_trader_id, reserved_order_number,"
-            u"quantity) VALUES(?,?,?,?,?)",
+            "INSERT INTO orders_reserved_ticks (trader_id, order_number, reserved_trader_id, reserved_order_number,"
+            "quantity) VALUES(?,?,?,?,?)",
             (database_blob(bytes(order_id.trader_id)), str(order_id.order_number),
              database_blob(bytes(reserved_order_id.trader_id)), str(reserved_order_id.order_number), amount))
         self.commit()
@@ -191,7 +192,7 @@ class MarketDB(TrustChainDB):
         """
         Get all reserved ticks for a specific order.
         """
-        db_results = self.execute(u"SELECT * FROM orders_reserved_ticks WHERE trader_id = ? AND order_number = ?",
+        db_results = self.execute("SELECT * FROM orders_reserved_ticks WHERE trader_id = ? AND order_number = ?",
                                   (database_blob(bytes(order_id.trader_id)), str(order_id.order_number)))
         return [(OrderId(TraderId(bytes(data[2])), OrderNumber(data[3])), data[4]) for data in db_results]
 
@@ -199,7 +200,7 @@ class MarketDB(TrustChainDB):
         """
         Return all transactions in the database.
         """
-        db_result = self.execute(u"SELECT * FROM transactions")
+        db_result = self.execute("SELECT * FROM transactions")
         return [Transaction.from_database(db_item,
                                           self.get_payments(TransactionId(db_item[1])))
                 for db_item in db_result]
@@ -208,23 +209,25 @@ class MarketDB(TrustChainDB):
         """
         Return a transaction with a specific id.
         """
-        try:
-            db_result = next(self.execute(u"SELECT * FROM transactions WHERE transaction_id = ?",
-                                          (database_blob(bytes(transaction_id)),)))
-        except StopIteration:
-            return None
-        return Transaction.from_database(db_result, self.get_payments(transaction_id))
+        db_result = next(
+            self.execute(
+                "SELECT * FROM transactions WHERE transaction_id = ?",
+                (database_blob(bytes(transaction_id)),)
+            ),
+            None,
+        )
+        return None if db_result is None else Transaction.from_database(db_result, self.get_payments(transaction_id))
 
     def add_transaction(self, transaction):
         """
         Add a specific transaction to the database
         """
         self.execute(
-            u"INSERT INTO transactions (trader_id, transaction_id, order_number,"
-            u"partner_trader_id, partner_order_number, asset1_amount, asset1_type, asset1_transferred, asset2_amount,"
-            u"asset2_type, asset2_transferred, transaction_timestamp,"
-            u"incoming_address, outgoing_address, partner_incoming_address, partner_outgoing_address) "
-            u"VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", transaction.to_database())
+            "INSERT INTO transactions (trader_id, transaction_id, order_number,"
+            "partner_trader_id, partner_order_number, asset1_amount, asset1_type, asset1_transferred, asset2_amount,"
+            "asset2_type, asset2_transferred, transaction_timestamp,"
+            "incoming_address, outgoing_address, partner_incoming_address, partner_outgoing_address) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", transaction.to_database())
         self.commit()
 
         self.delete_payments(transaction.transaction_id)
@@ -237,16 +240,16 @@ class MarketDB(TrustChainDB):
         Updates only if the timestamp is more recent than the one in the database.
         """
         self.execute(
-            u"INSERT OR IGNORE INTO transactions (trader_id, transaction_id, order_number,"
-            u"partner_trader_id, partner_order_number, asset1_amount, asset1_type, asset1_transferred, asset2_amount,"
-            u"asset2_type, asset2_transferred, transaction_timestamp,"
-            u"incoming_address, outgoing_address, partner_incoming_address, partner_outgoing_address) "
-            u"VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", transaction.to_database())
+            "INSERT OR IGNORE INTO transactions (trader_id, transaction_id, order_number,"
+            "partner_trader_id, partner_order_number, asset1_amount, asset1_type, asset1_transferred, asset2_amount,"
+            "asset2_type, asset2_transferred, transaction_timestamp,"
+            "incoming_address, outgoing_address, partner_incoming_address, partner_outgoing_address) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", transaction.to_database())
 
         self.execute(
-            u"UPDATE transactions SET asset1_amount = ?, asset1_transferred = ?, asset2_amount = ?, "
-            u"asset2_transferred = ?, transaction_timestamp = ? WHERE transaction_id = ?"
-            u"AND transaction_timestamp < ?", (transaction.assets.first.amount,
+            "UPDATE transactions SET asset1_amount = ?, asset1_transferred = ?, asset2_amount = ?, "
+            "asset2_transferred = ?, transaction_timestamp = ? WHERE transaction_id = ?"
+            "AND transaction_timestamp < ?", (transaction.assets.first.amount,
                                                transaction.transferred_assets.first.amount,
                                                transaction.assets.second.amount,
                                                transaction.transferred_assets.second.amount,
@@ -261,7 +264,7 @@ class MarketDB(TrustChainDB):
         """
         Delete a specific transaction from the database
         """
-        self.execute(u"DELETE FROM transactions WHERE transaction_id = ?", (database_blob(bytes(transaction_id)),))
+        self.execute("DELETE FROM transactions WHERE transaction_id = ?", (database_blob(bytes(transaction_id)),))
         self.delete_payments(transaction_id)
 
     def add_payment(self, payment):
@@ -269,8 +272,8 @@ class MarketDB(TrustChainDB):
         Add a specific transaction to the database
         """
         self.execute(
-            u"INSERT INTO payments (trader_id, transaction_id, payment_id,"
-            u"transferred_amount, transferred_type, address_from, address_to, timestamp) VALUES(?,?,?,?,?,?,?,?)",
+            "INSERT INTO payments (trader_id, transaction_id, payment_id,"
+            "transferred_amount, transferred_type, address_from, address_to, timestamp) VALUES(?,?,?,?,?,?,?,?)",
             payment.to_database())
         self.commit()
 
@@ -278,7 +281,7 @@ class MarketDB(TrustChainDB):
         """
         Return all payment tied to a specific transaction.
         """
-        db_result = self.execute(u"SELECT * FROM payments WHERE transaction_id = ? ORDER BY timestamp ASC",
+        db_result = self.execute("SELECT * FROM payments WHERE transaction_id = ? ORDER BY timestamp ASC",
                                  (database_blob(bytes(transaction_id)),))
         return [Payment.from_database(db_item) for db_item in db_result]
 
@@ -286,42 +289,42 @@ class MarketDB(TrustChainDB):
         """
         Delete all payments that are associated with a specific transaction
         """
-        self.execute(u"DELETE FROM payments WHERE transaction_id = ?", (database_blob(bytes(transaction_id)), ))
+        self.execute("DELETE FROM payments WHERE transaction_id = ?", (database_blob(bytes(transaction_id)), ))
 
     def add_tick(self, tick):
         """
         Add a specific tick to the database
         """
         self.execute(
-            u"INSERT INTO ticks (trader_id, order_number, asset1_amount, asset1_type, asset2_amount,"
-            u"asset2_type, timeout, timestamp, is_ask, traded, block_hash) "
-            u"VALUES(?,?,?,?,?,?,?,?,?,?,?)", tick.to_database())
+            "INSERT INTO ticks (trader_id, order_number, asset1_amount, asset1_type, asset2_amount,"
+            "asset2_type, timeout, timestamp, is_ask, traded, block_hash) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?)", tick.to_database())
         self.commit()
 
     def delete_all_ticks(self):
         """
         Remove all ticks from the database.
         """
-        self.execute(u"DELETE FROM ticks")
+        self.execute("DELETE FROM ticks")
 
     def get_ticks(self):
         """
         Get all ticks present in the database.
         """
-        return [Tick.from_database(db_tick) for db_tick in self.execute(u"SELECT * FROM ticks")]
+        return [Tick.from_database(db_tick) for db_tick in self.execute("SELECT * FROM ticks")]
 
     def open(self, initial_statements=True, prepare_visioning=True):
-        return super(MarketDB, self).open(initial_statements, prepare_visioning)
+        return super().open(initial_statements, prepare_visioning)
 
     def get_upgrade_script(self, current_version):
-        if current_version == 1 or current_version == 2 or current_version == 3 or current_version == 4:
-            return u"DROP TABLE IF EXISTS orders;" \
-                   u"DROP TABLE IF EXISTS transactions;" \
-                   u"DROP TABLE IF EXISTS payments;" \
-                   u"DROP TABLE IF EXISTS ticks;" \
-                   u"DROP TABLE IF EXISTS orders_reserved_ticks;" \
-                   u"DROP TABLE IF EXISTS option;" \
-                   u"DROP TABLE IF EXISTS traders;"
+        if current_version in (1, 2, 3, 4):
+            return "DROP TABLE IF EXISTS orders;" \
+                   "DROP TABLE IF EXISTS transactions;" \
+                   "DROP TABLE IF EXISTS payments;" \
+                   "DROP TABLE IF EXISTS ticks;" \
+                   "DROP TABLE IF EXISTS orders_reserved_ticks;" \
+                   "DROP TABLE IF EXISTS option;" \
+                   "DROP TABLE IF EXISTS traders;"
 
     def check_database(self, database_version):
         """
