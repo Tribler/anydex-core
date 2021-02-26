@@ -1,50 +1,47 @@
+import operator
+from collections import namedtuple
 from functools import cmp_to_key
-
 
 class MatchPriorityQueue:
     """
     This priority queue keeps track of incoming match message for a specific order.
     """
+    _QueueItem = namedtuple("QueueItem", ("retries", "price", "order_id", "other_quantity"))
+
     def __init__(self, order):
         self.order = order
         self.queue = []
 
     def __str__(self):
-        return ' '.join([str(i) for i in self.queue])
+        return ' '.join(map(str, self.queue))
 
     def is_empty(self):
         return len(self.queue) == 0
 
     def contains_order(self, order_id):
-        for _, _, other_order_id, _ in self.queue:
-            if other_order_id == order_id:
-                return True
-        return False
+        return any(queue_item.order_id == order_id for queue_item in self.queue)
 
     def insert(self, retries, price, order_id, other_quantity):
-        self.queue.append((retries, price, order_id, other_quantity))
+        self.queue.append(MatchPriorityQueue._QueueItem(retries, price, order_id, other_quantity))
 
-        def cmp_items(tup1, tup2):
-            if tup1[0] < tup2[0]:
+        def cmp_items(queue_item1, queue_item2):
+            if queue_item1.retries < queue_item2.retries:
                 return -1
-            elif tup1[0] > tup2[0]:
+            elif queue_item1.retries > queue_item2.retries:
                 return 1
             else:
                 if self.order.is_ask():
-                    if tup1[1] < tup2[1]:
+                    if queue_item1.price < queue_item2.price:
                         return 1
                     else:
                         return -1
                 else:
-                    if tup1[1] < tup2[1]:
+                    if queue_item1.price < queue_item2.price:
                         return -1
                     else:
                         return 1
 
-        self.queue = sorted(self.queue, key=cmp_to_key(cmp_items))
+        self.queue.sort(key=cmp_to_key(cmp_items))
 
     def delete(self):
-        if not self.queue:
-            return None
-
-        return self.queue.pop(0)
+        return self.queue.pop(0) if self.queue else None

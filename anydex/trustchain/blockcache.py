@@ -70,9 +70,4 @@ class BlockCache:
         """
         Get all the sequence numbers that are missing within a given range.
         """
-        missing = []
-        for seq_num in range(start_seq_num, end_seq_num + 1):
-            if seq_num not in self.blocks:
-                missing.append(seq_num)
-
-        return missing
+        return [seq_num for seq_num in range(start_seq_num, end_seq_num + 1) if seq_num not in self.blocks]

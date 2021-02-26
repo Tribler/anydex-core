@@ -1,4 +1,5 @@
 import logging
+import operator
 import time
 from binascii import unhexlify
 from itertools import chain
@@ -314,8 +315,10 @@ class OrderBook(TaskManager):
 
     @staticmethod
     def _get_order_ids(side: Side, reverse: bool=False) -> Generator[OrderId, None, None]:
-        for tick in chain.from_iterable(OrderBook._get_price_level_iter(side, reverse)):
-            yield tick.order_id
+        yield from map(
+            operator.attrgetter("order_id"),
+            chain.from_iterable(OrderBook._get_price_level_iter(side, reverse)),
+        )
 
     def get_ask_ids_iter(self) -> Generator[OrderId, None, None]:
         yield from OrderBook._get_order_ids(self.asks)
