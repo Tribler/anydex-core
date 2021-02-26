@@ -1,7 +1,7 @@
 from functools import cmp_to_key
 
 
-class MatchPriorityQueue(object):
+class MatchPriorityQueue:
     """
     This priority queue keeps track of incoming match message for a specific order.
     """

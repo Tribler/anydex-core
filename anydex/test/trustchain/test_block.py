@@ -568,7 +568,7 @@ class TestTrustChainBlock(TestBase):
         block.sequence_number = 1
         block.link_sequence_number = 4
 
-        class FakeDB(object):
+        class FakeDB:
 
             def get_linked(self, _):
                 return block
@@ -604,7 +604,7 @@ class TestTrustChainBlock(TestBase):
         """
         Test for error on double countersign fraud.
         """
-        class FakeDB(object):
+        class FakeDB:
 
             def get_linked(self, _):
                 return TestBlock(transaction={"a": "b"})

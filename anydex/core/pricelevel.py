@@ -1,4 +1,4 @@
-class PriceLevel(object):
+class PriceLevel:
     """Class to represents a list of ticks at a specific price level"""
 
     def __init__(self, price):

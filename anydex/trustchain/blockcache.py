@@ -1,7 +1,7 @@
 from ipv8.database import database_blob
 
 
-class BlockCache(object):
+class BlockCache:
     """
     This class will cache (originating and linked) blocks in the chain of this user.
     """
@@ -35,9 +35,9 @@ class BlockCache(object):
             db_result = list(self.database.execute(query,
                                                    (database_blob(self.public_key), database_blob(self.public_key)),
                                                    fetch_all=True))
-            blocks = [self.database.get_block_class(db_item[0] if isinstance(db_item[0], bytes)
+            blocks = (self.database.get_block_class(db_item[0] if isinstance(db_item[0], bytes)
                                                     else str(db_item[0]).encode('utf-8'))(db_item)
-                      for db_item in db_result]
+                      for db_item in db_result)
             for block in blocks:  # Add them to the cache
                 self.add(block)
 

@@ -1,4 +1,4 @@
-class MarketSettings(object):
+class MarketSettings:
     """
     Object that defines various settings for the market.
     """

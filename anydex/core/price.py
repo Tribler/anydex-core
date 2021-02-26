@@ -1,7 +1,7 @@
 from fractions import Fraction
 
 
-class Price(object):
+class Price:
     """
     This class represents a price in the market.
     The price is simply a fraction that expresses one asset in another asset.

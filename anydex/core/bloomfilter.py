@@ -30,7 +30,7 @@ from struct import Struct
 logger = logging.getLogger(__name__)
 
 
-class BloomFilter(object):
+class BloomFilter:
 
     """
     A Bloom filter, conceived by Burton Howard Bloom in 1970 is a space-efficient probabilistic data structure that is

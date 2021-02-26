@@ -518,7 +518,7 @@ class TrustChainBlock:
                 yield key, value.decode('utf-8') if isinstance(value, bytes) else value
 
 
-class ValidationResult(object):
+class ValidationResult:
     """
     Contains the various results that the validator can return.
     """

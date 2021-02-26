@@ -1,4 +1,4 @@
-class TrustChainSettings(object):
+class TrustChainSettings:
     """
     This class holds various settings regarding TrustChain.
     """

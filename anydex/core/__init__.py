@@ -1,4 +1,4 @@
-class DeclinedTradeReason(object):
+class DeclinedTradeReason:
     ORDER_COMPLETED = 0
     ORDER_EXPIRED = 1
     ORDER_RESERVED = 2
@@ -11,7 +11,7 @@ class DeclinedTradeReason(object):
     OTHER = 9
 
 
-class DeclineMatchReason(object):
+class DeclineMatchReason:
     ORDER_COMPLETED = 0
     OTHER_ORDER_COMPLETED = 1
     OTHER_ORDER_CANCELLED = 2
