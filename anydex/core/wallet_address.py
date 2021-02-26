@@ -5,11 +5,11 @@ class WalletAddress:
     def __init__(self, wallet_address):
         """
         :param wallet_address: String representation of a wallet address
-        :type wallet_address: str or unicode
-        :raises ValueError: Thrown when one of the arguments are invalid
+        :type wallet_address: str
+        :raises TypeError: Thrown when the type of wallet_address is invalid
         """
         if not isinstance(wallet_address, str):
-            raise ValueError(f"Wallet address must be a string, found {type(wallet_address)} instead")
+            raise TypeError(f"Wallet address must be a string, found {type(wallet_address)} instead")
 
         self._wallet_address = wallet_address
 

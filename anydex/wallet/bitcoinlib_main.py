@@ -61,13 +61,14 @@ def initialize_lib(wallet_dir):
         excluded_assignments = ['logfile', 'handler', 'logger', 'formatter']
         with open(os.path.join(CURRENT_INSTALLDIR, 'main.py'), 'rb') as source_file:
             file_contents = source_file.read()
-            ast_module_node = ast.parse(file_contents)
-            for node in ast.iter_child_nodes(ast_module_node):
-                if isinstance(node, ast.Assign):
-                    node_id, value = node.targets[0].id, node.value
-                    if not hasattr(sys.modules[__name__], node_id) and node_id not in excluded_assignments:
-                        output = eval(compile(ast.Expression(value), '<string>', 'eval'))
-                        setattr(sys.modules[__name__], node_id, output)
+        ast_module_node = ast.parse(file_contents)
+        for node in ast.iter_child_nodes(ast_module_node):
+            if not isinstance(node, ast.Assign):
+                continue
+            node_id, value = node.targets[0].id, node.value
+            if not hasattr(sys.modules[__name__], node_id) and node_id not in excluded_assignments:
+                output = eval(compile(ast.Expression(value), '<string>', 'eval'))
+                setattr(sys.modules[__name__], node_id, output)
 
         # Clear everything related to bitcoinlib from sys.modules
         for module_name in list(sys.modules):
@@ -84,7 +85,7 @@ def initialize_lib(wallet_dir):
         pass
 
 
-def script_type_default(witness_type=None, multisig=False, locking_script=False):
+def script_type_default(witness_type: str=None, multisig: bool=False, locking_script: bool=False):
     """
     Determine default script type for provided witness type and key type combination used in this library.
 
@@ -131,7 +132,7 @@ def get_encoding_from_witness(witness_type=None):
     elif witness_type in [None, 'legacy', 'p2sh-segwit']:
         return 'base58'
     else:
-        raise ValueError(f"Unknown witness type {witness_type}")
+        raise TypeError(f"Unknown witness type {witness_type}")
 
 
 def deprecated(func):

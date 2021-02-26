@@ -14,7 +14,7 @@ class PaymentIdTestSuite(unittest.TestCase):
         """
         Test the initialization of a quantity
         """
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             PaymentId(1)
 
     def test_str(self):

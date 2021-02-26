@@ -209,7 +209,7 @@ class OrderNumberTestSuite(unittest.TestCase):
 
     def test_init(self):
         # Test for init validation
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             OrderNumber(1.0)
 
     def test_equality(self):

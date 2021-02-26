@@ -15,10 +15,12 @@ class TimestampTestSuite(unittest.TestCase):
 
     def test_init(self):
         # Test for init validation
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             Timestamp(-1.0)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             Timestamp("1")
+        with self.assertRaises(ValueError):
+            Timestamp(-1)
 
     def test_now(self):
         # Test for Timestamp.now

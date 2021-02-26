@@ -4,14 +4,15 @@ import time
 class Timeout:
     """Used for having a validated instance of a timeout that we can easily check if it still valid."""
 
-    def __init__(self, timeout):
+    def __init__(self, timeout: int):
         """
         :param timeout: Integer representation of a timeout
         :type timeout: int
+        :raises TypeError: Thrown when the type of timeout is invalid
         :raises ValueError: Thrown when one of the arguments are invalid
         """
         if not isinstance(timeout, int):
-            raise ValueError("Timeout must be an integer")
+            raise TypeError("Timeout must be an integer")
 
         if timeout < 0:
             raise ValueError("Timeout must be positive or zero")

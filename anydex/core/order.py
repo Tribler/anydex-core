@@ -17,14 +17,14 @@ class TickWasNotReserved(Exception):
 class OrderNumber:
     """Immutable class for representing the number of an order."""
 
-    def __init__(self, order_number):
+    def __init__(self, order_number: int):
         """
         :param order_number: Integer representing the number of an order
         :type order_number: int
-        :raises ValueError: Thrown when one of the arguments are invalid
+        :raises TypeError: Thrown the type of order_number invalid
         """
         if not isinstance(order_number, int):
-            raise ValueError("Order number must be an integer")
+            raise TypeError("Order number must be an integer")
 
         self.order_number = order_number
 
@@ -311,7 +311,7 @@ class Order:
             else:
                 self._reserved_ticks[order_id] += quantity
         else:
-            raise ValueError("Order %s does not have enough available quantity for reservation", self.order_id)
+            raise ValueError(f"Order {self.order_id} does not have enough available quantity for reservation")
 
         self._logger.debug("Reserved %d quantity for order id %s (own order id: %s),"
                            "total quantity: %d, traded quantity: %d, reserved quantity: %d",

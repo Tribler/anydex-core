@@ -9,10 +9,11 @@ class Timestamp:
         """
         :param timestamp: Integer representation of a timestamp in milliseconds
         :type timestamp: int
+        :raises TypeError: Thrown when the type of timestamp is invalid
         :raises ValueError: Thrown when one of the arguments are invalid
         """
         if not isinstance(timestamp, int):
-            raise ValueError("Timestamp must be an integer")
+            raise TypeError("Timestamp must be an integer")
 
         if timestamp < 0:
             raise ValueError("Timestamp can not be negative")

@@ -13,12 +13,13 @@ class AssetAmount:
         """
         :param amount: Integer representation of the asset amount
         :param asset_id: Identifier of the asset type of this amount
+        :raises TypeError: Thrown when one of the arguments' types is invalid
         """
         if not isinstance(amount, int):
-            raise ValueError("Price must be an integer")
+            raise TypeError("Price must be an integer")
 
         if not isinstance(asset_id, str):
-            raise ValueError("Asset id must be a string")
+            raise TypeError("Asset id must be a string")
 
         self._amount = amount
         self._asset_id = asset_id

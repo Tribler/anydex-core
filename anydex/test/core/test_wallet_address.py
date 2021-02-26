@@ -13,7 +13,7 @@ class WalletAddressTestSuite(unittest.TestCase):
 
     def test_init(self):
         # Test for init validation
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             WalletAddress(1)
 
     def test_conversion(self):

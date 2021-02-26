@@ -19,9 +19,9 @@ class TestAssetAmount(unittest.TestCase):
         """
         Test the initialization of a price
         """
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             AssetAmount('1', 'MC')
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             AssetAmount(1, 2)
 
     def test_addition(self):
