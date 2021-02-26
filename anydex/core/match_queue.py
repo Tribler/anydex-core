@@ -31,15 +31,11 @@ class MatchPriorityQueue:
                 return 1
             else:
                 if self.order.is_ask():
-                    if queue_item1.price < queue_item2.price:
-                        return 1
-                    else:
-                        return -1
+                    # When `self.order` is an ask, upon a smaller price the returned code should result in *1*, not *-1*
+                    # like the other case!
+                    return 1 if queue_item1.price < queue_item2.price else -1 
                 else:
-                    if queue_item1.price < queue_item2.price:
-                        return -1
-                    else:
-                        return 1
+                    return -1 if queue_item1.price < queue_item2.price else 1 
 
         self.queue.sort(key=cmp_to_key(cmp_items))
 
