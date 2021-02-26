@@ -26,7 +26,11 @@ class PriceLevelList:
         """
         :type price: Price
         """
-        self._price_list.remove(price)
+        price_list = self._price_list
+        index = bisect.bisect_left(price_list, price)
+        if index >= len(price_list) or price != price_list[index]:
+            raise ValueError(f"PriceLevelList.remove(price): price '{price}' not in list")
+        del price_list[index]
         del self._price_level_dictionary[price]
 
     def succ_item(self, price: Price) -> PriceLevel:  # type: (Price) -> PriceLevel
@@ -36,10 +40,11 @@ class PriceLevelList:
         :type price: Price
         :rtype: PriceLevel
         """
-        index = self._price_list.index(price) + 1
-        if index >= len(self._price_list):
+        price_list = self._price_list
+        index = bisect.bisect_right(price_list, price)
+        if index >= len(price_list):
             raise IndexError
-        succ_price = self._price_list[index]
+        succ_price = price_list[index]
         return self._price_level_dictionary[succ_price]
 
     def prev_item(self, price: Price) -> PriceLevel:  # type: (Price) -> PriceLevel
@@ -49,10 +54,16 @@ class PriceLevelList:
         :type price: Price
         :rtype: PriceLevel
         """
-        index = self._price_list.index(price) - 1
+        price_list = self._price_list
+        index = bisect.bisect_left(price_list, price)
+        # If `price` is in the list, bisect_left may return an index value of that instead of the previous price. In such a
+        # case the actual index needs to be computed (and is one less than the found index).
+        if price == price_list[index]:
+            index -= 1
+        # Now that the actual index is known, it can be checked for validity
         if index < 0:
             raise IndexError
-        prev_price = self._price_list[index]
+        prev_price = price_list[index]
         return self._price_level_dictionary[prev_price]
 
     def min_key(self) -> Price:  # type: () -> Price
@@ -61,6 +72,9 @@ class PriceLevelList:
 
         :rtype: Price
         """
+        # While programmatically needless, conceptually this prevents the details of the internal implementation from leaking out
+        if not self._price_list:
+            raise IndexError
         return self._price_list[0]
 
     def max_key(self) -> Price:  # type: () -> Price
@@ -69,6 +83,9 @@ class PriceLevelList:
 
         :rtype: Price
         """
+        # While programmatically needless, conceptually this prevents the details of the internal implementation from leaking out
+        if not self._price_list:
+            raise IndexError
         return self._price_list[-1]
 
     def items(self, reverse: bool=False) -> List[Tuple[Price, PriceLevel]]:  # type: (bool) -> List[Tuple[Price, PriceLevel]]
