@@ -301,52 +301,55 @@ class OrderBook(TaskManager):
 
         :rtype: [OrderId]
         """
-        return list(chain(self._get_bid_ids_iter(), self._get_ask_ids_iter()))
+        return list(chain(self.get_bid_ids_iter(), self.get_ask_ids_iter()))
+
+    def get_order_ids_iter(self) -> Generator[OrderId, None, None]:
+        """
+        An iterator version of @OrderBook.get_order_ids
+        Return all IDs of the orders in the orderbook, both asks and bids.
+
+        :rtype: [OrderId]
+        """
+        yield from chain(self.get_bid_ids_iter(), self.get_ask_ids_iter())
 
     @staticmethod
-    def _get_order_ids(side: Side, reverse=False) -> Generator[OrderId, None, None]:
-        price_level_lists = (side.get_price_level_list(price_wallet_id, quantity_wallet_id).items(reverse)
-                            for price_wallet_id, quantity_wallet_id
-                            in side.get_price_level_list_wallets())
-        for tick in chain.from_iterable(chain.from_iterable(price_level_lists)):
+    def _get_order_ids(side: Side, reverse: bool=False) -> Generator[OrderId, None, None]:
+        for tick in chain.from_iterable(OrderBook._get_price_level_iter(side, reverse)):
             yield tick.order_id
 
-    def _get_ask_ids_iter(self) -> Generator[OrderId, None, None]:
-        for order_id in OrderBook._get_order_ids(self.asks):
-            yield order_id
+    def get_ask_ids_iter(self) -> Generator[OrderId, None, None]:
+        yield from OrderBook._get_order_ids(self.asks)
 
-    def get_ask_ids(self):
+    def get_ask_ids(self) -> List[OrderId]:
         return list(OrderBook._get_order_ids(self.asks))
 
-    def _get_bid_ids_iter(self) -> Generator[OrderId, None, None]:
-        for order_id in OrderBook._get_order_ids(self.bids):
-            yield order_id
+    def get_bid_ids_iter(self) -> Generator[OrderId, None, None]:
+        yield from OrderBook._get_order_ids(self.bids)
 
-    def get_bid_ids(self):
+    def get_bid_ids(self) -> List[OrderId]:
         return list(OrderBook._get_order_ids(self.bids))
 
     @staticmethod
-    def _get_price_level_lists_iter(
-        side: Side,
-        list_func: Callable[[Any, Any], PriceLevelList],
-        reverse: bool=False,
-    ) -> Generator[List[PriceLevel], None, None]:
+    def _get_price_level_iter(side: Side, reverse: bool=False) -> Generator[PriceLevel, None, None]:
         for price_wallet_id, quantity_wallet_id in side.get_price_level_list_wallets():
-            yield list_func(price_wallet_id, quantity_wallet_id).items_iter(reverse)
+            yield from side.get_price_level_list(price_wallet_id, quantity_wallet_id).items_iter(reverse)
 
     def __str__(self):
-        res_str_list = ["------ Bids -------\n"]
-        price_level_lists = OrderBook._get_price_level_lists_iter(self.bids, self._bids.get_price_level_list, True)
-        res_str_list.extend(map(str, chain.from_iterable(price_level_lists)))
-        res_str_list.append("\n------ Asks -------\n")
-        price_level_lists = OrderBook._get_price_level_lists_iter(self.asks, self._asks.get_price_level_list)
-        res_str_list.extend(map(str, chain.from_iterable(price_level_lists)))
+        sides_to_stringify = (
+            ("------ Bids -------\n", self.bids, True),
+            ("\n------ Asks -------\n", self.asks, False),
+        )
+        res_str_list = []
+        for headline, side, reverse in sides_to_stringify:
+            res_str_list.append(headline)
+            price_level_iter = OrderBook._get_price_level_iter(side, reverse)
+            res_str_list.extend(map(str, price_level_iter))
         res_str_list.append("\n")
         return "".join(res_str_list)
 
     def cancel_all_pending_tasks(self):
         tasks = super().cancel_all_pending_tasks()
-        for order_id in self.get_order_ids():
+        for order_id in self.get_order_ids_iter():
             tasks.extend(self.get_tick(order_id).cancel_all_pending_tasks())
         return tasks
 
