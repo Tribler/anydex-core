@@ -1,5 +1,7 @@
 import os
 
+import pytest
+
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
 from anydex.core.database import LATEST_DB_VERSION, MarketDB
@@ -12,188 +14,210 @@ from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
 from anydex.core.transaction import Transaction, TransactionId
 from anydex.core.wallet_address import WalletAddress
-from anydex.test.base import AbstractServer
 
 
-class TestDatabase(AbstractServer):
+@pytest.fixture
+def db(tmpdir):
+    os.makedirs(os.path.join(tmpdir, "sqlite"))
+    db = MarketDB(tmpdir, 'market')
+    yield db
+    db.close()
 
-    async def setUp(self):
-        super(TestDatabase, self).setUp()
 
-        path = os.path.join(self.getStateDir(), 'sqlite')
-        if not os.path.exists(path):
-            os.makedirs(path)
+@pytest.fixture
+def order1():
+    order_id1 = OrderId(TraderId(b'3' * 20), OrderNumber(4))
+    return Order(order_id1, AssetPair(AssetAmount(5, 'BTC'), AssetAmount(6, 'EUR')),
+                 Timeout(3600), Timestamp.now(), True)
 
-        self.database = MarketDB(self.getStateDir(), 'market')
 
-        self.order_id1 = OrderId(TraderId(b'3' * 20), OrderNumber(4))
-        self.order_id2 = OrderId(TraderId(b'4' * 20), OrderNumber(5))
-        self.order1 = Order(self.order_id1, AssetPair(AssetAmount(5, 'BTC'), AssetAmount(6, 'EUR')),
-                            Timeout(3600), Timestamp.now(), True)
-        self.order2 = Order(self.order_id2, AssetPair(AssetAmount(5, 'BTC'), AssetAmount(6, 'EUR')),
-                            Timeout(3600), Timestamp.now(), False)
-        self.order2.reserve_quantity_for_tick(OrderId(TraderId(b'3' * 20), OrderNumber(4)), 3)
+@pytest.fixture
+def order2():
+    order_id2 = OrderId(TraderId(b'4' * 20), OrderNumber(5))
+    order2 = Order(order_id2, AssetPair(AssetAmount(5, 'BTC'), AssetAmount(6, 'EUR')),
+                   Timeout(3600), Timestamp.now(), False)
+    order2.reserve_quantity_for_tick(OrderId(TraderId(b'3' * 20), OrderNumber(4)), 3)
+    return order2
 
-        self.transaction_id1 = TransactionId(b'a' * 32)
-        self.transaction1 = Transaction(self.transaction_id1, AssetPair(AssetAmount(100, 'BTC'), AssetAmount(30, 'MB')),
-                                        OrderId(TraderId(b'0' * 20), OrderNumber(1)),
-                                        OrderId(TraderId(b'1' * 20), OrderNumber(2)), Timestamp(20000))
 
-        self.payment1 = Payment(TraderId(b'0' * 20), self.transaction_id1, AssetAmount(5, 'BTC'),
-                                WalletAddress('abc'), WalletAddress('def'), PaymentId("abc"), Timestamp(20000))
+@pytest.fixture
+def payment():
+    transaction_id = TransactionId(b'a' * 32)
+    payment = Payment(TraderId(b'0' * 20), transaction_id, AssetAmount(5, 'BTC'),
+                      WalletAddress('abc'), WalletAddress('def'), PaymentId("abc"), Timestamp(20000))
+    return payment
 
-        self.transaction1.add_payment(self.payment1)
 
-    async def tearDown(self):
-        self.database.close()
-        await super(TestDatabase, self).tearDown()
+@pytest.fixture
+def transaction(payment):
+    transaction_id = TransactionId(b'a' * 32)
+    transaction = Transaction(transaction_id, AssetPair(AssetAmount(100, 'BTC'), AssetAmount(30, 'MB')),
+                              OrderId(TraderId(b'0' * 20), OrderNumber(1)),
+                              OrderId(TraderId(b'1' * 20), OrderNumber(2)), Timestamp(20000))
 
-    def test_add_get_order(self):
-        """
-        Test the insertion and retrieval of an order in the database
-        """
-        self.database.add_order(self.order1)
-        self.database.add_order(self.order2)
-        orders = self.database.get_all_orders()
-        self.assertEqual(len(orders), 2)
+    transaction.add_payment(payment)
+    return transaction
 
-        # Verify that the assets are correctly decoded
-        assets = orders[0].assets
-        self.assertEqual(assets.first.asset_id, "BTC")
-        self.assertEqual(assets.second.asset_id, "EUR")
 
-    def test_get_specific_order(self):
-        """
-        Test the retrieval of a specific order
-        """
-        order_id = OrderId(TraderId(b'3' * 20), OrderNumber(4))
-        self.assertIsNone(self.database.get_order(order_id))
-        self.database.add_order(self.order1)
-        self.assertIsNotNone(self.database.get_order(order_id))
+def test_add_get_order(db, order1, order2):
+    """
+    Test the insertion and retrieval of an order in the database
+    """
+    db.add_order(order1)
+    db.add_order(order2)
+    orders = db.get_all_orders()
+    assert len(orders) == 2
 
-    def test_delete_order(self):
-        """
-        Test the deletion of an order from the database
-        """
-        self.database.add_order(self.order1)
-        self.assertEqual(len(self.database.get_all_orders()), 1)
-        self.database.delete_order(self.order_id1)
-        self.assertEqual(len(self.database.get_all_orders()), 0)
+    # Verify that the assets are correctly decoded
+    assets = orders[0].assets
+    assert assets.first.asset_id == "BTC"
+    assert assets.second.asset_id == "EUR"
 
-    def test_get_next_order_number(self):
-        """
-        Test the retrieval of the next order number from the database
-        """
-        self.assertEqual(self.database.get_next_order_number(), 1)
-        self.database.add_order(self.order1)
-        self.assertEqual(self.database.get_next_order_number(), 5)
 
-    def test_add_delete_reserved_ticks(self):
-        """
-        Test the retrieval, addition and deletion of reserved ticks in the database
-        """
-        self.database.add_reserved_tick(self.order_id1, self.order_id2, self.order1.total_quantity)
-        self.assertEqual(len(self.database.get_reserved_ticks(self.order_id1)), 1)
-        self.database.delete_reserved_ticks(self.order_id1)
-        self.assertEqual(len(self.database.get_reserved_ticks(self.order_id1)), 0)
+def test_get_specific_order(db, order1):
+    """
+    Test the retrieval of a specific order
+    """
+    order_id = OrderId(TraderId(b'3' * 20), OrderNumber(4))
+    assert not db.get_order(order_id)
+    db.add_order(order1)
+    assert db.get_order(order_id)
 
-    def test_add_get_transaction(self):
-        """
-        Test the insertion and retrieval of a transaction in the database
-        """
-        self.database.add_transaction(self.transaction1)
-        transactions = self.database.get_all_transactions()
-        self.assertEqual(len(transactions), 1)
-        self.assertEqual(len(self.database.get_payments(self.transaction1.transaction_id)), 1)
 
-        # Verify that the assets are correctly decoded
-        assets = transactions[0].assets
-        self.assertEqual(assets.first.asset_id, "BTC")
-        self.assertEqual(assets.second.asset_id, "MB")
+def test_delete_order(db, order1):
+    """
+    Test the deletion of an order from the database
+    """
+    db.add_order(order1)
+    assert len(db.get_all_orders()) == 1
+    db.delete_order(order1.order_id)
+    assert not db.get_all_orders()
 
-    def test_insert_or_update_transaction(self):
-        """
-        Test the conditional insertion or update of a transaction in the database
-        """
-        # Test insertion
-        self.database.insert_or_update_transaction(self.transaction1)
-        transactions = self.database.get_all_transactions()
-        self.assertEqual(len(transactions), 1)
 
-        # Test try to update with older timestamp
-        before_trans1 = Transaction(self.transaction1.transaction_id, self.transaction1.assets,
-                                    self.transaction1.order_id, self.transaction1.partner_order_id,
-                                    Timestamp(int(self.transaction1.timestamp) - 1000))
-        self.database.insert_or_update_transaction(before_trans1)
-        transaction = self.database.get_transaction(self.transaction1.transaction_id)
-        self.assertEqual(int(transaction.timestamp), int(self.transaction1.timestamp))
+def test_get_next_order_number(db, order1):
+    """
+    Test the retrieval of the next order number from the database
+    """
+    assert db.get_next_order_number() == 1
+    db.add_order(order1)
+    assert db.get_next_order_number() == 5
 
-        # Test update with newer timestamp
-        after_trans1 = Transaction(self.transaction1.transaction_id, self.transaction1.assets,
-                                   self.transaction1.order_id, self.transaction1.partner_order_id,
-                                   Timestamp(int(self.transaction1.timestamp) + 1000))
-        self.database.insert_or_update_transaction(after_trans1)
-        transaction = self.database.get_transaction(self.transaction1.transaction_id)
-        self.assertEqual(int(transaction.timestamp), int(after_trans1.timestamp))
 
-    def test_get_specific_transaction(self):
-        """
-        Test the retrieval of a specific transaction
-        """
-        transaction_id = TransactionId(b'a' * 32)
-        self.assertIsNone(self.database.get_transaction(transaction_id))
-        self.database.add_transaction(self.transaction1)
-        self.assertIsNotNone(self.database.get_transaction(transaction_id))
+def test_add_delete_reserved_ticks(db, order1, order2):
+    """
+    Test the retrieval, addition and deletion of reserved ticks in the database
+    """
+    db.add_reserved_tick(order1.order_id, order2.order_id, order1.total_quantity)
+    assert len(db.get_reserved_ticks(order1.order_id)) == 1
+    db.delete_reserved_ticks(order1.order_id)
+    assert not db.get_reserved_ticks(order1.order_id)
 
-    def test_delete_transaction(self):
-        """
-        Test the deletion of a transaction from the database
-        """
-        self.database.add_transaction(self.transaction1)
-        self.assertEqual(len(self.database.get_all_transactions()), 1)
-        self.database.delete_transaction(self.transaction_id1)
-        self.assertEqual(len(self.database.get_all_transactions()), 0)
 
-    def test_add_get_payment(self):
-        """
-        Test the insertion and retrieval of a payment in the database
-        """
-        self.database.add_payment(self.payment1)
-        payments = self.database.get_payments(self.transaction_id1)
-        self.assertEqual(len(payments), 1)
+def test_add_get_transaction(db, transaction):
+    """
+    Test the insertion and retrieval of a transaction in the database
+    """
+    db.add_transaction(transaction)
+    transactions = db.get_all_transactions()
+    assert len(transactions) == 1
+    assert len(db.get_payments(transaction.transaction_id)) == 1
 
-        # Verify that the assets are correctly decoded
-        self.assertEqual(payments[0].transferred_assets.asset_id, "BTC")
+    # Verify that the assets are correctly decoded
+    assets = transactions[0].assets
+    assert assets.first.asset_id == "BTC"
+    assert assets.second.asset_id == "MB"
 
-    def test_add_remove_tick(self):
-        """
-        Test addition, retrieval and deletion of ticks in the database
-        """
-        ask = Tick.from_order(self.order1)
-        self.database.add_tick(ask)
-        bid = Tick.from_order(self.order2)
-        self.database.add_tick(bid)
 
-        self.assertEqual(len(self.database.get_ticks()), 2)
+def test_insert_or_update_transaction(db, transaction):
+    """
+    Test the conditional insertion or update of a transaction in the database
+    """
+    # Test insertion
+    db.insert_or_update_transaction(transaction)
+    transactions = db.get_all_transactions()
+    assert len(transactions) == 1
 
-        self.database.delete_all_ticks()
-        self.assertEqual(len(self.database.get_ticks()), 0)
+    # Test try to update with older timestamp
+    before_trans1 = Transaction(transaction.transaction_id, transaction.assets,
+                                transaction.order_id, transaction.partner_order_id,
+                                Timestamp(int(transaction.timestamp) - 1000))
+    db.insert_or_update_transaction(before_trans1)
+    transaction = db.get_transaction(transaction.transaction_id)
+    assert int(transaction.timestamp) == int(transaction.timestamp)
 
-    def test_check_database(self):
-        """
-        Test the check of the database
-        """
-        self.assertEqual(self.database.check_database(b"%d" % LATEST_DB_VERSION), LATEST_DB_VERSION)
+    # Test update with newer timestamp
+    after_trans1 = Transaction(transaction.transaction_id, transaction.assets,
+                               transaction.order_id, transaction.partner_order_id,
+                               Timestamp(int(transaction.timestamp) + 1000))
+    db.insert_or_update_transaction(after_trans1)
+    transaction = db.get_transaction(transaction.transaction_id)
+    assert int(transaction.timestamp) == int(after_trans1.timestamp)
 
-    def test_get_upgrade_script(self):
-        """
-        Test fetching the upgrade script of the database
-        """
-        self.assertTrue(self.database.get_upgrade_script(1))
 
-    def test_db_upgrade(self):
-        self.database.execute(u"DROP TABLE orders;")
-        self.database.execute(u"DROP TABLE ticks;")
-        self.database.execute(u"CREATE TABLE orders(x INTEGER PRIMARY KEY ASC);")
-        self.database.execute(u"CREATE TABLE ticks(x INTEGER PRIMARY KEY ASC);")
-        self.assertEqual(self.database.check_database(b"1"), 5)
+def test_get_specific_transaction(db, transaction):
+    """
+    Test the retrieval of a specific transaction
+    """
+    transaction_id = TransactionId(b'a' * 32)
+    assert not db.get_transaction(transaction_id)
+    db.add_transaction(transaction)
+    assert db.get_transaction(transaction_id)
+
+
+def test_delete_transaction(db, transaction):
+    """
+    Test the deletion of a transaction from the database
+    """
+    db.add_transaction(transaction)
+    assert len(db.get_all_transactions()) == 1
+    db.delete_transaction(transaction.transaction_id)
+    assert not db.get_all_transactions()
+
+
+def test_add_get_payment(db, payment, transaction):
+    """
+    Test the insertion and retrieval of a payment in the database
+    """
+    db.add_payment(payment)
+    payments = db.get_payments(transaction.transaction_id)
+    assert payments
+
+    # Verify that the assets are correctly decoded
+    assert payments[0].transferred_assets.asset_id == "BTC"
+
+
+def test_add_remove_tick(db, order1, order2):
+    """
+    Test addition, retrieval and deletion of ticks in the database
+    """
+    ask = Tick.from_order(order1)
+    db.add_tick(ask)
+    bid = Tick.from_order(order2)
+    db.add_tick(bid)
+
+    assert len(db.get_ticks()) == 2
+
+    db.delete_all_ticks()
+    assert not db.get_ticks()
+
+
+def test_check_database(db):
+    """
+    Test the check of the database
+    """
+    assert db.check_database(b"%d" % LATEST_DB_VERSION) == LATEST_DB_VERSION
+
+
+def test_get_upgrade_script(db):
+    """
+    Test fetching the upgrade script of the database
+    """
+    assert db.get_upgrade_script(1)
+
+
+def test_db_upgrade(db):
+    db.execute(u"DROP TABLE orders;")
+    db.execute(u"DROP TABLE ticks;")
+    db.execute(u"CREATE TABLE orders(x INTEGER PRIMARY KEY ASC);")
+    db.execute(u"CREATE TABLE ticks(x INTEGER PRIMARY KEY ASC);")
+    assert db.check_database(b"1") == 5
