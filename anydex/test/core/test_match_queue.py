@@ -1,5 +1,7 @@
 import unittest
 
+import pytest
+
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
 from anydex.core.match_queue import MatchPriorityQueue
@@ -10,57 +12,63 @@ from anydex.core.timeout import Timeout
 from anydex.core.timestamp import Timestamp
 
 
-class TestMatchQueue(unittest.TestCase):
+@pytest.fixture
+def ask_order():
+    order_id = OrderId(TraderId(b'3' * 20), OrderNumber(1))
+    return Order(order_id, AssetPair(AssetAmount(5, 'BTC'), AssetAmount(6, 'EUR')),
+                 Timeout(3600), Timestamp.now(), True)
+
+
+@pytest.fixture
+def bid_order():
+    order_id = OrderId(TraderId(b'3' * 20), OrderNumber(1))
+    return Order(order_id, AssetPair(AssetAmount(5, 'BTC'), AssetAmount(6, 'EUR')),
+                 Timeout(3600), Timestamp.now(), False)
+
+
+@pytest.fixture
+def queue(ask_order):
+    return MatchPriorityQueue(ask_order)
+
+
+def test_priority(bid_order, queue):
     """
-    This class contains tests for the MatchingPriorityQueue object.
+    Test the priority mechanism of the queue
     """
+    order_id = OrderId(TraderId(b'1' * 20), OrderNumber(1))
+    other_order_id = OrderId(TraderId(b'2' * 20), OrderNumber(1))
+    queue.insert(1, Price(1, 1, 'DUM1', 'DUM2'), order_id, other_order_id)
+    queue.insert(0, Price(1, 1, 'DUM1', 'DUM2'), order_id, other_order_id)
+    queue.insert(2, Price(1, 1, 'DUM1', 'DUM2'), order_id, other_order_id)
 
-    def setUp(self):
-        order_id = OrderId(TraderId(b'3' * 20), OrderNumber(1))
-        self.ask_order = Order(order_id, AssetPair(AssetAmount(5, 'BTC'), AssetAmount(6, 'EUR')),
-                         Timeout(3600), Timestamp.now(), True)
-        self.bid_order = Order(order_id, AssetPair(AssetAmount(5, 'BTC'), AssetAmount(6, 'EUR')),
-                         Timeout(3600), Timestamp.now(), False)
-        self.queue = MatchPriorityQueue(self.ask_order)
+    item1 = queue.delete()
+    item2 = queue.delete()
+    item3 = queue.delete()
+    assert item1[0] == 0
+    assert item2[0] == 1
+    assert item3[0] == 2
 
-    def test_priority(self):
-        """
-        Test the priority mechanism of the queue
-        """
-        order_id = OrderId(TraderId(b'1' * 20), OrderNumber(1))
-        other_order_id = OrderId(TraderId(b'2' * 20), OrderNumber(1))
-        self.queue.insert(1, Price(1, 1, 'DUM1', 'DUM2'), order_id, other_order_id)
-        self.queue.insert(0, Price(1, 1, 'DUM1', 'DUM2'), order_id, other_order_id)
-        self.queue.insert(2, Price(1, 1, 'DUM1', 'DUM2'), order_id, other_order_id)
+    # Same retries, different prices
+    queue.insert(1, Price(1, 1, 'DUM1', 'DUM2'), order_id, other_order_id)
+    queue.insert(1, Price(1, 2, 'DUM1', 'DUM2'), order_id, other_order_id)
+    queue.insert(1, Price(1, 3, 'DUM1', 'DUM2'), order_id, other_order_id)
 
-        item1 = self.queue.delete()
-        item2 = self.queue.delete()
-        item3 = self.queue.delete()
-        self.assertEqual(item1[0], 0)
-        self.assertEqual(item2[0], 1)
-        self.assertEqual(item3[0], 2)
+    item1 = queue.delete()
+    item2 = queue.delete()
+    item3 = queue.delete()
+    assert item1[1] == Price(1, 1, 'DUM1', 'DUM2')
+    assert item2[1] == Price(1, 2, 'DUM1', 'DUM2')
+    assert item3[1] == Price(1, 3, 'DUM1', 'DUM2')
 
-        # Same retries, different prices
-        self.queue.insert(1, Price(1, 1, 'DUM1', 'DUM2'), order_id, other_order_id)
-        self.queue.insert(1, Price(1, 2, 'DUM1', 'DUM2'), order_id, other_order_id)
-        self.queue.insert(1, Price(1, 3, 'DUM1', 'DUM2'), order_id, other_order_id)
+    # Test with bid order
+    queue = MatchPriorityQueue(bid_order)
+    queue.insert(1, Price(1, 1, 'DUM1', 'DUM2'), order_id, other_order_id)
+    queue.insert(1, Price(1, 2, 'DUM1', 'DUM2'), order_id, other_order_id)
+    queue.insert(1, Price(1, 3, 'DUM1', 'DUM2'), order_id, other_order_id)
 
-        item1 = self.queue.delete()
-        item2 = self.queue.delete()
-        item3 = self.queue.delete()
-        self.assertEqual(item1[1], Price(1, 1, 'DUM1', 'DUM2'))
-        self.assertEqual(item2[1], Price(1, 2, 'DUM1', 'DUM2'))
-        self.assertEqual(item3[1], Price(1, 3, 'DUM1', 'DUM2'))
-
-        # Test with bid order
-        self.queue = MatchPriorityQueue(self.bid_order)
-        self.queue.insert(1, Price(1, 1, 'DUM1', 'DUM2'), order_id, other_order_id)
-        self.queue.insert(1, Price(1, 2, 'DUM1', 'DUM2'), order_id, other_order_id)
-        self.queue.insert(1, Price(1, 3, 'DUM1', 'DUM2'), order_id, other_order_id)
-
-        item1 = self.queue.delete()
-        item2 = self.queue.delete()
-        item3 = self.queue.delete()
-        self.assertEqual(item1[1], Price(1, 3, 'DUM1', 'DUM2'))
-        self.assertEqual(item2[1], Price(1, 2, 'DUM1', 'DUM2'))
-        self.assertEqual(item3[1], Price(1, 1, 'DUM1', 'DUM2'))
+    item1 = queue.delete()
+    item2 = queue.delete()
+    item3 = queue.delete()
+    assert item1[1] == Price(1, 3, 'DUM1', 'DUM2')
+    assert item2[1] == Price(1, 2, 'DUM1', 'DUM2')
+    assert item3[1] == Price(1, 1, 'DUM1', 'DUM2')
