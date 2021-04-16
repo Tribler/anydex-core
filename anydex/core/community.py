@@ -1,3 +1,4 @@
+import os
 import random
 from asyncio import Future, ensure_future, gather
 from base64 import b64decode
@@ -90,7 +91,7 @@ class MarketCommunity(Community, BlockListener):
         self.mid_register = {}
         self.pk_register = {}
         self.order_book = None
-        self.market_database = MarketDB(db_working_dir, self.DB_NAME)
+        self.market_database = MarketDB(os.path.join(db_working_dir, self.DB_NAME))
         self.matching_engine = None
         self.transaction_manager = None
         self.use_local_address = False

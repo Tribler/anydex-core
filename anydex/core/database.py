@@ -1,8 +1,6 @@
 """
 This file contains everything related to persistence for the market community.
 """
-from os import path
-
 from ipv8.database import database_blob
 
 from anydex.core.message import TraderId
@@ -13,9 +11,6 @@ from anydex.core.transaction import Transaction, TransactionId
 from anydex.trustchain.database import TrustChainDB
 
 
-DATABASE_DIRECTORY = path.join(u"sqlite")
-# Path to the database location + dispersy._workingdirectory
-DATABASE_PATH = path.join(DATABASE_DIRECTORY, u"market.db")
 # Version to keep track if the db schema needs to be updated.
 LATEST_DB_VERSION = 5
 # Schema for the Market DB.

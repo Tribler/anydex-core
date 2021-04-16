@@ -4,6 +4,7 @@ This reputation system builds a tamper proof interaction history contained in a 
 Every node has a chain and these chains intertwine by blocks shared by chains.
 """
 import logging
+import os
 import random
 import struct
 from asyncio import Future, ensure_future, get_event_loop
@@ -61,7 +62,8 @@ class TrustChainCommunity(Community):
         self.logger = logging.getLogger(self.__class__.__name__)
 
         if not self.persistence:
-            self.persistence = self.DB_CLASS(working_directory, db_name, self.my_peer.public_key.key_to_bin())
+            db_path = os.path.join(working_directory, db_name) if working_directory != ":memory:" else working_directory
+            self.persistence = self.DB_CLASS(db_path, self.my_peer.public_key.key_to_bin())
         self.relayed_broadcasts = set()
         self.relayed_broadcasts_order = deque()
         self.logger.debug("The trustchain community started with Public Key: %s",

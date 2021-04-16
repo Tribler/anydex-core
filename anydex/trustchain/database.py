@@ -1,15 +1,12 @@
 """
 This file contains everything related to persistence for TrustChain.
 """
-import os
 from binascii import hexlify
 
 from ipv8.database import Database, database_blob
 
 from anydex.trustchain.block import TrustChainBlock
 from anydex.trustchain.blockcache import BlockCache
-
-DATABASE_DIRECTORY = os.path.join("sqlite")
 
 
 class TrustChainDB(Database):
@@ -20,21 +17,14 @@ class TrustChainDB(Database):
     """
     LATEST_DB_VERSION = 8
 
-    def __init__(self, working_directory, db_name, my_pk=None):
+    def __init__(self, db_path, my_pk=None):
         """
         Sets up the persistence layer ready for use.
-        :param working_directory: Path to the working directory
-        that will contain the the db at working directory/DATABASE_PATH
-        :param db_name: The name of the database
+        :param db_path: Path to the database
         :param my_pk: The public key of this user, used for caching purposes
         """
-        if working_directory != u":memory:":
-            db_path = os.path.join(working_directory, os.path.join(DATABASE_DIRECTORY, u"%s.db" % db_name))
-        else:
-            db_path = working_directory
         super(TrustChainDB, self).__init__(db_path)
         self._logger.debug("TrustChain database path: %s", db_path)
-        self.db_name = db_name
         self.block_types = {}
         self.my_blocks_cache = None
         if my_pk:
