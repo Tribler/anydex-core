@@ -1,7 +1,5 @@
 import logging
 
-from ipv8.database import database_blob
-
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
 from anydex.core.message import TraderId
@@ -145,7 +143,7 @@ class Order(object):
         :rtype: tuple
         """
         completed_timestamp = int(self.completed_timestamp) if self.completed_timestamp else None
-        return (database_blob(bytes(self.order_id.trader_id)), str(self.order_id.order_number),
+        return (bytes(self.order_id.trader_id), str(self.order_id.order_number),
                 self.assets.first.amount, self.assets.first.asset_id, self.assets.second.amount,
                 self.assets.second.asset_id, self.traded_quantity, self._received_quantity,
                 int(self.timeout), int(self.timestamp), completed_timestamp, self.is_ask(), self._cancelled,

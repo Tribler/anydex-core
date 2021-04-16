@@ -1,8 +1,6 @@
 import logging
 from binascii import hexlify, unhexlify
 
-from ipv8.database import database_blob
-
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
 from anydex.core.message import TraderId
@@ -117,9 +115,9 @@ class Transaction(object):
         Returns a database representation of a Transaction object.
         :rtype: tuple
         """
-        return (database_blob(bytes(self.order_id.trader_id)), database_blob(bytes(self.transaction_id)),
+        return (bytes(self.order_id.trader_id), bytes(self.transaction_id),
                 int(self.order_id.order_number),
-                database_blob(bytes(self.partner_order_id.trader_id)), int(self.partner_order_id.order_number),
+                bytes(self.partner_order_id.trader_id), int(self.partner_order_id.order_number),
                 self.assets.first.amount, str(self.assets.first.asset_id), self.transferred_assets.first.amount,
                 self.assets.second.amount, str(self.assets.second.asset_id),
                 self.transferred_assets.second.amount, int(self.timestamp),

@@ -1,10 +1,6 @@
 """
 This file contains everything related to persistence for the market community.
 """
-from os import path
-
-from ipv8.database import database_blob
-
 from anydex.core.message import TraderId
 from anydex.core.order import Order, OrderId, OrderNumber
 from anydex.core.payment import Payment
@@ -13,9 +9,6 @@ from anydex.core.transaction import Transaction, TransactionId
 from anydex.trustchain.database import TrustChainDB
 
 
-DATABASE_DIRECTORY = path.join(u"sqlite")
-# Path to the database location + dispersy._workingdirectory
-DATABASE_PATH = path.join(DATABASE_DIRECTORY, u"market.db")
 # Version to keep track if the db schema needs to be updated.
 LATEST_DB_VERSION = 5
 # Schema for the Market DB.
@@ -131,7 +124,7 @@ class MarketDB(TrustChainDB):
         """
         try:
             db_result = next(self.execute(u"SELECT * FROM orders WHERE trader_id = ? AND order_number = ?",
-                                          (database_blob(bytes(order_id.trader_id)),
+                                          (bytes(order_id.trader_id),
                                            str(order_id.order_number))))
         except StopIteration:
             return None
@@ -157,7 +150,7 @@ class MarketDB(TrustChainDB):
         Delete a specific order from the database
         """
         self.execute(u"DELETE FROM orders WHERE trader_id = ? AND order_number = ?",
-                     (database_blob(bytes(order_id.trader_id)), str(order_id.order_number)))
+                     (bytes(order_id.trader_id), str(order_id.order_number)))
         self.delete_reserved_ticks(order_id)
 
     def get_next_order_number(self):
@@ -174,7 +167,7 @@ class MarketDB(TrustChainDB):
         Delete all reserved ticks from a specific order
         """
         self.execute(u"DELETE FROM orders_reserved_ticks WHERE trader_id = ? AND order_number = ?",
-                     (database_blob(bytes(order_id.trader_id)), str(order_id.order_number)))
+                     (bytes(order_id.trader_id), str(order_id.order_number)))
 
     def add_reserved_tick(self, order_id, reserved_order_id, amount):
         """
@@ -183,8 +176,8 @@ class MarketDB(TrustChainDB):
         self.execute(
             u"INSERT INTO orders_reserved_ticks (trader_id, order_number, reserved_trader_id, reserved_order_number,"
             u"quantity) VALUES(?,?,?,?,?)",
-            (database_blob(bytes(order_id.trader_id)), str(order_id.order_number),
-             database_blob(bytes(reserved_order_id.trader_id)), str(reserved_order_id.order_number), amount))
+            (bytes(order_id.trader_id), str(order_id.order_number),
+             bytes(reserved_order_id.trader_id), str(reserved_order_id.order_number), amount))
         self.commit()
 
     def get_reserved_ticks(self, order_id):
@@ -192,7 +185,7 @@ class MarketDB(TrustChainDB):
         Get all reserved ticks for a specific order.
         """
         db_results = self.execute(u"SELECT * FROM orders_reserved_ticks WHERE trader_id = ? AND order_number = ?",
-                                  (database_blob(bytes(order_id.trader_id)), str(order_id.order_number)))
+                                  (bytes(order_id.trader_id), str(order_id.order_number)))
         return [(OrderId(TraderId(bytes(data[2])), OrderNumber(data[3])), data[4]) for data in db_results]
 
     def get_all_transactions(self):
@@ -210,7 +203,7 @@ class MarketDB(TrustChainDB):
         """
         try:
             db_result = next(self.execute(u"SELECT * FROM transactions WHERE transaction_id = ?",
-                                          (database_blob(bytes(transaction_id)),)))
+                                          (bytes(transaction_id),)))
         except StopIteration:
             return None
         return Transaction.from_database(db_result, self.get_payments(transaction_id))
@@ -251,7 +244,7 @@ class MarketDB(TrustChainDB):
                                                transaction.assets.second.amount,
                                                transaction.transferred_assets.second.amount,
                                                int(transaction.timestamp),
-                                               database_blob(bytes(transaction.transaction_id)),
+                                               bytes(transaction.transaction_id),
                                                int(transaction.timestamp))
         )
 
@@ -261,7 +254,7 @@ class MarketDB(TrustChainDB):
         """
         Delete a specific transaction from the database
         """
-        self.execute(u"DELETE FROM transactions WHERE transaction_id = ?", (database_blob(bytes(transaction_id)),))
+        self.execute(u"DELETE FROM transactions WHERE transaction_id = ?", (bytes(transaction_id),))
         self.delete_payments(transaction_id)
 
     def add_payment(self, payment):
@@ -279,14 +272,14 @@ class MarketDB(TrustChainDB):
         Return all payment tied to a specific transaction.
         """
         db_result = self.execute(u"SELECT * FROM payments WHERE transaction_id = ? ORDER BY timestamp ASC",
-                                 (database_blob(bytes(transaction_id)),))
+                                 (bytes(transaction_id),))
         return [Payment.from_database(db_item) for db_item in db_result]
 
     def delete_payments(self, transaction_id):
         """
         Delete all payments that are associated with a specific transaction
         """
-        self.execute(u"DELETE FROM payments WHERE transaction_id = ?", (database_blob(bytes(transaction_id)), ))
+        self.execute(u"DELETE FROM payments WHERE transaction_id = ?", (bytes(transaction_id), ))
 
     def add_tick(self, tick):
         """

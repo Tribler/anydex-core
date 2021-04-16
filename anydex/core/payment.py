@@ -1,7 +1,5 @@
 from binascii import unhexlify
 
-from ipv8.database import database_blob
-
 from anydex.core.assetamount import AssetAmount
 from anydex.core.message import Message, TraderId
 from anydex.core.payment_id import PaymentId
@@ -40,7 +38,7 @@ class Payment(Message):
         Returns a database representation of a Payment object.
         :rtype: tuple
         """
-        return (database_blob(bytes(self.trader_id)), database_blob(bytes(self.transaction_id)),
+        return (bytes(self.trader_id), bytes(self.transaction_id),
                 str(self.payment_id), self.transferred_assets.amount,
                 self.transferred_assets.asset_id, str(self.address_from),
                 str(self.address_to), int(self.timestamp))

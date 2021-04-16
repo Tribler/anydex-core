@@ -18,8 +18,8 @@ from anydex.core.wallet_address import WalletAddress
 
 @pytest.fixture
 def db(tmpdir):
-    os.makedirs(os.path.join(tmpdir, "sqlite"))
-    db = MarketDB(tmpdir, 'market')
+    db_path = os.path.join(tmpdir, "market.db")
+    db = MarketDB(db_path)
     yield db
     db.close()
 

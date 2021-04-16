@@ -1,3 +1,5 @@
+import os
+
 from ipv8.keyvault.crypto import default_eccrypto
 from ipv8.test.base import TestBase
 
@@ -12,7 +14,7 @@ class TestTrustChainMemoryDB(TestBase):
         super(TestTrustChainMemoryDB, self).setUp()
         self.key = default_eccrypto.generate_key(u"curve25519")
         self.public_key = self.key.pub().key_to_bin()
-        self.db = TrustChainDB(u":memory:", 'temp_trustchain', my_pk=self.public_key)
+        self.db = TrustChainDB(u":memory:", my_pk=self.public_key)
 
     def test_connected_users(self):
         """
@@ -72,8 +74,8 @@ class TestTrustChainDB(TestBase):
     def setUp(self):
         super(TestTrustChainDB, self).setUp()
         self.key = default_eccrypto.generate_key(u"curve25519")
-        self.db_dir = self.temporary_directory()
-        self.db = TrustChainDB(self.db_dir, 'temp_trustchain')
+        self.db_path = os.path.join(self.temporary_directory(), "trustchain.db")
+        self.db = TrustChainDB(self.db_path)
 
     def test_upgrade_wipe_db(self):
         """
@@ -86,7 +88,7 @@ class TestTrustChainDB(TestBase):
         self.db.close()
 
         # Load the database again
-        db = TrustChainDB(self.db_dir, 'temp_trustchain')
+        db = TrustChainDB(self.db_path)
         self.assertFalse(db.get_all_blocks())
         db.close()
 
@@ -106,5 +108,5 @@ class TestTrustChainDB(TestBase):
         self.db.close()
 
         # Load the database again
-        db = TrustChainDB(self.db_dir, 'temp_trustchain')
+        db = TrustChainDB(self.db_path, 'temp_trustchain')
         db.close()
