@@ -1,6 +1,5 @@
 from asyncio import sleep
 
-from ipv8.database import database_blob
 from ipv8.keyvault.crypto import default_eccrypto
 from ipv8.test.base import TestBase
 from ipv8.test.mocking.ipv8 import MockIPv8
@@ -191,7 +190,7 @@ class TestTrustChainCommunity(TestBase):
                                              transaction={})
 
         self.persistence(1).execute(u"DELETE FROM blocks WHERE sequence_number = 2 AND public_key = ?",
-                                    (database_blob(self.key_bin(0)), ))
+                                    (self.key_bin(0), ))
         self.assertIsNone(self.persistence(1).get(self.key_bin(0), 2))
 
         await self.overlay(1).crawl_lowest_unknown(self.my_peer(0))

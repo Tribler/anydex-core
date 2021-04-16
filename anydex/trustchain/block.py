@@ -4,7 +4,6 @@ from binascii import hexlify
 from collections import namedtuple
 from hashlib import sha256
 
-from ipv8.database import database_blob
 from ipv8.keyvault.crypto import default_eccrypto
 from ipv8.messaging.serialization import PackError, default_serializer
 
@@ -199,7 +198,7 @@ class TrustChainBlock(object):
         """
         Encode this block for transport
         :param signature: False to pack EMPTY_SIG in the signature location, true to pack the signature field
-        :return: the database_blob the data was packed into
+        :return: the byte representation the data was packed into
         """
         args = [self.public_key, self.sequence_number, self.link_public_key, self.link_sequence_number,
                 self.previous_hash, self.signature if signature else EMPTY_SIG, self.type, self._transaction,
@@ -498,10 +497,9 @@ class TrustChainBlock(object):
         Prepare a tuple to use for inserting into the database
         :return: A database insertable tuple
         """
-        return (self.type, database_blob(self._transaction), database_blob(self.public_key),
-                self.sequence_number, database_blob(self.link_public_key), self.link_sequence_number,
-                database_blob(self.previous_hash), database_blob(self.signature), self.timestamp,
-                database_blob(self.hash))
+        return (self.type, self._transaction, self.public_key,
+                self.sequence_number, self.link_public_key, self.link_sequence_number,
+                self.previous_hash, self.signature, self.timestamp, self.hash)
 
     def __iter__(self):
         """

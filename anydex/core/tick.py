@@ -1,8 +1,6 @@
 import time
 from binascii import hexlify, unhexlify
 
-from ipv8.database import database_blob
-
 from anydex.core import MAX_ORDER_TIMEOUT
 from anydex.core.assetamount import AssetAmount
 from anydex.core.assetpair import AssetPair
@@ -59,10 +57,10 @@ class Tick(object):
                         Timeout(timeout), Timestamp(timestamp), traded=traded, block_hash=bytes(block_hash))
 
     def to_database(self):
-        return (database_blob(bytes(self.order_id.trader_id)), int(self.order_id.order_number),
+        return (bytes(self.order_id.trader_id), int(self.order_id.order_number),
                 self.assets.first.amount, str(self.assets.first.asset_id), self.assets.second.amount,
                 str(self.assets.second.asset_id), int(self.timeout), int(self.timestamp), self.is_ask(),
-                self.traded, database_blob(self.block_hash))
+                self.traded, self.block_hash)
 
     @classmethod
     def from_order(cls, order):
